@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from execution_accelerator.config import load_runtime_config
+from execution_accelerator.graph import bootstrap_ticket_run
 from execution_accelerator.observability import configure_logging
 from execution_accelerator.version import __version__
 
@@ -18,6 +19,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--show-config",
         action="store_true",
         help="Print resolved runtime directories for local development.",
+    )
+    parser.add_argument(
+        "--bootstrap-ticket",
+        metavar="TICKET_ID",
+        help="Bootstrap a persisted remediation run for the provided Jira ticket id.",
+    )
+    parser.add_argument(
+        "--thread-id",
+        help="Override the LangGraph thread id used for checkpointed runs.",
     )
     return parser
 
@@ -39,6 +49,22 @@ def main() -> int:
         print(f"data_dir={config.data_dir}")
         print(f"workspace_dir={config.workspace_dir}")
         print(f"logs_dir={config.logs_dir}")
+        print(f"checkpoints_path={config.checkpoints_path}")
+        return 0
+
+    if args.bootstrap_ticket:
+        config = load_runtime_config()
+        result = bootstrap_ticket_run(
+            args.bootstrap_ticket,
+            runtime_config=config,
+            thread_id=args.thread_id,
+        )
+        print(f"thread_id={result.thread_id}")
+        print(f"checkpoint_path={result.checkpoint_path}")
+        print(f"workflow_status={result.state.workflow_status}")
+        print(f"audit_event_count={len(result.state.audit_events)}")
+        if result.state.remediation_plan is not None:
+            print(f"plan_strategy={result.state.remediation_plan.strategy}")
         return 0
 
     parser.print_help()
