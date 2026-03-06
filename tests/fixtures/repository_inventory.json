@@ -1,0 +1,22 @@
+{
+  "repositories": [
+    {
+      "name": "payments-service",
+      "clone_url": "https://github.com/example/payments-service.git",
+      "default_branch": "main",
+      "build_system": "maven",
+      "manifest_path": "pom.xml",
+      "owner": "payments-platform",
+      "tags": ["tier-1", "java"]
+    },
+    {
+      "name": "ledger-service",
+      "clone_url": "https://github.com/example/ledger-service.git",
+      "default_branch": "main",
+      "build_system": "maven",
+      "manifest_path": "ledger-app/pom.xml",
+      "owner": "finance-core",
+      "tags": ["tier-2", "shared-lib"]
+    }
+  ]
+}

@@ -122,6 +122,24 @@ class JiraIssuePayload(BaseSchemaModel):
     references: list[VulnerabilityReference] = Field(default_factory=list)
 
 
+class RepositoryInventoryRecord(BaseSchemaModel):
+    """Repository metadata discovered during intake and clone preparation."""
+
+    name: str = Field(min_length=1)
+    clone_url: str = Field(min_length=1)
+    default_branch: str = "main"
+    build_system: str = "maven"
+    manifest_path: str = Field(min_length=1)
+    owner: str | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
+class RepositoryInventoryPayload(BaseSchemaModel):
+    """Local inventory fixture used by the Day 3 repository intake flow."""
+
+    repositories: list[RepositoryInventoryRecord] = Field(default_factory=list)
+
+
 class RemediationPlan(BaseSchemaModel):
     """Planner output that guides the next stages of execution."""
 

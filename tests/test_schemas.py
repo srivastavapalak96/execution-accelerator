@@ -8,6 +8,7 @@ from execution_accelerator.schemas import (
     JiraIssuePayload,
     RemediationPlan,
     RemediationStrategy,
+    RepositoryInventoryPayload,
     Severity,
     ValidationCheck,
     ValidationStatus,
@@ -61,3 +62,12 @@ def test_jira_issue_fixture_parses_into_typed_payload() -> None:
     assert payload.package_name == "org.example:legacy-json"
     assert payload.severity == Severity.HIGH
     assert payload.affected_repositories[0].clone_url == "https://github.com/example/payments-service.git"
+
+
+def test_repository_inventory_fixture_parses_into_typed_payload() -> None:
+    fixture_path = Path(__file__).parent / "fixtures" / "repository_inventory.json"
+    payload = RepositoryInventoryPayload.model_validate(json.loads(fixture_path.read_text()))
+
+    assert len(payload.repositories) == 2
+    assert payload.repositories[0].owner == "payments-platform"
+    assert payload.repositories[1].manifest_path == "ledger-app/pom.xml"
