@@ -402,3 +402,23 @@ This architecture balances three things:
 It is designed to support the actual target:
 
 > **complete automation of vulnerability remediation, including hard EOL and backward-incompatible migration cases, without losing traceability or control.**
+
+---
+
+## Current implementation status
+
+The repository currently includes the Day 1 foundation plus the Day 2 bootstrap:
+
+- typed Pydantic workflow schemas
+- typed `RemediationState`
+- local SQLite checkpoint wiring for LangGraph
+- a minimal compiled remediation graph
+- CLI support to bootstrap a persisted ticket run locally
+
+### Local bootstrap example
+
+```bash
+python -m execution_accelerator --bootstrap-ticket SEC-123 --thread-id sec-123-dev
+```
+
+This creates the local runtime directories when needed and persists checkpoints to `.local/data/checkpoints.sqlite` by default.
