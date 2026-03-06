@@ -89,6 +89,7 @@ class AffectedRepository(BaseSchemaModel):
     """Repository linked to a vulnerability."""
 
     name: str = Field(min_length=1)
+    clone_url: str | None = None
     default_branch: str = "main"
     build_system: str = "maven"
     manifest_path: str | None = None
@@ -101,6 +102,20 @@ class VulnerabilityDetails(BaseSchemaModel):
     installed_version: str = Field(min_length=1)
     summary: str = Field(min_length=1)
     cve_id: str | None = None
+    fixed_version: str | None = None
+    severity: Severity = Severity.UNKNOWN
+    affected_repositories: list[AffectedRepository] = Field(default_factory=list)
+    references: list[VulnerabilityReference] = Field(default_factory=list)
+
+
+class JiraIssuePayload(BaseSchemaModel):
+    """Normalized Jira payload used for local Day 3 intake."""
+
+    ticket_id: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    description: str | None = None
+    package_name: str = Field(min_length=1)
+    installed_version: str = Field(min_length=1)
     fixed_version: str | None = None
     severity: Severity = Severity.UNKNOWN
     affected_repositories: list[AffectedRepository] = Field(default_factory=list)

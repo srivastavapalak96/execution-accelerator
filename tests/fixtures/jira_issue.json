@@ -1,0 +1,25 @@
+{
+  "ticket_id": "SEC-123",
+  "summary": "Upgrade vulnerable JSON dependency",
+  "description": "Sample Day 3 Jira fixture for local development.",
+  "package_name": "org.example:legacy-json",
+  "installed_version": "1.2.3",
+  "fixed_version": "1.2.4",
+  "severity": "high",
+  "affected_repositories": [
+    {
+      "name": "payments-service",
+      "clone_url": "https://github.com/example/payments-service.git",
+      "default_branch": "main",
+      "build_system": "maven",
+      "manifest_path": "pom.xml"
+    }
+  ],
+  "references": [
+    {
+      "source": "cve",
+      "identifier": "CVE-2026-12345",
+      "url": "https://example.com/advisories/CVE-2026-12345"
+    }
+  ]
+}
