@@ -1,5 +1,6 @@
 export EA_JIRA_BASE_URL="https://your-domain.atlassian.net"
 export EA_JIRA_PROJECT_KEY="SEC"
+export EA_JIRA_FIXTURE_PATH="tests/fixtures/jira_issue.json"
 export EA_GITHUB_OWNER="srivastavapalak96"
 export EA_DATA_DIR=".local/data"
 export EA_WORKSPACE_DIR=".local/workspace"

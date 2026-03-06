@@ -27,6 +27,7 @@ class RuntimeConfig:
     checkpoints_path: Path
     jira_base_url: str | None
     jira_project_key: str | None
+    jira_fixture_path: Path | None
     github_owner: str | None
 
 
@@ -50,6 +51,7 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         os.getenv("EA_CHECKPOINTS_PATH", data_dir / "checkpoints.sqlite"),
         repo_root=resolved_root,
     )
+    jira_fixture_path_value = os.getenv("EA_JIRA_FIXTURE_PATH")
 
     return RuntimeConfig(
         repo_root=resolved_root,
@@ -59,5 +61,10 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         checkpoints_path=checkpoints_path,
         jira_base_url=os.getenv("EA_JIRA_BASE_URL"),
         jira_project_key=os.getenv("EA_JIRA_PROJECT_KEY"),
+        jira_fixture_path=(
+            _resolve_path_setting(jira_fixture_path_value, repo_root=resolved_root)
+            if jira_fixture_path_value
+            else None
+        ),
         github_owner=os.getenv("EA_GITHUB_OWNER"),
     )
