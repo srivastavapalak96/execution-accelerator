@@ -21,8 +21,12 @@ class RepositoryWorkspace(BaseSchemaModel):
 
     name: str = Field(min_length=1)
     local_path: str = Field(min_length=1)
+    clone_url: str | None = None
     default_branch: str = "main"
     build_system: str = "maven"
+    manifest_path: str | None = None
+    owner: str | None = None
+    tags: list[str] = Field(default_factory=list)
 
 
 class SkippedRepository(BaseSchemaModel):
