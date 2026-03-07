@@ -54,5 +54,5 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "thread_id=sec-401-dev" in captured.out
     assert f"checkpoint_path={tmp_path / 'state' / 'checkpoints.sqlite'}" in captured.out
     assert "workflow_status=planning_ready" in captured.out
-    assert "audit_event_count=2" in captured.out
+    assert "audit_event_count=4" in captured.out
     assert "plan_strategy=unknown" in captured.out

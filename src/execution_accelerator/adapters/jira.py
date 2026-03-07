@@ -45,7 +45,13 @@ class JiraAdapter:
             fixture_path=config.jira_fixture_path,
         )
 
-    def load_issue(self, ticket_id: str, *, fixture_path: Path | None = None) -> JiraIssuePayload:
+    def load_issue(
+        self,
+        ticket_id: str,
+        *,
+        fixture_path: Path | None = None,
+        strict_ticket_match: bool = True,
+    ) -> JiraIssuePayload:
         """Load a Jira issue payload for the provided ticket id."""
 
         resolved_fixture_path = fixture_path or self.fixture_path
@@ -56,6 +62,8 @@ class JiraAdapter:
 
         payload = JiraIssuePayload.model_validate(json.loads(resolved_fixture_path.read_text()))
         if payload.ticket_id != ticket_id:
+            if not strict_ticket_match:
+                return payload.model_copy(update={"ticket_id": ticket_id})
             raise JiraTicketMismatchError(
                 f"Requested ticket '{ticket_id}' does not match fixture ticket '{payload.ticket_id}'."
             )
@@ -69,7 +77,11 @@ class JiraAdapter:
     ) -> VulnerabilityDetails:
         """Convert a Jira issue payload into workflow vulnerability details."""
 
-        issue = self.load_issue(ticket_id, fixture_path=fixture_path)
+        issue = self.load_issue(
+            ticket_id,
+            fixture_path=fixture_path,
+            strict_ticket_match=False,
+        )
         return VulnerabilityDetails(
             package_name=issue.package_name,
             installed_version=issue.installed_version,

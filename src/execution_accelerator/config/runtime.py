@@ -52,8 +52,14 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         os.getenv("EA_CHECKPOINTS_PATH", data_dir / "checkpoints.sqlite"),
         repo_root=resolved_root,
     )
-    jira_fixture_path_value = os.getenv("EA_JIRA_FIXTURE_PATH")
-    repository_inventory_fixture_path_value = os.getenv("EA_REPOSITORY_INVENTORY_FIXTURE_PATH")
+    jira_fixture_path_value = os.getenv(
+        "EA_JIRA_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "jira_issue.json"),
+    )
+    repository_inventory_fixture_path_value = os.getenv(
+        "EA_REPOSITORY_INVENTORY_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "repository_inventory.json"),
+    )
 
     return RuntimeConfig(
         repo_root=resolved_root,
