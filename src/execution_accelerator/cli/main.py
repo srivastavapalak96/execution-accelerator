@@ -50,6 +50,8 @@ def main() -> int:
         print(f"workspace_dir={config.workspace_dir}")
         print(f"logs_dir={config.logs_dir}")
         print(f"checkpoints_path={config.checkpoints_path}")
+        print(f"jira_fixture_path={config.jira_fixture_path}")
+        print(f"repository_inventory_fixture_path={config.repository_inventory_fixture_path}")
         return 0
 
     if args.bootstrap_ticket:
@@ -63,6 +65,10 @@ def main() -> int:
         print(f"checkpoint_path={result.checkpoint_path}")
         print(f"workflow_status={result.state.workflow_status}")
         print(f"audit_event_count={len(result.state.audit_events)}")
+        if result.state.vulnerability_details is not None:
+            print(f"package_name={result.state.vulnerability_details.package_name}")
+            print(f"severity={result.state.vulnerability_details.severity}")
+        print(f"pending_repos={','.join(result.state.pending_repos)}")
         if result.state.remediation_plan is not None:
             print(f"plan_strategy={result.state.remediation_plan.strategy}")
         return 0

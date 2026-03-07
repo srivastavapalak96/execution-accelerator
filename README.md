@@ -407,13 +407,15 @@ It is designed to support the actual target:
 
 ## Current implementation status
 
-The repository currently includes the Day 1 foundation plus the Day 2 bootstrap:
+The repository currently includes the Day 1 foundation, Day 2 bootstrap, and the Day 3 local intake path:
 
 - typed Pydantic workflow schemas
 - typed `RemediationState`
 - local SQLite checkpoint wiring for LangGraph
-- a minimal compiled remediation graph
-- CLI support to bootstrap a persisted ticket run locally
+- fixture-backed Jira intake adapter
+- fixture-backed repository inventory and intake adapter
+- a compiled remediation graph that boots, ingests Jira context, resolves repositories, and persists state
+- CLI support to bootstrap a persisted ticket run locally and print the discovered Day 3 intake context
 
 ### Local bootstrap example
 
@@ -421,4 +423,4 @@ The repository currently includes the Day 1 foundation plus the Day 2 bootstrap:
 python -m execution_accelerator --bootstrap-ticket SEC-123 --thread-id sec-123-dev
 ```
 
-This creates the local runtime directories when needed and persists checkpoints to `.local/data/checkpoints.sqlite` by default.
+This creates the local runtime directories when needed, persists checkpoints to `.local/data/checkpoints.sqlite` by default, loads the Day 3 fixture-backed Jira and repository inventory context, and prints the resulting package and repository intake summary.
