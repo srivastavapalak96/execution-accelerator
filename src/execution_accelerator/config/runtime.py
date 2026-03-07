@@ -28,6 +28,7 @@ class RuntimeConfig:
     jira_base_url: str | None
     jira_project_key: str | None
     jira_fixture_path: Path | None
+    repository_inventory_fixture_path: Path | None
     github_owner: str | None
 
 
@@ -52,6 +53,7 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         repo_root=resolved_root,
     )
     jira_fixture_path_value = os.getenv("EA_JIRA_FIXTURE_PATH")
+    repository_inventory_fixture_path_value = os.getenv("EA_REPOSITORY_INVENTORY_FIXTURE_PATH")
 
     return RuntimeConfig(
         repo_root=resolved_root,
@@ -64,6 +66,11 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         jira_fixture_path=(
             _resolve_path_setting(jira_fixture_path_value, repo_root=resolved_root)
             if jira_fixture_path_value
+            else None
+        ),
+        repository_inventory_fixture_path=(
+            _resolve_path_setting(repository_inventory_fixture_path_value, repo_root=resolved_root)
+            if repository_inventory_fixture_path_value
             else None
         ),
         github_owner=os.getenv("EA_GITHUB_OWNER"),
