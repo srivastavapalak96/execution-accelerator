@@ -54,6 +54,14 @@ class ValidationStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class VerificationStatus(StrEnum):
+    """Status for advisory and Maven verification steps."""
+
+    PENDING = "pending"
+    VERIFIED = "verified"
+    REJECTED = "rejected"
+
+
 class ApprovalDecision(StrEnum):
     """Possible human review outcomes."""
 
@@ -138,6 +146,56 @@ class RepositoryInventoryPayload(BaseSchemaModel):
     """Local inventory fixture used by the Day 3 repository intake flow."""
 
     repositories: list[RepositoryInventoryRecord] = Field(default_factory=list)
+
+
+class MavenDependencyKind(StrEnum):
+    """Whether the vulnerable dependency is direct or transitive."""
+
+    DIRECT = "direct"
+    TRANSITIVE = "transitive"
+
+
+class CompatibilityRisk(StrEnum):
+    """Compatibility risk level for a proposed remediation target."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class AdvisoryVerification(BaseSchemaModel):
+    """Normalized advisory verification result for a vulnerable package."""
+
+    package_name: str = Field(min_length=1)
+    vulnerable_version: str = Field(min_length=1)
+    recommended_fix_version: str = Field(min_length=1)
+    status: VerificationStatus = VerificationStatus.PENDING
+    source: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    cve_id: str | None = None
+    severity: Severity = Severity.UNKNOWN
+    references: list[VulnerabilityReference] = Field(default_factory=list)
+
+
+class MavenVerification(BaseSchemaModel):
+    """Result of verifying a remediation target against Maven-style metadata."""
+
+    package_name: str = Field(min_length=1)
+    current_version: str = Field(min_length=1)
+    target_version: str = Field(min_length=1)
+    dependency_kind: MavenDependencyKind = MavenDependencyKind.DIRECT
+    status: VerificationStatus = VerificationStatus.PENDING
+    compatibility_risk: CompatibilityRisk = CompatibilityRisk.LOW
+    resolver_note: str = Field(min_length=1)
+
+
+class RemediationRouteDecision(BaseSchemaModel):
+    """Routing decision produced after advisory and Maven verification."""
+
+    strategy: RemediationStrategy = RemediationStrategy.UNKNOWN
+    reason: str = Field(min_length=1)
+    confidence: float = Field(ge=0.0, le=1.0)
+    requires_human_approval: bool = False
 
 
 class RemediationPlan(BaseSchemaModel):

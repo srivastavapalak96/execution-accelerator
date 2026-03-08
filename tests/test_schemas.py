@@ -5,8 +5,13 @@ from pathlib import Path
 
 from execution_accelerator.schemas import (
     AffectedRepository,
+    AdvisoryVerification,
+    CompatibilityRisk,
     JiraIssuePayload,
+    MavenDependencyKind,
+    MavenVerification,
     RemediationPlan,
+    RemediationRouteDecision,
     RemediationStrategy,
     RepositoryInventoryPayload,
     Severity,
@@ -71,3 +76,32 @@ def test_repository_inventory_fixture_parses_into_typed_payload() -> None:
     assert len(payload.repositories) == 2
     assert payload.repositories[0].owner == "payments-platform"
     assert payload.repositories[1].manifest_path == "ledger-app/pom.xml"
+
+
+def test_advisory_verification_fixture_parses_into_typed_payload() -> None:
+    fixture_path = Path(__file__).parent / "fixtures" / "advisory_verification.json"
+    payload = AdvisoryVerification.model_validate(json.loads(fixture_path.read_text()))
+
+    assert payload.package_name == "org.example:legacy-json"
+    assert payload.recommended_fix_version == "1.2.4"
+    assert payload.severity == Severity.HIGH
+
+
+def test_maven_verification_fixture_parses_into_typed_payload() -> None:
+    fixture_path = Path(__file__).parent / "fixtures" / "maven_verification.json"
+    payload = MavenVerification.model_validate(json.loads(fixture_path.read_text()))
+
+    assert payload.target_version == "1.2.4"
+    assert payload.dependency_kind == MavenDependencyKind.DIRECT
+    assert payload.compatibility_risk == CompatibilityRisk.LOW
+
+
+def test_route_decision_captures_routing_confidence() -> None:
+    decision = RemediationRouteDecision(
+        strategy=RemediationStrategy.SIMPLE_UPDATE,
+        reason="Verified fix is available and dependency remains on the direct simple lane.",
+        confidence=0.92,
+    )
+
+    assert decision.strategy == RemediationStrategy.SIMPLE_UPDATE
+    assert decision.requires_human_approval is False

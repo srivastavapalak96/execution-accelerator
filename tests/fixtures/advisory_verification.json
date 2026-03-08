@@ -1,0 +1,17 @@
+{
+  "package_name": "org.example:legacy-json",
+  "vulnerable_version": "1.2.3",
+  "recommended_fix_version": "1.2.4",
+  "status": "verified",
+  "source": "osv",
+  "summary": "Verified non-EOL fix for the vulnerable dependency.",
+  "cve_id": "CVE-2026-12345",
+  "severity": "high",
+  "references": [
+    {
+      "source": "cve",
+      "identifier": "CVE-2026-12345",
+      "url": "https://example.com/advisories/CVE-2026-12345"
+    }
+  ]
+}

@@ -6,10 +6,13 @@ from pydantic import Field
 
 from execution_accelerator.schemas import (
     ApprovalDecision,
+    AdvisoryVerification,
     AuditEvent,
     BaseSchemaModel,
+    MavenVerification,
     HumanFeedback,
     RemediationPlan,
+    RemediationRouteDecision,
     RepositoryValidationResult,
     VulnerabilityDetails,
     WorkflowStatus,
@@ -60,6 +63,9 @@ class RemediationState(BaseSchemaModel):
     initial_ticket_id: str = Field(min_length=1)
     workflow_status: WorkflowStatus = WorkflowStatus.PENDING
     vulnerability_details: VulnerabilityDetails | None = None
+    advisory_verification: AdvisoryVerification | None = None
+    maven_verification: MavenVerification | None = None
+    route_decision: RemediationRouteDecision | None = None
     repo_map: dict[str, RepositoryWorkspace] = Field(default_factory=dict)
     pending_repos: list[str] = Field(default_factory=list)
     current_working_repo: str | None = None

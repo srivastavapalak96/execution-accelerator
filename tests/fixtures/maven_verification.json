@@ -1,0 +1,9 @@
+{
+  "package_name": "org.example:legacy-json",
+  "current_version": "1.2.3",
+  "target_version": "1.2.4",
+  "dependency_kind": "direct",
+  "status": "verified",
+  "compatibility_risk": "low",
+  "resolver_note": "Target version is available and keeps the dependency on the simple update lane."
+}
