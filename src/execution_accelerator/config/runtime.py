@@ -29,6 +29,8 @@ class RuntimeConfig:
     jira_project_key: str | None
     jira_fixture_path: Path | None
     repository_inventory_fixture_path: Path | None
+    advisory_fixture_path: Path | None
+    maven_verification_fixture_path: Path | None
     github_owner: str | None
 
 
@@ -60,6 +62,14 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         "EA_REPOSITORY_INVENTORY_FIXTURE_PATH",
         str(resolved_root / "tests" / "fixtures" / "repository_inventory.json"),
     )
+    advisory_fixture_path_value = os.getenv(
+        "EA_ADVISORY_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "advisory_verification.json"),
+    )
+    maven_verification_fixture_path_value = os.getenv(
+        "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "maven_verification.json"),
+    )
 
     return RuntimeConfig(
         repo_root=resolved_root,
@@ -77,6 +87,16 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         repository_inventory_fixture_path=(
             _resolve_path_setting(repository_inventory_fixture_path_value, repo_root=resolved_root)
             if repository_inventory_fixture_path_value
+            else None
+        ),
+        advisory_fixture_path=(
+            _resolve_path_setting(advisory_fixture_path_value, repo_root=resolved_root)
+            if advisory_fixture_path_value
+            else None
+        ),
+        maven_verification_fixture_path=(
+            _resolve_path_setting(maven_verification_fixture_path_value, repo_root=resolved_root)
+            if maven_verification_fixture_path_value
             else None
         ),
         github_owner=os.getenv("EA_GITHUB_OWNER"),

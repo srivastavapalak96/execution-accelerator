@@ -7,6 +7,14 @@ from .repository_inventory import (
     RepositoryInventoryConfigurationError,
     RepositoryInventoryLookupError,
 )
+from .verification import (
+    AdvisoryVerificationAdapter,
+    AdvisoryVerificationMismatchError,
+    MavenVerificationAdapter,
+    MavenVerificationMismatchError,
+    VerificationAdapterError,
+    VerificationConfigurationError,
+)
 
 __all__ = [
     "JiraAdapter",
@@ -17,4 +25,10 @@ __all__ = [
     "RepositoryInventoryAdapterError",
     "RepositoryInventoryConfigurationError",
     "RepositoryInventoryLookupError",
+    "AdvisoryVerificationAdapter",
+    "AdvisoryVerificationMismatchError",
+    "MavenVerificationAdapter",
+    "MavenVerificationMismatchError",
+    "VerificationAdapterError",
+    "VerificationConfigurationError",
 ]
