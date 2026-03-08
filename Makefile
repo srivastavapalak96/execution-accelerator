@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: install test smoke run
+.PHONY: install test smoke intake-smoke run
 
 install:
 	$(PYTHON) -m pip install -e .[dev]
@@ -10,6 +10,9 @@ test:
 
 smoke:
 	$(PYTHON) -m execution_accelerator --show-config
+
+intake-smoke:
+	$(PYTHON) -m execution_accelerator --bootstrap-ticket SEC-123 --thread-id sec-123-dev
 
 run:
 	$(PYTHON) -m execution_accelerator

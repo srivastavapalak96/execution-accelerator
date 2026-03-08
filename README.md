@@ -424,3 +424,11 @@ python -m execution_accelerator --bootstrap-ticket SEC-123 --thread-id sec-123-d
 ```
 
 This creates the local runtime directories when needed, persists checkpoints to `.local/data/checkpoints.sqlite` by default, loads the Day 3 fixture-backed Jira and repository inventory context, and prints the resulting package and repository intake summary.
+
+### Inspecting a persisted thread
+
+```bash
+python -m execution_accelerator --show-thread-state sec-123-dev
+```
+
+This prints the current persisted workflow summary for the requested thread so local Day 3 intake runs can be inspected without opening the SQLite checkpoint store directly.

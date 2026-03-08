@@ -42,3 +42,7 @@ def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch)
     assert loaded_state.initial_ticket_id == "SEC-42"
     assert loaded_state.workflow_status == WorkflowStatus.PLANNING_READY
     assert len(loaded_state.audit_events) == 4
+    assert Path(loaded_state.repo_map["payments-service"].local_path).is_dir()
+    assert (
+        Path(loaded_state.repo_map["payments-service"].local_path) / ".execution-accelerator-repo.json"
+    ).exists()

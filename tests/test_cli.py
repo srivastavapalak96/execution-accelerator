@@ -79,3 +79,48 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "severity=high" in captured.out
     assert "pending_repos=payments-service" in captured.out
     assert "plan_strategy=unknown" in captured.out
+
+
+def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    monkeypatch.setenv("EA_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
+    monkeypatch.setenv("EA_LOGS_DIR", str(tmp_path / "logs"))
+    monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "state" / "checkpoints.sqlite"))
+    monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(fixture_dir / "jira_issue.json"))
+    monkeypatch.setenv(
+        "EA_REPOSITORY_INVENTORY_FIXTURE_PATH",
+        str(fixture_dir / "repository_inventory.json"),
+    )
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--bootstrap-ticket",
+            "SEC-402",
+            "--thread-id",
+            "sec-402-dev",
+        ],
+    )
+    assert main() == 0
+    capsys.readouterr()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--show-thread-state",
+            "sec-402-dev",
+        ],
+    )
+    exit_code = main()
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "thread_id=sec-402-dev" in captured.out
+    assert "workflow_status=planning_ready" in captured.out
+    assert "pending_repos=payments-service" in captured.out
+    assert "completed_repos=" in captured.out
+    assert "audit_event_count=4" in captured.out
+    assert "package_name=org.example:legacy-json" in captured.out
