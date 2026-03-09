@@ -11,6 +11,7 @@ from execution_accelerator.schemas import (
     PomMutationChange,
     PomMutationKind,
     PomMutationPlan,
+    PomSectionTarget,
     RemediationStrategy,
 )
 from execution_accelerator.state import CodeDiffSummary, RemediationState
@@ -107,6 +108,7 @@ def _build_simple_plan(state: RemediationState, repository: str) -> PomMutationP
                 file_path=file_path,
                 dependency=dependency,
                 mutation_kind=PomMutationKind.DIRECT_VERSION_BUMP,
+                target_section=PomSectionTarget.PROJECT_DEPENDENCIES,
                 previous_version=state.vulnerability_details.installed_version,
                 target_version=state.maven_verification.target_version,
                 xml_path_hint="./dependencies/dependency/version",

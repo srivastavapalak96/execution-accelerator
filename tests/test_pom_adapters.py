@@ -17,6 +17,7 @@ from execution_accelerator.schemas import (
     PomMutationChange,
     PomMutationPlan,
     PomMutationKind,
+    PomSectionTarget,
     ValidationStatus,
 )
 
@@ -34,6 +35,7 @@ def build_plan() -> PomMutationPlan:
                     version="1.2.4",
                 ),
                 mutation_kind=PomMutationKind.DIRECT_VERSION_BUMP,
+                target_section=PomSectionTarget.PROJECT_DEPENDENCIES,
                 previous_version="1.2.3",
                 target_version="1.2.4",
                 xml_path_hint="./dependencies/dependency[artifactId='legacy-json']/version",

@@ -213,12 +213,20 @@ class PomMutationKind(StrEnum):
     DEPENDENCY_MANAGEMENT_OVERRIDE = "dependency_management_override"
 
 
+class PomSectionTarget(StrEnum):
+    """Pom section targeted by a mutation change."""
+
+    PROJECT_DEPENDENCIES = "project_dependencies"
+    DEPENDENCY_MANAGEMENT = "dependency_management"
+
+
 class PomMutationChange(BaseSchemaModel):
     """One mutation to apply to a pom file."""
 
     file_path: str = Field(min_length=1)
     dependency: DependencyCoordinate
     mutation_kind: PomMutationKind = PomMutationKind.DIRECT_VERSION_BUMP
+    target_section: PomSectionTarget = PomSectionTarget.PROJECT_DEPENDENCIES
     previous_version: str = Field(min_length=1)
     target_version: str = Field(min_length=1)
     xml_path_hint: str = Field(min_length=1)

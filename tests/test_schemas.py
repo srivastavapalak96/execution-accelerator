@@ -14,6 +14,7 @@ from execution_accelerator.schemas import (
     PomMutationChange,
     PomMutationKind,
     PomMutationPlan,
+    PomSectionTarget,
     PreflightResolutionResult,
     RemediationPlan,
     RemediationRouteDecision,
@@ -125,6 +126,7 @@ def test_pom_mutation_plan_captures_simple_update_change() -> None:
                     version="1.2.4",
                 ),
                 mutation_kind=PomMutationKind.DIRECT_VERSION_BUMP,
+                target_section=PomSectionTarget.PROJECT_DEPENDENCIES,
                 previous_version="1.2.3",
                 target_version="1.2.4",
                 xml_path_hint="./dependencies/dependency[artifactId='legacy-json']/version",
@@ -134,6 +136,24 @@ def test_pom_mutation_plan_captures_simple_update_change() -> None:
 
     assert plan.strategy == RemediationStrategy.SIMPLE_UPDATE
     assert plan.changes[0].target_version == "1.2.4"
+
+
+def test_pom_mutation_change_can_target_dependency_management() -> None:
+    change = PomMutationChange(
+        file_path="pom.xml",
+        dependency=DependencyCoordinate(
+            group_id="org.example",
+            artifact_id="legacy-json",
+            version="1.2.4",
+        ),
+        mutation_kind=PomMutationKind.DEPENDENCY_MANAGEMENT_OVERRIDE,
+        target_section=PomSectionTarget.DEPENDENCY_MANAGEMENT,
+        previous_version="1.2.3",
+        target_version="1.2.4",
+        xml_path_hint="./dependencyManagement/dependencies/dependency/version",
+    )
+
+    assert change.target_section == PomSectionTarget.DEPENDENCY_MANAGEMENT
 
 
 def test_preflight_resolution_fixture_parses_into_typed_payload() -> None:
