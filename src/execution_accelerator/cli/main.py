@@ -59,6 +59,9 @@ def main() -> int:
         print(f"repository_inventory_fixture_path={config.repository_inventory_fixture_path}")
         print(f"advisory_fixture_path={config.advisory_fixture_path}")
         print(f"maven_verification_fixture_path={config.maven_verification_fixture_path}")
+        print(f"pom_fixture_before_path={config.pom_fixture_before_path}")
+        print(f"pom_fixture_after_path={config.pom_fixture_after_path}")
+        print(f"preflight_resolution_fixture_path={config.preflight_resolution_fixture_path}")
         return 0
 
     if args.bootstrap_ticket:
@@ -85,6 +88,14 @@ def main() -> int:
             print(f"route_confidence={result.state.route_decision.confidence:.2f}")
         if result.state.remediation_plan is not None:
             print(f"plan_strategy={result.state.remediation_plan.strategy}")
+        if result.state.current_working_repo is not None:
+            print(f"current_working_repo={result.state.current_working_repo}")
+        print(f"modified_file_count={len(result.state.modified_files)}")
+        if result.state.modified_files:
+            print(f"modified_file={result.state.modified_files[0]}")
+        if result.state.preflight_resolution is not None:
+            print(f"preflight_status={result.state.preflight_resolution.status}")
+            print(f"preflight_resolved_version={result.state.preflight_resolution.resolved_version}")
         return 0
 
     if args.show_thread_state:
@@ -101,6 +112,14 @@ def main() -> int:
             print(f"recommended_fix_version={state.advisory_verification.recommended_fix_version}")
         if state.route_decision is not None:
             print(f"route_strategy={state.route_decision.strategy}")
+        if state.current_working_repo is not None:
+            print(f"current_working_repo={state.current_working_repo}")
+        print(f"modified_file_count={len(state.modified_files)}")
+        if state.modified_files:
+            print(f"modified_file={state.modified_files[0]}")
+        if state.preflight_resolution is not None:
+            print(f"preflight_status={state.preflight_resolution.status}")
+            print(f"preflight_resolved_version={state.preflight_resolution.resolved_version}")
         return 0
 
     parser.print_help()

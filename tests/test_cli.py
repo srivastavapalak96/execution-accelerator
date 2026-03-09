@@ -31,6 +31,12 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
         "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
         str(tmp_path / "fixtures" / "maven_verification.json"),
     )
+    monkeypatch.setenv("EA_POM_FIXTURE_BEFORE_PATH", str(tmp_path / "fixtures" / "pom_before.xml"))
+    monkeypatch.setenv("EA_POM_FIXTURE_AFTER_PATH", str(tmp_path / "fixtures" / "pom_after.xml"))
+    monkeypatch.setenv(
+        "EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH",
+        str(tmp_path / "fixtures" / "preflight_resolution.json"),
+    )
 
     exit_code = main()
 
@@ -49,6 +55,12 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     assert f"advisory_fixture_path={tmp_path / 'fixtures' / 'advisory_verification.json'}" in captured.out
     assert (
         f"maven_verification_fixture_path={tmp_path / 'fixtures' / 'maven_verification.json'}"
+        in captured.out
+    )
+    assert f"pom_fixture_before_path={tmp_path / 'fixtures' / 'pom_before.xml'}" in captured.out
+    assert f"pom_fixture_after_path={tmp_path / 'fixtures' / 'pom_after.xml'}" in captured.out
+    assert (
+        f"preflight_resolution_fixture_path={tmp_path / 'fixtures' / 'preflight_resolution.json'}"
         in captured.out
     )
 
@@ -113,6 +125,11 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "route_strategy=simple_update" in captured.out
     assert "route_confidence=0.93" in captured.out
     assert "plan_strategy=simple_update" in captured.out
+    assert "current_working_repo=payments-service" in captured.out
+    assert "modified_file_count=1" in captured.out
+    assert f"modified_file={tmp_path / 'workspace' / 'sec-401' / 'payments-service' / 'pom.xml'}" in captured.out
+    assert "preflight_status=passed" in captured.out
+    assert "preflight_resolved_version=1.2.4" in captured.out
 
 
 def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> None:
@@ -171,3 +188,8 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     assert "package_name=org.example:legacy-json" in captured.out
     assert "recommended_fix_version=1.2.4" in captured.out
     assert "route_strategy=simple_update" in captured.out
+    assert "current_working_repo=payments-service" in captured.out
+    assert "modified_file_count=1" in captured.out
+    assert f"modified_file={tmp_path / 'workspace' / 'sec-402' / 'payments-service' / 'pom.xml'}" in captured.out
+    assert "preflight_status=passed" in captured.out
+    assert "preflight_resolved_version=1.2.4" in captured.out
