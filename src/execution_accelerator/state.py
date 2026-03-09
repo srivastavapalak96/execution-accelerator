@@ -11,6 +11,8 @@ from execution_accelerator.schemas import (
     BaseSchemaModel,
     MavenVerification,
     HumanFeedback,
+    PomMutationPlan,
+    PreflightResolutionResult,
     RemediationPlan,
     RemediationRouteDecision,
     RepositoryValidationResult,
@@ -66,6 +68,8 @@ class RemediationState(BaseSchemaModel):
     advisory_verification: AdvisoryVerification | None = None
     maven_verification: MavenVerification | None = None
     route_decision: RemediationRouteDecision | None = None
+    pom_mutation_plan: PomMutationPlan | None = None
+    preflight_resolution: PreflightResolutionResult | None = None
     repo_map: dict[str, RepositoryWorkspace] = Field(default_factory=dict)
     pending_repos: list[str] = Field(default_factory=list)
     current_working_repo: str | None = None
