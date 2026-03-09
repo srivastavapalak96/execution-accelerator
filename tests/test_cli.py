@@ -84,6 +84,18 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
         "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
         str(Path(__file__).parent / "fixtures" / "maven_verification.json"),
     )
+    monkeypatch.setenv(
+        "EA_POM_FIXTURE_BEFORE_PATH",
+        str(Path(__file__).parent / "fixtures" / "pom_before.xml"),
+    )
+    monkeypatch.setenv(
+        "EA_POM_FIXTURE_AFTER_PATH",
+        str(Path(__file__).parent / "fixtures" / "pom_after.xml"),
+    )
+    monkeypatch.setenv(
+        "EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "preflight_resolution.json"),
+    )
 
     exit_code = main()
 
@@ -92,7 +104,7 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "thread_id=sec-401-dev" in captured.out
     assert f"checkpoint_path={tmp_path / 'state' / 'checkpoints.sqlite'}" in captured.out
     assert "workflow_status=planning_ready" in captured.out
-    assert "audit_event_count=6" in captured.out
+    assert "audit_event_count=8" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
     assert "severity=high" in captured.out
     assert "recommended_fix_version=1.2.4" in captured.out
@@ -118,6 +130,12 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     monkeypatch.setenv(
         "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
         str(fixture_dir / "maven_verification.json"),
+    )
+    monkeypatch.setenv("EA_POM_FIXTURE_BEFORE_PATH", str(fixture_dir / "pom_before.xml"))
+    monkeypatch.setenv("EA_POM_FIXTURE_AFTER_PATH", str(fixture_dir / "pom_after.xml"))
+    monkeypatch.setenv(
+        "EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH",
+        str(fixture_dir / "preflight_resolution.json"),
     )
 
     monkeypatch.setattr(
@@ -149,7 +167,7 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     assert "workflow_status=planning_ready" in captured.out
     assert "pending_repos=payments-service" in captured.out
     assert "completed_repos=" in captured.out
-    assert "audit_event_count=6" in captured.out
+    assert "audit_event_count=8" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
     assert "recommended_fix_version=1.2.4" in captured.out
     assert "route_strategy=simple_update" in captured.out
