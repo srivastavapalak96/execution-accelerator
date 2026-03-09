@@ -1,0 +1,7 @@
+{
+  "repository": "payments-service",
+  "status": "passed",
+  "resolved_version": "1.2.4",
+  "dependency_kind": "direct",
+  "message": "Dependency resolves cleanly after the direct version bump."
+}

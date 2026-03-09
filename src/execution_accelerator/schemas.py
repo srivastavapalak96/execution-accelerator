@@ -198,6 +198,51 @@ class RemediationRouteDecision(BaseSchemaModel):
     requires_human_approval: bool = False
 
 
+class DependencyCoordinate(BaseSchemaModel):
+    """Maven dependency coordinate used in simple remediation planning."""
+
+    group_id: str = Field(min_length=1)
+    artifact_id: str = Field(min_length=1)
+    version: str = Field(min_length=1)
+
+
+class PomMutationKind(StrEnum):
+    """Kinds of pom mutations supported by the Day 5 simple remediation flow."""
+
+    DIRECT_VERSION_BUMP = "direct_version_bump"
+    DEPENDENCY_MANAGEMENT_OVERRIDE = "dependency_management_override"
+
+
+class PomMutationChange(BaseSchemaModel):
+    """One mutation to apply to a pom file."""
+
+    file_path: str = Field(min_length=1)
+    dependency: DependencyCoordinate
+    mutation_kind: PomMutationKind = PomMutationKind.DIRECT_VERSION_BUMP
+    previous_version: str = Field(min_length=1)
+    target_version: str = Field(min_length=1)
+    xml_path_hint: str = Field(min_length=1)
+
+
+class PomMutationPlan(BaseSchemaModel):
+    """Planned simple remediation changes for one repository."""
+
+    repository: str = Field(min_length=1)
+    strategy: RemediationStrategy = RemediationStrategy.SIMPLE_UPDATE
+    changes: list[PomMutationChange] = Field(default_factory=list)
+    summary: str = Field(min_length=1)
+
+
+class PreflightResolutionResult(BaseSchemaModel):
+    """Result of validating the mutated pom configuration before full remediation."""
+
+    repository: str = Field(min_length=1)
+    status: ValidationStatus = ValidationStatus.PENDING
+    resolved_version: str = Field(min_length=1)
+    dependency_kind: MavenDependencyKind = MavenDependencyKind.DIRECT
+    message: str = Field(min_length=1)
+
+
 class RemediationPlan(BaseSchemaModel):
     """Planner output that guides the next stages of execution."""
 

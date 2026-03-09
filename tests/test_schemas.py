@@ -7,9 +7,14 @@ from execution_accelerator.schemas import (
     AffectedRepository,
     AdvisoryVerification,
     CompatibilityRisk,
+    DependencyCoordinate,
     JiraIssuePayload,
     MavenDependencyKind,
     MavenVerification,
+    PomMutationChange,
+    PomMutationKind,
+    PomMutationPlan,
+    PreflightResolutionResult,
     RemediationPlan,
     RemediationRouteDecision,
     RemediationStrategy,
@@ -105,3 +110,36 @@ def test_route_decision_captures_routing_confidence() -> None:
 
     assert decision.strategy == RemediationStrategy.SIMPLE_UPDATE
     assert decision.requires_human_approval is False
+
+
+def test_pom_mutation_plan_captures_simple_update_change() -> None:
+    plan = PomMutationPlan(
+        repository="payments-service",
+        summary="Directly bump the vulnerable dependency to the verified target version.",
+        changes=[
+            PomMutationChange(
+                file_path="pom.xml",
+                dependency=DependencyCoordinate(
+                    group_id="org.example",
+                    artifact_id="legacy-json",
+                    version="1.2.4",
+                ),
+                mutation_kind=PomMutationKind.DIRECT_VERSION_BUMP,
+                previous_version="1.2.3",
+                target_version="1.2.4",
+                xml_path_hint="./dependencies/dependency[artifactId='legacy-json']/version",
+            )
+        ],
+    )
+
+    assert plan.strategy == RemediationStrategy.SIMPLE_UPDATE
+    assert plan.changes[0].target_version == "1.2.4"
+
+
+def test_preflight_resolution_fixture_parses_into_typed_payload() -> None:
+    fixture_path = Path(__file__).parent / "fixtures" / "preflight_resolution.json"
+    payload = PreflightResolutionResult.model_validate(json.loads(fixture_path.read_text()))
+
+    assert payload.repository == "payments-service"
+    assert payload.resolved_version == "1.2.4"
+    assert payload.dependency_kind == MavenDependencyKind.DIRECT
