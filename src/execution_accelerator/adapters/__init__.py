@@ -7,6 +7,13 @@ from .repository_inventory import (
     RepositoryInventoryConfigurationError,
     RepositoryInventoryLookupError,
 )
+from .pom import (
+    PomMutationAdapter,
+    PomMutationAdapterError,
+    PomMutationConfigurationError,
+    PomMutationTargetError,
+    PreflightResolutionAdapter,
+)
 from .verification import (
     AdvisoryVerificationAdapter,
     AdvisoryVerificationMismatchError,
@@ -25,6 +32,11 @@ __all__ = [
     "RepositoryInventoryAdapterError",
     "RepositoryInventoryConfigurationError",
     "RepositoryInventoryLookupError",
+    "PomMutationAdapter",
+    "PomMutationAdapterError",
+    "PomMutationConfigurationError",
+    "PomMutationTargetError",
+    "PreflightResolutionAdapter",
     "AdvisoryVerificationAdapter",
     "AdvisoryVerificationMismatchError",
     "MavenVerificationAdapter",

@@ -31,6 +31,9 @@ class RuntimeConfig:
     repository_inventory_fixture_path: Path | None
     advisory_fixture_path: Path | None
     maven_verification_fixture_path: Path | None
+    pom_fixture_before_path: Path | None
+    pom_fixture_after_path: Path | None
+    preflight_resolution_fixture_path: Path | None
     github_owner: str | None
 
 
@@ -70,6 +73,18 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
         str(resolved_root / "tests" / "fixtures" / "maven_verification.json"),
     )
+    pom_fixture_before_path_value = os.getenv(
+        "EA_POM_FIXTURE_BEFORE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "pom_before.xml"),
+    )
+    pom_fixture_after_path_value = os.getenv(
+        "EA_POM_FIXTURE_AFTER_PATH",
+        str(resolved_root / "tests" / "fixtures" / "pom_after.xml"),
+    )
+    preflight_resolution_fixture_path_value = os.getenv(
+        "EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "preflight_resolution.json"),
+    )
 
     return RuntimeConfig(
         repo_root=resolved_root,
@@ -97,6 +112,21 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         maven_verification_fixture_path=(
             _resolve_path_setting(maven_verification_fixture_path_value, repo_root=resolved_root)
             if maven_verification_fixture_path_value
+            else None
+        ),
+        pom_fixture_before_path=(
+            _resolve_path_setting(pom_fixture_before_path_value, repo_root=resolved_root)
+            if pom_fixture_before_path_value
+            else None
+        ),
+        pom_fixture_after_path=(
+            _resolve_path_setting(pom_fixture_after_path_value, repo_root=resolved_root)
+            if pom_fixture_after_path_value
+            else None
+        ),
+        preflight_resolution_fixture_path=(
+            _resolve_path_setting(preflight_resolution_fixture_path_value, repo_root=resolved_root)
+            if preflight_resolution_fixture_path_value
             else None
         ),
         github_owner=os.getenv("EA_GITHUB_OWNER"),
