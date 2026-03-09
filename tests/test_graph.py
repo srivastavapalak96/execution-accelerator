@@ -18,6 +18,11 @@ def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch)
         "EA_REPOSITORY_INVENTORY_FIXTURE_PATH",
         str(fixtures_dir / "repository_inventory.json"),
     )
+    monkeypatch.setenv("EA_ADVISORY_FIXTURE_PATH", str(fixtures_dir / "advisory_verification.json"))
+    monkeypatch.setenv(
+        "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
+        str(fixtures_dir / "maven_verification.json"),
+    )
     config = load_runtime_config(repo_root=tmp_path)
 
     result = bootstrap_ticket_run(
@@ -35,13 +40,20 @@ def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch)
     assert result.state.workflow_status == WorkflowStatus.PLANNING_READY
     assert result.state.vulnerability_details is not None
     assert result.state.vulnerability_details.package_name == "org.example:legacy-json"
+    assert result.state.advisory_verification is not None
+    assert result.state.advisory_verification.recommended_fix_version == "1.2.4"
+    assert result.state.maven_verification is not None
+    assert result.state.maven_verification.target_version == "1.2.4"
+    assert result.state.route_decision is not None
+    assert result.state.route_decision.strategy == "simple_update"
     assert result.state.remediation_plan is not None
+    assert result.state.remediation_plan.strategy == "simple_update"
     assert result.state.pending_repos == ["payments-service"]
     assert result.state.repo_map["payments-service"].owner == "payments-platform"
     assert config.checkpoints_path.exists()
     assert loaded_state.initial_ticket_id == "SEC-42"
     assert loaded_state.workflow_status == WorkflowStatus.PLANNING_READY
-    assert len(loaded_state.audit_events) == 4
+    assert len(loaded_state.audit_events) == 6
     assert Path(loaded_state.repo_map["payments-service"].local_path).is_dir()
     assert (
         Path(loaded_state.repo_map["payments-service"].local_path) / ".execution-accelerator-repo.json"

@@ -66,6 +66,14 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
         "EA_REPOSITORY_INVENTORY_FIXTURE_PATH",
         str(Path(__file__).parent / "fixtures" / "repository_inventory.json"),
     )
+    monkeypatch.setenv(
+        "EA_ADVISORY_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "advisory_verification.json"),
+    )
+    monkeypatch.setenv(
+        "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "maven_verification.json"),
+    )
 
     exit_code = main()
 
@@ -74,11 +82,11 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "thread_id=sec-401-dev" in captured.out
     assert f"checkpoint_path={tmp_path / 'state' / 'checkpoints.sqlite'}" in captured.out
     assert "workflow_status=planning_ready" in captured.out
-    assert "audit_event_count=4" in captured.out
+    assert "audit_event_count=6" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
     assert "severity=high" in captured.out
     assert "pending_repos=payments-service" in captured.out
-    assert "plan_strategy=unknown" in captured.out
+    assert "plan_strategy=simple_update" in captured.out
 
 
 def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> None:
@@ -91,6 +99,11 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     monkeypatch.setenv(
         "EA_REPOSITORY_INVENTORY_FIXTURE_PATH",
         str(fixture_dir / "repository_inventory.json"),
+    )
+    monkeypatch.setenv("EA_ADVISORY_FIXTURE_PATH", str(fixture_dir / "advisory_verification.json"))
+    monkeypatch.setenv(
+        "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
+        str(fixture_dir / "maven_verification.json"),
     )
 
     monkeypatch.setattr(
@@ -122,5 +135,5 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     assert "workflow_status=planning_ready" in captured.out
     assert "pending_repos=payments-service" in captured.out
     assert "completed_repos=" in captured.out
-    assert "audit_event_count=4" in captured.out
+    assert "audit_event_count=6" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
