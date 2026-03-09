@@ -57,6 +57,8 @@ def main() -> int:
         print(f"checkpoints_path={config.checkpoints_path}")
         print(f"jira_fixture_path={config.jira_fixture_path}")
         print(f"repository_inventory_fixture_path={config.repository_inventory_fixture_path}")
+        print(f"advisory_fixture_path={config.advisory_fixture_path}")
+        print(f"maven_verification_fixture_path={config.maven_verification_fixture_path}")
         return 0
 
     if args.bootstrap_ticket:
@@ -73,7 +75,14 @@ def main() -> int:
         if result.state.vulnerability_details is not None:
             print(f"package_name={result.state.vulnerability_details.package_name}")
             print(f"severity={result.state.vulnerability_details.severity}")
+        if result.state.advisory_verification is not None:
+            print(f"recommended_fix_version={result.state.advisory_verification.recommended_fix_version}")
+        if result.state.maven_verification is not None:
+            print(f"dependency_kind={result.state.maven_verification.dependency_kind}")
         print(f"pending_repos={','.join(result.state.pending_repos)}")
+        if result.state.route_decision is not None:
+            print(f"route_strategy={result.state.route_decision.strategy}")
+            print(f"route_confidence={result.state.route_decision.confidence:.2f}")
         if result.state.remediation_plan is not None:
             print(f"plan_strategy={result.state.remediation_plan.strategy}")
         return 0
@@ -88,6 +97,10 @@ def main() -> int:
         print(f"audit_event_count={len(state.audit_events)}")
         if state.vulnerability_details is not None:
             print(f"package_name={state.vulnerability_details.package_name}")
+        if state.advisory_verification is not None:
+            print(f"recommended_fix_version={state.advisory_verification.recommended_fix_version}")
+        if state.route_decision is not None:
+            print(f"route_strategy={state.route_decision.strategy}")
         return 0
 
     parser.print_help()

@@ -407,15 +407,16 @@ It is designed to support the actual target:
 
 ## Current implementation status
 
-The repository currently includes the Day 1 foundation, Day 2 bootstrap, and the Day 3 local intake path:
+The repository currently includes the Day 1 foundation, Day 2 bootstrap, Day 3 local intake path, and the Day 4 verification/routing flow:
 
 - typed Pydantic workflow schemas
 - typed `RemediationState`
 - local SQLite checkpoint wiring for LangGraph
 - fixture-backed Jira intake adapter
 - fixture-backed repository inventory and intake adapter
-- a compiled remediation graph that boots, ingests Jira context, resolves repositories, and persists state
-- CLI support to bootstrap a persisted ticket run locally and print the discovered Day 3 intake context
+- fixture-backed advisory and Maven verification adapters
+- a compiled remediation graph that boots, ingests Jira context, resolves repositories, verifies the remediation target, selects a route, and persists state
+- CLI support to bootstrap a persisted ticket run locally and print the discovered intake plus routing context
 
 ### Local bootstrap example
 
@@ -423,7 +424,7 @@ The repository currently includes the Day 1 foundation, Day 2 bootstrap, and the
 python -m execution_accelerator --bootstrap-ticket SEC-123 --thread-id sec-123-dev
 ```
 
-This creates the local runtime directories when needed, persists checkpoints to `.local/data/checkpoints.sqlite` by default, loads the Day 3 fixture-backed Jira and repository inventory context, and prints the resulting package and repository intake summary.
+This creates the local runtime directories when needed, persists checkpoints to `.local/data/checkpoints.sqlite` by default, loads the Day 4 fixture-backed Jira, repository inventory, advisory, and Maven verification context, and prints the resulting package, target version, and route summary.
 
 ### Inspecting a persisted thread
 
@@ -431,4 +432,4 @@ This creates the local runtime directories when needed, persists checkpoints to 
 python -m execution_accelerator --show-thread-state sec-123-dev
 ```
 
-This prints the current persisted workflow summary for the requested thread so local Day 3 intake runs can be inspected without opening the SQLite checkpoint store directly.
+This prints the current persisted workflow summary for the requested thread so local Day 4 verification runs can be inspected without opening the SQLite checkpoint store directly.

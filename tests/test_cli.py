@@ -26,6 +26,11 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
         "EA_REPOSITORY_INVENTORY_FIXTURE_PATH",
         str(tmp_path / "fixtures" / "repository_inventory.json"),
     )
+    monkeypatch.setenv("EA_ADVISORY_FIXTURE_PATH", str(tmp_path / "fixtures" / "advisory_verification.json"))
+    monkeypatch.setenv(
+        "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
+        str(tmp_path / "fixtures" / "maven_verification.json"),
+    )
 
     exit_code = main()
 
@@ -39,6 +44,11 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     assert f"jira_fixture_path={tmp_path / 'fixtures' / 'jira_issue.json'}" in captured.out
     assert (
         f"repository_inventory_fixture_path={tmp_path / 'fixtures' / 'repository_inventory.json'}"
+        in captured.out
+    )
+    assert f"advisory_fixture_path={tmp_path / 'fixtures' / 'advisory_verification.json'}" in captured.out
+    assert (
+        f"maven_verification_fixture_path={tmp_path / 'fixtures' / 'maven_verification.json'}"
         in captured.out
     )
 
@@ -85,7 +95,11 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "audit_event_count=6" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
     assert "severity=high" in captured.out
+    assert "recommended_fix_version=1.2.4" in captured.out
+    assert "dependency_kind=direct" in captured.out
     assert "pending_repos=payments-service" in captured.out
+    assert "route_strategy=simple_update" in captured.out
+    assert "route_confidence=0.93" in captured.out
     assert "plan_strategy=simple_update" in captured.out
 
 
@@ -137,3 +151,5 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     assert "completed_repos=" in captured.out
     assert "audit_event_count=6" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
+    assert "recommended_fix_version=1.2.4" in captured.out
+    assert "route_strategy=simple_update" in captured.out
