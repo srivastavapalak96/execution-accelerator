@@ -1,0 +1,24 @@
+{
+  "artifact_candidates": [
+    {
+      "coordinate": {
+        "group_id": "org.example",
+        "artifact_id": "legacy-json",
+        "version": "2.0.0"
+      },
+      "source": "maven-central",
+      "packaging": "jar",
+      "rationale": "First major-version candidate that resolves the advisory but requires API review."
+    },
+    {
+      "coordinate": {
+        "group_id": "org.example",
+        "artifact_id": "legacy-json-modern",
+        "version": "2.1.0"
+      },
+      "source": "internal-curation",
+      "packaging": "jar",
+      "rationale": "Curated replacement library candidate for the long-term migration path."
+    }
+  ]
+}

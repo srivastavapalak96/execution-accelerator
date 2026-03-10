@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from execution_accelerator.adapters import PomMutationAdapter, PreflightResolutionAdapter
+from execution_accelerator.adapters import (
+    ComplexRemediationAdapter,
+    PomMutationAdapter,
+    PreflightResolutionAdapter,
+)
 from execution_accelerator.schemas import (
     AuditEvent,
     DependencyCoordinate,
@@ -12,6 +16,7 @@ from execution_accelerator.schemas import (
     PomMutationKind,
     PomMutationPlan,
     PomSectionTarget,
+    ComplexRemediationPlan,
     RemediationStrategy,
 )
 from execution_accelerator.state import CodeDiffSummary, RemediationState
@@ -128,6 +133,53 @@ def build_preflight_validation_node(preflight_adapter: PreflightResolutionAdapte
         }
 
     return preflight_validate
+
+
+def build_prepare_complex_remediation_node(complex_adapter: ComplexRemediationAdapter):
+    """Create a node that records the Day 7 complex-lane analysis placeholders."""
+
+    def prepare_complex_remediation(state: RemediationState) -> dict[str, object]:
+        assert state.route_decision is not None
+        assert state.maven_verification is not None
+        assert state.vulnerability_details is not None
+        assert state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR
+
+        repository = state.current_working_repo or state.pending_repos[0]
+        artifact_candidates = complex_adapter.load_artifact_candidates()
+        compatibility_diff = complex_adapter.load_compatibility_diff()
+        complex_plan = ComplexRemediationPlan(
+            repository=repository,
+            summary=(
+                f"Analyze {state.vulnerability_details.package_name} "
+                f"from {state.vulnerability_details.installed_version} to {state.maven_verification.target_version} "
+                "before attempting code changes."
+            ),
+            artifact_candidates=artifact_candidates,
+            compatibility_diff=compatibility_diff,
+        )
+
+        audit_events = list(state.audit_events)
+        audit_events.append(
+            AuditEvent(
+                event_type="remediation.complex_prepare",
+                message=f"Prepared complex remediation analysis for {repository}.",
+                details={
+                    "repository": repository,
+                    "candidate_count": len(artifact_candidates),
+                    "breaking_change_count": len(compatibility_diff.breaking_changes),
+                },
+            )
+        )
+
+        return {
+            "current_working_repo": repository,
+            "artifact_candidates": artifact_candidates,
+            "compatibility_diff": compatibility_diff,
+            "complex_remediation_plan": complex_plan,
+            "audit_events": audit_events,
+        }
+
+    return prepare_complex_remediation
 
 
 def _build_simple_plan(state: RemediationState, repository: str) -> PomMutationPlan:

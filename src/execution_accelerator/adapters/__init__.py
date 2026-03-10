@@ -1,6 +1,11 @@
 """External system adapters."""
 
 from .jira import JiraAdapter, JiraAdapterError, JiraConfigurationError, JiraTicketMismatchError
+from .complex import (
+    ComplexRemediationAdapter,
+    ComplexRemediationAdapterError,
+    ComplexRemediationConfigurationError,
+)
 from .repository_inventory import (
     RepositoryInventoryAdapter,
     RepositoryInventoryAdapterError,
@@ -28,6 +33,9 @@ __all__ = [
     "JiraAdapterError",
     "JiraConfigurationError",
     "JiraTicketMismatchError",
+    "ComplexRemediationAdapter",
+    "ComplexRemediationAdapterError",
+    "ComplexRemediationConfigurationError",
     "RepositoryInventoryAdapter",
     "RepositoryInventoryAdapterError",
     "RepositoryInventoryConfigurationError",

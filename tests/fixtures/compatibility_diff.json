@@ -1,0 +1,21 @@
+{
+  "package_name": "org.example:legacy-json",
+  "baseline_version": "1.2.3",
+  "target_version": "2.0.0",
+  "summary": "Major-version upgrade removes legacy parser entry points and changes serializer constructors.",
+  "risk": "high",
+  "breaking_changes": [
+    {
+      "symbol": "org.example.LegacyParser#parse",
+      "change_type": "removed",
+      "impact": "Call sites must migrate to JsonParserBuilder before code changes can compile.",
+      "guidance": "Replace direct parse calls with builder.create().parse(...)"
+    },
+    {
+      "symbol": "org.example.LegacySerializer.<init>(boolean)",
+      "change_type": "modified",
+      "impact": "Serializer construction now requires a SerializationConfig object.",
+      "guidance": "Introduce a config factory and update dependency injection wiring."
+    }
+  ]
+}

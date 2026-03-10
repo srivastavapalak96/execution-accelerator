@@ -4,6 +4,7 @@ from pathlib import Path
 
 from execution_accelerator.adapters import (
     AdvisoryVerificationAdapter,
+    ComplexRemediationAdapter,
     JiraAdapter,
     MavenVerificationAdapter,
     PomMutationAdapter,
@@ -13,6 +14,7 @@ from execution_accelerator.adapters import (
 from execution_accelerator.nodes import (
     build_load_repository_context_node,
     build_preflight_validation_node,
+    build_prepare_complex_remediation_node,
     build_remediate_simple_node,
     build_remediate_transitive_node,
 )
@@ -20,7 +22,7 @@ from execution_accelerator.nodes.verification import select_route
 from execution_accelerator.state import RemediationState
 
 
-def build_state(tmp_path: Path, *, transitive: bool = False) -> RemediationState:
+def build_state(tmp_path: Path, *, transitive: bool = False, complex_refactor: bool = False) -> RemediationState:
     fixture_dir = Path(__file__).parent / "fixtures"
     vulnerability_details = JiraAdapter(
         fixture_path=fixture_dir / "jira_issue.json"
@@ -41,11 +43,18 @@ def build_state(tmp_path: Path, *, transitive: bool = False) -> RemediationState
         ).load_verification(vulnerability_details),
         maven_verification=MavenVerificationAdapter(
             fixture_path=(
+                fixture_dir / "maven_verification_complex.json"
+                if complex_refactor
+                else (
                 fixture_dir / "maven_verification_transitive.json"
                 if transitive
                 else fixture_dir / "maven_verification.json"
+                )
             )
-        ).load_verification(vulnerability_details, target_version="1.2.4"),
+        ).load_verification(
+            vulnerability_details,
+            target_version="2.0.0" if complex_refactor else "1.2.4",
+        ),
     )
     route_update = select_route(state)
     return state.model_copy(update=route_update)
@@ -104,3 +113,22 @@ def test_preflight_validation_node_loads_fixture_result() -> None:
 
     assert update["preflight_resolution"].resolved_version == "1.2.4"
     assert update["audit_events"][-1].event_type == "remediation.preflight"
+
+
+def test_prepare_complex_remediation_node_records_analysis_placeholders(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    node = build_prepare_complex_remediation_node(
+        ComplexRemediationAdapter(
+            artifact_fixture_path=fixture_dir / "complex_artifacts.json",
+            compatibility_diff_fixture_path=fixture_dir / "compatibility_diff.json",
+        )
+    )
+    state = build_state(tmp_path, complex_refactor=True)
+
+    update = node(state)
+
+    assert update["current_working_repo"] == "payments-service"
+    assert len(update["artifact_candidates"]) == 2
+    assert update["compatibility_diff"].risk == "high"
+    assert update["complex_remediation_plan"].strategy == "complex_refactor"
+    assert update["audit_events"][-1].event_type == "remediation.complex_prepare"
