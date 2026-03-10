@@ -62,28 +62,60 @@ class PomMutationAdapter:
         root = ET.fromstring(xml_text)
 
         for change in plan.changes:
-            dependencies = root.findall(".//m:dependency", MAVEN_NAMESPACE)
-            matched = False
-            for dependency in dependencies:
-                group_id = dependency.find("m:groupId", MAVEN_NAMESPACE)
-                artifact_id = dependency.find("m:artifactId", MAVEN_NAMESPACE)
-                version = dependency.find("m:version", MAVEN_NAMESPACE)
-                if (
-                    group_id is not None
-                    and artifact_id is not None
-                    and version is not None
-                    and group_id.text == change.dependency.group_id
-                    and artifact_id.text == change.dependency.artifact_id
-                ):
-                    version.text = change.target_version
-                    matched = True
-                    break
-            if not matched:
-                raise PomMutationTargetError(
-                    f"Dependency {change.dependency.group_id}:{change.dependency.artifact_id} was not found in pom.xml."
-                )
+            if change.target_section == "dependency_management":
+                self._apply_dependency_management_override(root, change)
+            else:
+                self._apply_direct_dependency_update(root, change)
 
         return ET.tostring(root, encoding="unicode")
+
+    def _apply_direct_dependency_update(self, root: ET.Element, change) -> None:
+        dependencies = root.findall(".//m:dependencies/m:dependency", MAVEN_NAMESPACE)
+        for dependency in dependencies:
+            group_id = dependency.find("m:groupId", MAVEN_NAMESPACE)
+            artifact_id = dependency.find("m:artifactId", MAVEN_NAMESPACE)
+            version = dependency.find("m:version", MAVEN_NAMESPACE)
+            if (
+                group_id is not None
+                and artifact_id is not None
+                and version is not None
+                and group_id.text == change.dependency.group_id
+                and artifact_id.text == change.dependency.artifact_id
+            ):
+                version.text = change.target_version
+                return
+        raise PomMutationTargetError(
+            f"Dependency {change.dependency.group_id}:{change.dependency.artifact_id} was not found in pom.xml."
+        )
+
+    def _apply_dependency_management_override(self, root: ET.Element, change) -> None:
+        dependency_management = root.find("m:dependencyManagement", MAVEN_NAMESPACE)
+        if dependency_management is None:
+            dependency_management = ET.SubElement(root, _namespaced("dependencyManagement"))
+
+        dependencies = dependency_management.find("m:dependencies", MAVEN_NAMESPACE)
+        if dependencies is None:
+            dependencies = ET.SubElement(dependency_management, _namespaced("dependencies"))
+
+        for dependency in dependencies.findall("m:dependency", MAVEN_NAMESPACE):
+            group_id = dependency.find("m:groupId", MAVEN_NAMESPACE)
+            artifact_id = dependency.find("m:artifactId", MAVEN_NAMESPACE)
+            version = dependency.find("m:version", MAVEN_NAMESPACE)
+            if (
+                group_id is not None
+                and artifact_id is not None
+                and group_id.text == change.dependency.group_id
+                and artifact_id.text == change.dependency.artifact_id
+            ):
+                if version is None:
+                    version = ET.SubElement(dependency, _namespaced("version"))
+                version.text = change.target_version
+                return
+
+        dependency = ET.SubElement(dependencies, _namespaced("dependency"))
+        ET.SubElement(dependency, _namespaced("groupId")).text = change.dependency.group_id
+        ET.SubElement(dependency, _namespaced("artifactId")).text = change.dependency.artifact_id
+        ET.SubElement(dependency, _namespaced("version")).text = change.target_version
 
     def expected_fixture_after(self, *, fixture_path: Path | None = None) -> str:
         """Load the expected mutated pom fixture for local verification."""
@@ -129,3 +161,7 @@ class PreflightResolutionAdapter:
                 "Preflight resolution fixture repository does not match the requested repository."
             )
         return result
+
+
+def _namespaced(tag: str) -> str:
+    return f"{{{MAVEN_NAMESPACE['m']}}}{tag}"

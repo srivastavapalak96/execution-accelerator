@@ -1,0 +1,7 @@
+{
+  "repository": "payments-service",
+  "status": "passed",
+  "resolved_version": "1.2.4",
+  "dependency_kind": "transitive",
+  "message": "DependencyManagement override resolves the transitive package to the verified target."
+}
