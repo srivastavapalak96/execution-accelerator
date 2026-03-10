@@ -7,8 +7,11 @@ from pydantic import Field
 from execution_accelerator.schemas import (
     ApprovalDecision,
     AdvisoryVerification,
+    ArtifactCandidate,
     AuditEvent,
     BaseSchemaModel,
+    CompatibilityDiffResult,
+    ComplexRemediationPlan,
     MavenVerification,
     HumanFeedback,
     PomMutationPlan,
@@ -70,6 +73,9 @@ class RemediationState(BaseSchemaModel):
     route_decision: RemediationRouteDecision | None = None
     pom_mutation_plan: PomMutationPlan | None = None
     preflight_resolution: PreflightResolutionResult | None = None
+    artifact_candidates: list[ArtifactCandidate] = Field(default_factory=list)
+    compatibility_diff: CompatibilityDiffResult | None = None
+    complex_remediation_plan: ComplexRemediationPlan | None = None
     repo_map: dict[str, RepositoryWorkspace] = Field(default_factory=dict)
     pending_repos: list[str] = Field(default_factory=list)
     current_working_repo: str | None = None

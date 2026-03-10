@@ -206,6 +206,44 @@ class DependencyCoordinate(BaseSchemaModel):
     version: str = Field(min_length=1)
 
 
+class ArtifactCandidate(BaseSchemaModel):
+    """Candidate artifact considered during complex remediation planning."""
+
+    coordinate: DependencyCoordinate
+    source: str = Field(min_length=1)
+    packaging: str = "jar"
+    rationale: str = Field(min_length=1)
+
+
+class CompatibilityChangeType(StrEnum):
+    """Kinds of compatibility changes observed between artifact versions."""
+
+    ADDED = "added"
+    REMOVED = "removed"
+    MODIFIED = "modified"
+    DEPRECATED = "deprecated"
+
+
+class CompatibilityDiffEntry(BaseSchemaModel):
+    """One compatibility finding for the complex remediation lane."""
+
+    symbol: str = Field(min_length=1)
+    change_type: CompatibilityChangeType = CompatibilityChangeType.MODIFIED
+    impact: str = Field(min_length=1)
+    guidance: str | None = None
+
+
+class CompatibilityDiffResult(BaseSchemaModel):
+    """Placeholder compatibility diff summary between current and target artifacts."""
+
+    package_name: str = Field(min_length=1)
+    baseline_version: str = Field(min_length=1)
+    target_version: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    risk: CompatibilityRisk = CompatibilityRisk.HIGH
+    breaking_changes: list[CompatibilityDiffEntry] = Field(default_factory=list)
+
+
 class PomMutationKind(StrEnum):
     """Kinds of pom mutations supported by the Day 5 simple remediation flow."""
 
@@ -249,6 +287,17 @@ class PreflightResolutionResult(BaseSchemaModel):
     resolved_version: str = Field(min_length=1)
     dependency_kind: MavenDependencyKind = MavenDependencyKind.DIRECT
     message: str = Field(min_length=1)
+
+
+class ComplexRemediationPlan(BaseSchemaModel):
+    """Planned Day 7 complex-remediation analysis for one repository."""
+
+    repository: str = Field(min_length=1)
+    strategy: RemediationStrategy = RemediationStrategy.COMPLEX_REFACTOR
+    summary: str = Field(min_length=1)
+    artifact_candidates: list[ArtifactCandidate] = Field(default_factory=list)
+    compatibility_diff: CompatibilityDiffResult
+    requires_code_changes: bool = True
 
 
 class RemediationPlan(BaseSchemaModel):

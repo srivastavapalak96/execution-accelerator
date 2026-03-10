@@ -6,7 +6,12 @@ from pathlib import Path
 from execution_accelerator.schemas import (
     AffectedRepository,
     AdvisoryVerification,
+    ArtifactCandidate,
     CompatibilityRisk,
+    CompatibilityChangeType,
+    CompatibilityDiffEntry,
+    CompatibilityDiffResult,
+    ComplexRemediationPlan,
     DependencyCoordinate,
     JiraIssuePayload,
     MavenDependencyKind,
@@ -154,6 +159,41 @@ def test_pom_mutation_change_can_target_dependency_management() -> None:
     )
 
     assert change.target_section == PomSectionTarget.DEPENDENCY_MANAGEMENT
+
+
+def test_complex_remediation_plan_captures_artifact_candidates_and_diff() -> None:
+    candidate = ArtifactCandidate(
+        coordinate=DependencyCoordinate(
+            group_id="org.example",
+            artifact_id="legacy-json",
+            version="2.0.0",
+        ),
+        source="maven-central",
+        rationale="First verified candidate that resolves the CVE.",
+    )
+    diff = CompatibilityDiffResult(
+        package_name="org.example:legacy-json",
+        baseline_version="1.2.3",
+        target_version="2.0.0",
+        summary="Major-version jump removes deprecated parser entry points.",
+        breaking_changes=[
+            CompatibilityDiffEntry(
+                symbol="org.example.LegacyParser#parse",
+                change_type=CompatibilityChangeType.REMOVED,
+                impact="Call sites must migrate to the builder-based parser.",
+            )
+        ],
+    )
+    plan = ComplexRemediationPlan(
+        repository="payments-service",
+        summary="Analyze the major-version jump before attempting code changes.",
+        artifact_candidates=[candidate],
+        compatibility_diff=diff,
+    )
+
+    assert plan.strategy == RemediationStrategy.COMPLEX_REFACTOR
+    assert plan.artifact_candidates[0].coordinate.version == "2.0.0"
+    assert plan.compatibility_diff.breaking_changes[0].change_type == CompatibilityChangeType.REMOVED
 
 
 def test_preflight_resolution_fixture_parses_into_typed_payload() -> None:
