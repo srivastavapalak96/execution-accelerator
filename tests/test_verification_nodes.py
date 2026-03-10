@@ -76,3 +76,24 @@ def test_select_route_prefers_simple_update_for_low_risk_direct_dependencies() -
     assert update["route_decision"].strategy == RemediationStrategy.SIMPLE_UPDATE
     assert update["remediation_plan"].strategy == RemediationStrategy.SIMPLE_UPDATE
     assert update["audit_events"][-1].event_type == "verification.route"
+
+
+def test_select_route_prefers_transitive_override_for_indirect_dependencies() -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    state = build_state().model_copy(
+        update={
+            "advisory_verification": AdvisoryVerificationAdapter(
+                fixture_path=fixture_dir / "advisory_verification.json"
+            ).load_verification(build_state().vulnerability_details),
+            "maven_verification": MavenVerificationAdapter(
+                fixture_path=fixture_dir / "maven_verification_transitive.json"
+            ).load_verification(build_state().vulnerability_details, target_version="1.2.4"),
+        }
+    )
+
+    update = select_route(state)
+
+    assert update["workflow_status"] == WorkflowStatus.PLANNING_READY
+    assert update["route_decision"].strategy == RemediationStrategy.TRANSITIVE_OVERRIDE
+    assert update["remediation_plan"].strategy == RemediationStrategy.TRANSITIVE_OVERRIDE
+    assert update["audit_events"][-1].event_type == "verification.route"

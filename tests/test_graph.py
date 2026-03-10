@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 from execution_accelerator.config import load_runtime_config
 from execution_accelerator.graph import bootstrap_ticket_run, load_remediation_state
 from execution_accelerator.schemas import WorkflowStatus
 
 
-def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch) -> None:
+def _configure_runtime(monkeypatch, tmp_path, *, transitive: bool = False) -> None:
     fixtures_dir = Path(__file__).parent / "fixtures"
     monkeypatch.setenv("EA_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
@@ -21,14 +22,29 @@ def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch)
     monkeypatch.setenv("EA_ADVISORY_FIXTURE_PATH", str(fixtures_dir / "advisory_verification.json"))
     monkeypatch.setenv(
         "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
-        str(fixtures_dir / "maven_verification.json"),
+        str(
+            fixtures_dir / ("maven_verification_transitive.json" if transitive else "maven_verification.json")
+        ),
     )
-    monkeypatch.setenv("EA_POM_FIXTURE_BEFORE_PATH", str(fixtures_dir / "pom_before.xml"))
-    monkeypatch.setenv("EA_POM_FIXTURE_AFTER_PATH", str(fixtures_dir / "pom_after.xml"))
+    monkeypatch.setenv(
+        "EA_POM_FIXTURE_BEFORE_PATH",
+        str(fixtures_dir / ("pom_transitive_before.xml" if transitive else "pom_before.xml")),
+    )
+    monkeypatch.setenv(
+        "EA_POM_FIXTURE_AFTER_PATH",
+        str(fixtures_dir / ("pom_transitive_after.xml" if transitive else "pom_after.xml")),
+    )
     monkeypatch.setenv(
         "EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH",
-        str(fixtures_dir / "preflight_resolution.json"),
+        str(
+            fixtures_dir
+            / ("preflight_resolution_transitive.json" if transitive else "preflight_resolution.json")
+        ),
     )
+
+
+def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path)
     config = load_runtime_config(repo_root=tmp_path)
 
     result = bootstrap_ticket_run(
@@ -71,3 +87,40 @@ def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch)
         Path(loaded_state.repo_map["payments-service"].local_path) / ".execution-accelerator-repo.json"
     ).exists()
     assert Path(loaded_state.modified_files[0]).exists()
+
+
+def test_bootstrap_ticket_run_persists_transitive_override_state(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path, transitive=True)
+    config = load_runtime_config(repo_root=tmp_path)
+
+    result = bootstrap_ticket_run(
+        "SEC-420",
+        runtime_config=config,
+        thread_id="sec-420-thread",
+    )
+    loaded_state = load_remediation_state(
+        runtime_config=config,
+        thread_id="sec-420-thread",
+    )
+
+    assert result.thread_id == "sec-420-thread"
+    assert result.state.route_decision is not None
+    assert result.state.route_decision.strategy == "transitive_override"
+    assert result.state.remediation_plan is not None
+    assert result.state.remediation_plan.strategy == "transitive_override"
+    assert result.state.pom_mutation_plan is not None
+    assert result.state.pom_mutation_plan.changes[0].target_section == "dependency_management"
+    assert result.state.preflight_resolution is not None
+    assert result.state.preflight_resolution.dependency_kind == "transitive"
+    assert len(result.state.audit_events) == 8
+    mutated_root = ET.fromstring(Path(result.state.modified_files[0]).read_text())
+    version = mutated_root.find(
+        ".//{http://maven.apache.org/POM/4.0.0}dependencyManagement/"
+        "{http://maven.apache.org/POM/4.0.0}dependencies/"
+        "{http://maven.apache.org/POM/4.0.0}dependency/"
+        "{http://maven.apache.org/POM/4.0.0}version"
+    )
+    assert version is not None
+    assert version.text == "1.2.4"
+    assert loaded_state.route_decision is not None
+    assert loaded_state.route_decision.strategy == "transitive_override"

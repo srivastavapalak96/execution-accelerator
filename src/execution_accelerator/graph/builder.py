@@ -1,4 +1,4 @@
-"""Minimal LangGraph bootstrap for the Day 4 foundation."""
+"""Stateful remediation graph composition."""
 
 from __future__ import annotations
 
@@ -23,11 +23,13 @@ from execution_accelerator.nodes import (
     build_load_repository_context_node,
     build_preflight_validation_node,
     build_remediate_simple_node,
+    build_remediate_transitive_node,
     build_verify_advisory_node,
     build_verify_maven_target_node,
     select_route,
 )
 from execution_accelerator.persistence import build_default_thread_id, build_thread_config, sqlite_checkpointer
+from execution_accelerator.schemas import RemediationStrategy
 from execution_accelerator.state import RemediationState
 
 
@@ -48,7 +50,7 @@ def build_remediation_graph(
     pom_mutation_adapter: PomMutationAdapter,
     preflight_resolution_adapter: PreflightResolutionAdapter,
 ) -> StateGraph:
-    """Build the Day 5 stateful remediation graph."""
+    """Build the Day 6 stateful remediation graph."""
 
     builder = StateGraph(RemediationState)
     builder.add_node("bootstrap_state", bootstrap_state)
@@ -67,6 +69,7 @@ def build_remediation_graph(
     )
     builder.add_node("select_route", select_route)
     builder.add_node("remediate_simple", build_remediate_simple_node(pom_mutation_adapter))
+    builder.add_node("remediate_transitive", build_remediate_transitive_node(pom_mutation_adapter))
     builder.add_node(
         "preflight_validate",
         build_preflight_validation_node(preflight_resolution_adapter),
@@ -77,8 +80,17 @@ def build_remediation_graph(
     builder.add_edge("load_repository_context", "verify_advisory")
     builder.add_edge("verify_advisory", "verify_maven_target")
     builder.add_edge("verify_maven_target", "select_route")
-    builder.add_edge("select_route", "remediate_simple")
+    builder.add_conditional_edges(
+        "select_route",
+        _select_remediation_node,
+        {
+            "remediate_simple": "remediate_simple",
+            "remediate_transitive": "remediate_transitive",
+            END: END,
+        },
+    )
     builder.add_edge("remediate_simple", "preflight_validate")
+    builder.add_edge("remediate_transitive", "preflight_validate")
     builder.add_edge("preflight_validate", END)
     return builder
 
@@ -165,3 +177,13 @@ def load_remediation_state(*, runtime_config: RuntimeConfig, thread_id: str) -> 
         )
         snapshot = graph.get_state(build_thread_config(thread_id))
     return RemediationState.model_validate(snapshot.values)
+
+
+def _select_remediation_node(state: RemediationState) -> str:
+    assert state.route_decision is not None
+
+    if state.route_decision.strategy == RemediationStrategy.SIMPLE_UPDATE:
+        return "remediate_simple"
+    if state.route_decision.strategy == RemediationStrategy.TRANSITIVE_OVERRIDE:
+        return "remediate_transitive"
+    return END
