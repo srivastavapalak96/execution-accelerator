@@ -1,4 +1,4 @@
-"""Day 5 simple remediation and preflight nodes."""
+"""Day 5/6 remediation and preflight nodes."""
 
 from __future__ import annotations
 
@@ -59,6 +59,49 @@ def build_remediate_simple_node(pom_adapter: PomMutationAdapter):
     return remediate_simple
 
 
+def build_remediate_transitive_node(pom_adapter: PomMutationAdapter):
+    """Create a node that applies the Day 6 transitive override remediation plan."""
+
+    def remediate_transitive(state: RemediationState) -> dict[str, object]:
+        assert state.route_decision is not None
+        assert state.maven_verification is not None
+        assert state.route_decision.strategy == RemediationStrategy.TRANSITIVE_OVERRIDE
+
+        repository = state.current_working_repo or state.pending_repos[0]
+        workspace = state.repo_map[repository]
+        plan = _build_transitive_plan(state, repository)
+
+        pom_path = Path(workspace.local_path) / plan.changes[0].file_path
+        pom_path.parent.mkdir(parents=True, exist_ok=True)
+        pom_path.write_text(pom_adapter.load_fixture_before())
+        mutated_xml = pom_adapter.apply_plan(pom_path.read_text(), plan)
+        pom_path.write_text(mutated_xml)
+
+        audit_events = list(state.audit_events)
+        audit_events.append(
+            AuditEvent(
+                event_type="remediation.transitive_override",
+                message=f"Applied transitive override remediation for {repository}.",
+                details={
+                    "repository": repository,
+                    "file_path": plan.changes[0].file_path,
+                    "target_version": plan.changes[0].target_version,
+                    "target_section": plan.changes[0].target_section,
+                },
+            )
+        )
+
+        return {
+            "current_working_repo": repository,
+            "pom_mutation_plan": plan,
+            "modified_files": [str(pom_path)],
+            "code_diffs": _build_diff_summary(plan),
+            "audit_events": audit_events,
+        }
+
+    return remediate_transitive
+
+
 def build_preflight_validation_node(preflight_adapter: PreflightResolutionAdapter):
     """Create a node that loads the fixture-backed preflight validation result."""
 
@@ -117,16 +160,60 @@ def _build_simple_plan(state: RemediationState, repository: str) -> PomMutationP
     )
 
 
+def _build_transitive_plan(state: RemediationState, repository: str) -> PomMutationPlan:
+    assert state.vulnerability_details is not None
+    assert state.maven_verification is not None
+
+    current_repo = state.repo_map[repository]
+    file_path = current_repo.manifest_path or "pom.xml"
+    dependency = DependencyCoordinate(
+        group_id=state.vulnerability_details.package_name.split(":", maxsplit=1)[0],
+        artifact_id=state.vulnerability_details.package_name.split(":", maxsplit=1)[1],
+        version=state.maven_verification.target_version,
+    )
+
+    return PomMutationPlan(
+        repository=repository,
+        strategy=RemediationStrategy.TRANSITIVE_OVERRIDE,
+        summary=(
+            f"Add a dependencyManagement override for {state.vulnerability_details.package_name} "
+            f"at {state.maven_verification.target_version}."
+        ),
+        changes=[
+            PomMutationChange(
+                file_path=file_path,
+                dependency=dependency,
+                mutation_kind=PomMutationKind.DEPENDENCY_MANAGEMENT_OVERRIDE,
+                target_section=PomSectionTarget.DEPENDENCY_MANAGEMENT,
+                previous_version=state.vulnerability_details.installed_version,
+                target_version=state.maven_verification.target_version,
+                xml_path_hint="./dependencyManagement/dependencies/dependency/version",
+            )
+        ],
+    )
+
+
 def _build_diff_summary(plan: PomMutationPlan) -> list[CodeDiffSummary]:
     return [
         CodeDiffSummary(
             file_path=change.file_path,
-            change_summary=(
-                f"Updated {change.dependency.group_id}:{change.dependency.artifact_id} "
-                f"from {change.previous_version} to {change.target_version}."
-            ),
+            change_summary=_build_change_summary(change),
             additions=1,
             deletions=1,
         )
         for change in plan.changes
     ]
+
+
+def _build_change_summary(change: PomMutationChange) -> str:
+    if change.target_section == PomSectionTarget.DEPENDENCY_MANAGEMENT:
+        return (
+            f"Added dependencyManagement override for "
+            f"{change.dependency.group_id}:{change.dependency.artifact_id} "
+            f"at {change.target_version}."
+        )
+
+    return (
+        f"Updated {change.dependency.group_id}:{change.dependency.artifact_id} "
+        f"from {change.previous_version} to {change.target_version}."
+    )
