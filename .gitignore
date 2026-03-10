@@ -12,4 +12,5 @@ dist/
 htmlcov/
 coverage.xml
 checkpoints.sqlite
+.local/
 *.log

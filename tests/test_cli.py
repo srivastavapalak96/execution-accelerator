@@ -125,10 +125,13 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "route_strategy=simple_update" in captured.out
     assert "route_confidence=0.93" in captured.out
     assert "plan_strategy=simple_update" in captured.out
+    assert "pom_change_kind=direct_version_bump" in captured.out
+    assert "pom_change_target_section=project_dependencies" in captured.out
     assert "current_working_repo=payments-service" in captured.out
     assert "modified_file_count=1" in captured.out
     assert f"modified_file={tmp_path / 'workspace' / 'sec-401' / 'payments-service' / 'pom.xml'}" in captured.out
     assert "preflight_status=passed" in captured.out
+    assert "preflight_dependency_kind=direct" in captured.out
     assert "preflight_resolved_version=1.2.4" in captured.out
 
 
@@ -188,8 +191,56 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     assert "package_name=org.example:legacy-json" in captured.out
     assert "recommended_fix_version=1.2.4" in captured.out
     assert "route_strategy=simple_update" in captured.out
+    assert "pom_change_kind=direct_version_bump" in captured.out
+    assert "pom_change_target_section=project_dependencies" in captured.out
     assert "current_working_repo=payments-service" in captured.out
     assert "modified_file_count=1" in captured.out
     assert f"modified_file={tmp_path / 'workspace' / 'sec-402' / 'payments-service' / 'pom.xml'}" in captured.out
     assert "preflight_status=passed" in captured.out
+    assert "preflight_dependency_kind=direct" in captured.out
+    assert "preflight_resolved_version=1.2.4" in captured.out
+
+
+def test_main_bootstraps_transitive_ticket(monkeypatch, capsys, tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--bootstrap-ticket",
+            "SEC-499",
+            "--thread-id",
+            "sec-499-transitive",
+        ],
+    )
+    monkeypatch.setenv("EA_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
+    monkeypatch.setenv("EA_LOGS_DIR", str(tmp_path / "logs"))
+    monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "state" / "checkpoints.sqlite"))
+    monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(fixture_dir / "jira_issue.json"))
+    monkeypatch.setenv("EA_REPOSITORY_INVENTORY_FIXTURE_PATH", str(fixture_dir / "repository_inventory.json"))
+    monkeypatch.setenv("EA_ADVISORY_FIXTURE_PATH", str(fixture_dir / "advisory_verification.json"))
+    monkeypatch.setenv(
+        "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
+        str(fixture_dir / "maven_verification_transitive.json"),
+    )
+    monkeypatch.setenv("EA_POM_FIXTURE_BEFORE_PATH", str(fixture_dir / "pom_transitive_before.xml"))
+    monkeypatch.setenv("EA_POM_FIXTURE_AFTER_PATH", str(fixture_dir / "pom_transitive_after.xml"))
+    monkeypatch.setenv(
+        "EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH",
+        str(fixture_dir / "preflight_resolution_transitive.json"),
+    )
+
+    exit_code = main()
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "thread_id=sec-499-transitive" in captured.out
+    assert "route_strategy=transitive_override" in captured.out
+    assert "route_confidence=0.88" in captured.out
+    assert "plan_strategy=transitive_override" in captured.out
+    assert "pom_change_kind=dependency_management_override" in captured.out
+    assert "pom_change_target_section=dependency_management" in captured.out
+    assert "preflight_status=passed" in captured.out
+    assert "preflight_dependency_kind=transitive" in captured.out
     assert "preflight_resolved_version=1.2.4" in captured.out

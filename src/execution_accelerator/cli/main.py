@@ -88,6 +88,10 @@ def main() -> int:
             print(f"route_confidence={result.state.route_decision.confidence:.2f}")
         if result.state.remediation_plan is not None:
             print(f"plan_strategy={result.state.remediation_plan.strategy}")
+        if result.state.pom_mutation_plan is not None and result.state.pom_mutation_plan.changes:
+            change = result.state.pom_mutation_plan.changes[0]
+            print(f"pom_change_kind={change.mutation_kind}")
+            print(f"pom_change_target_section={change.target_section}")
         if result.state.current_working_repo is not None:
             print(f"current_working_repo={result.state.current_working_repo}")
         print(f"modified_file_count={len(result.state.modified_files)}")
@@ -95,6 +99,7 @@ def main() -> int:
             print(f"modified_file={result.state.modified_files[0]}")
         if result.state.preflight_resolution is not None:
             print(f"preflight_status={result.state.preflight_resolution.status}")
+            print(f"preflight_dependency_kind={result.state.preflight_resolution.dependency_kind}")
             print(f"preflight_resolved_version={result.state.preflight_resolution.resolved_version}")
         return 0
 
@@ -112,6 +117,10 @@ def main() -> int:
             print(f"recommended_fix_version={state.advisory_verification.recommended_fix_version}")
         if state.route_decision is not None:
             print(f"route_strategy={state.route_decision.strategy}")
+        if state.pom_mutation_plan is not None and state.pom_mutation_plan.changes:
+            change = state.pom_mutation_plan.changes[0]
+            print(f"pom_change_kind={change.mutation_kind}")
+            print(f"pom_change_target_section={change.target_section}")
         if state.current_working_repo is not None:
             print(f"current_working_repo={state.current_working_repo}")
         print(f"modified_file_count={len(state.modified_files)}")
@@ -119,6 +128,7 @@ def main() -> int:
             print(f"modified_file={state.modified_files[0]}")
         if state.preflight_resolution is not None:
             print(f"preflight_status={state.preflight_resolution.status}")
+            print(f"preflight_dependency_kind={state.preflight_resolution.dependency_kind}")
             print(f"preflight_resolved_version={state.preflight_resolution.resolved_version}")
         return 0
 
