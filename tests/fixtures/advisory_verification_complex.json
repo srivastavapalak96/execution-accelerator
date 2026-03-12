@@ -1,0 +1,17 @@
+{
+  "package_name": "org.example:legacy-json",
+  "vulnerable_version": "1.2.3",
+  "recommended_fix_version": "2.0.0",
+  "status": "verified",
+  "source": "internal-curation",
+  "summary": "Only the major-version remediation target is still supported for this package family.",
+  "cve_id": "CVE-2026-12345",
+  "severity": "high",
+  "references": [
+    {
+      "source": "cve",
+      "identifier": "CVE-2026-12345",
+      "url": "https://example.com/advisories/CVE-2026-12345"
+    }
+  ]
+}

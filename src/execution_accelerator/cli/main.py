@@ -62,6 +62,8 @@ def main() -> int:
         print(f"pom_fixture_before_path={config.pom_fixture_before_path}")
         print(f"pom_fixture_after_path={config.pom_fixture_after_path}")
         print(f"preflight_resolution_fixture_path={config.preflight_resolution_fixture_path}")
+        print(f"complex_artifact_fixture_path={config.complex_artifact_fixture_path}")
+        print(f"compatibility_diff_fixture_path={config.compatibility_diff_fixture_path}")
         return 0
 
     if args.bootstrap_ticket:
@@ -92,6 +94,12 @@ def main() -> int:
             change = result.state.pom_mutation_plan.changes[0]
             print(f"pom_change_kind={change.mutation_kind}")
             print(f"pom_change_target_section={change.target_section}")
+        if result.state.complex_remediation_plan is not None:
+            print(f"complex_candidate_count={len(result.state.complex_remediation_plan.artifact_candidates)}")
+            print(
+                "complex_breaking_change_count="
+                f"{len(result.state.complex_remediation_plan.compatibility_diff.breaking_changes)}"
+            )
         if result.state.current_working_repo is not None:
             print(f"current_working_repo={result.state.current_working_repo}")
         print(f"modified_file_count={len(result.state.modified_files)}")
@@ -121,6 +129,12 @@ def main() -> int:
             change = state.pom_mutation_plan.changes[0]
             print(f"pom_change_kind={change.mutation_kind}")
             print(f"pom_change_target_section={change.target_section}")
+        if state.complex_remediation_plan is not None:
+            print(f"complex_candidate_count={len(state.complex_remediation_plan.artifact_candidates)}")
+            print(
+                "complex_breaking_change_count="
+                f"{len(state.complex_remediation_plan.compatibility_diff.breaking_changes)}"
+            )
         if state.current_working_repo is not None:
             print(f"current_working_repo={state.current_working_repo}")
         print(f"modified_file_count={len(state.modified_files)}")

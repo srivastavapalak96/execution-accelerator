@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: install test smoke intake-smoke verify-smoke remediate-smoke transitive-smoke run
+.PHONY: install test smoke intake-smoke verify-smoke remediate-smoke transitive-smoke complex-smoke run
 
 install:
 	$(PYTHON) -m pip install -e .[dev]
@@ -32,6 +32,18 @@ transitive-smoke:
 	EA_POM_FIXTURE_AFTER_PATH=tests/fixtures/pom_transitive_after.xml \
 	EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH=tests/fixtures/preflight_resolution_transitive.json \
 	$(PYTHON) -m execution_accelerator --show-thread-state sec-123-transitive
+
+complex-smoke:
+	EA_ADVISORY_FIXTURE_PATH=tests/fixtures/advisory_verification_complex.json \
+	EA_MAVEN_VERIFICATION_FIXTURE_PATH=tests/fixtures/maven_verification_complex.json \
+	EA_COMPLEX_ARTIFACT_FIXTURE_PATH=tests/fixtures/complex_artifacts.json \
+	EA_COMPATIBILITY_DIFF_FIXTURE_PATH=tests/fixtures/compatibility_diff.json \
+	$(PYTHON) -m execution_accelerator --bootstrap-ticket SEC-123 --thread-id sec-123-complex
+	EA_ADVISORY_FIXTURE_PATH=tests/fixtures/advisory_verification_complex.json \
+	EA_MAVEN_VERIFICATION_FIXTURE_PATH=tests/fixtures/maven_verification_complex.json \
+	EA_COMPLEX_ARTIFACT_FIXTURE_PATH=tests/fixtures/complex_artifacts.json \
+	EA_COMPATIBILITY_DIFF_FIXTURE_PATH=tests/fixtures/compatibility_diff.json \
+	$(PYTHON) -m execution_accelerator --show-thread-state sec-123-complex
 
 run:
 	$(PYTHON) -m execution_accelerator

@@ -8,7 +8,7 @@ from execution_accelerator.graph import bootstrap_ticket_run, load_remediation_s
 from execution_accelerator.schemas import WorkflowStatus
 
 
-def _configure_runtime(monkeypatch, tmp_path, *, transitive: bool = False) -> None:
+def _configure_runtime(monkeypatch, tmp_path, *, transitive: bool = False, complex_refactor: bool = False) -> None:
     fixtures_dir = Path(__file__).parent / "fixtures"
     monkeypatch.setenv("EA_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
@@ -19,11 +19,22 @@ def _configure_runtime(monkeypatch, tmp_path, *, transitive: bool = False) -> No
         "EA_REPOSITORY_INVENTORY_FIXTURE_PATH",
         str(fixtures_dir / "repository_inventory.json"),
     )
-    monkeypatch.setenv("EA_ADVISORY_FIXTURE_PATH", str(fixtures_dir / "advisory_verification.json"))
+    monkeypatch.setenv(
+        "EA_ADVISORY_FIXTURE_PATH",
+        str(
+            fixtures_dir
+            / ("advisory_verification_complex.json" if complex_refactor else "advisory_verification.json")
+        ),
+    )
     monkeypatch.setenv(
         "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
         str(
-            fixtures_dir / ("maven_verification_transitive.json" if transitive else "maven_verification.json")
+            fixtures_dir
+            / (
+                "maven_verification_complex.json"
+                if complex_refactor
+                else ("maven_verification_transitive.json" if transitive else "maven_verification.json")
+            )
         ),
     )
     monkeypatch.setenv(
@@ -41,6 +52,8 @@ def _configure_runtime(monkeypatch, tmp_path, *, transitive: bool = False) -> No
             / ("preflight_resolution_transitive.json" if transitive else "preflight_resolution.json")
         ),
     )
+    monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixtures_dir / "complex_artifacts.json"))
+    monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixtures_dir / "compatibility_diff.json"))
 
 
 def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch) -> None:
@@ -124,3 +137,30 @@ def test_bootstrap_ticket_run_persists_transitive_override_state(tmp_path, monke
     assert version.text == "1.2.4"
     assert loaded_state.route_decision is not None
     assert loaded_state.route_decision.strategy == "transitive_override"
+
+
+def test_bootstrap_ticket_run_persists_complex_refactor_state(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path, complex_refactor=True)
+    config = load_runtime_config(repo_root=tmp_path)
+
+    result = bootstrap_ticket_run(
+        "SEC-777",
+        runtime_config=config,
+        thread_id="sec-777-thread",
+    )
+    loaded_state = load_remediation_state(
+        runtime_config=config,
+        thread_id="sec-777-thread",
+    )
+
+    assert result.state.route_decision is not None
+    assert result.state.route_decision.strategy == "complex_refactor"
+    assert result.state.complex_remediation_plan is not None
+    assert len(result.state.complex_remediation_plan.artifact_candidates) == 2
+    assert result.state.compatibility_diff is not None
+    assert result.state.compatibility_diff.risk == "high"
+    assert result.state.preflight_resolution is None
+    assert result.state.pom_mutation_plan is None
+    assert len(result.state.audit_events) == 7
+    assert loaded_state.complex_remediation_plan is not None
+    assert loaded_state.complex_remediation_plan.compatibility_diff.target_version == "2.0.0"

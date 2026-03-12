@@ -407,7 +407,7 @@ It is designed to support the actual target:
 
 ## Current implementation status
 
-The repository currently includes the Day 1 foundation, Day 2 bootstrap, Day 3 local intake path, Day 4 verification/routing, Day 5 simple remediation, and the Day 6 transitive override lane:
+The repository currently includes the Day 1 foundation, Day 2 bootstrap, Day 3 local intake path, Day 4 verification/routing, Day 5 simple remediation, the Day 6 transitive override lane, and the Day 7 complex remediation foundation:
 
 - typed Pydantic workflow schemas
 - typed `RemediationState`
@@ -416,8 +416,9 @@ The repository currently includes the Day 1 foundation, Day 2 bootstrap, Day 3 l
 - fixture-backed repository inventory and intake adapter
 - fixture-backed advisory and Maven verification adapters
 - fixture-backed pom mutation and preflight validation adapters
-- a compiled remediation graph that boots, ingests Jira context, resolves repositories, verifies the remediation target, selects a route, applies either a direct pom bump or a dependencyManagement override, runs preflight validation, and persists state
-- CLI support to bootstrap a persisted ticket run locally and print the discovered intake, routing, mutation kind/target section, mutated file, and preflight outcome
+- fixture-backed complex artifact-candidate and compatibility-diff adapters
+- a compiled remediation graph that boots, ingests Jira context, resolves repositories, verifies the remediation target, selects a route, applies either a direct pom bump, a dependencyManagement override, or a complex analysis placeholder, and persists state
+- CLI support to bootstrap a persisted ticket run locally and print the discovered intake, routing, mutation kind/target section or complex analysis counts, mutated file, and preflight outcome
 
 ### Local bootstrap example
 
@@ -425,7 +426,7 @@ The repository currently includes the Day 1 foundation, Day 2 bootstrap, Day 3 l
 python -m execution_accelerator --bootstrap-ticket SEC-123 --thread-id sec-123-dev
 ```
 
-This creates the local runtime directories when needed, persists checkpoints to `.local/data/checkpoints.sqlite` by default, loads the Day 6 fixture-backed Jira, repository inventory, advisory, Maven verification, pom mutation, and preflight context, and prints the resulting package, route, mutation type, mutated manifest path, and preflight summary.
+This creates the local runtime directories when needed, persists checkpoints to `.local/data/checkpoints.sqlite` by default, loads the Day 7 fixture-backed Jira, repository inventory, advisory, Maven verification, pom mutation or complex-analysis fixtures, and prints the resulting package, route, mutation type or complex-analysis counts, mutated manifest path, and preflight summary.
 
 ### Inspecting a persisted thread
 
@@ -433,13 +434,14 @@ This creates the local runtime directories when needed, persists checkpoints to 
 python -m execution_accelerator --show-thread-state sec-123-dev
 ```
 
-This prints the current persisted workflow summary for the requested thread so local Day 6 remediation runs can be inspected without opening the SQLite checkpoint store directly.
+This prints the current persisted workflow summary for the requested thread so local Day 7 remediation runs can be inspected without opening the SQLite checkpoint store directly.
 
 ### Local remediation smoke runs
 
 ```bash
 make remediate-smoke
 make transitive-smoke
+make complex-smoke
 ```
 
-These run the fixture-backed Day 6 direct and transitive remediation paths end to end and then reload the persisted thread state to confirm the mutated `pom.xml` and preflight result were recorded.
+These run the fixture-backed Day 7 direct, transitive, and complex-lane flows end to end and then reload the persisted thread state to confirm the recorded mutation or analysis state.

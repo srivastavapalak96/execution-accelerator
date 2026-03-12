@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from execution_accelerator.adapters import (
     AdvisoryVerificationAdapter,
+    ComplexRemediationAdapter,
     JiraAdapter,
     MavenVerificationAdapter,
     PomMutationAdapter,
@@ -22,6 +23,7 @@ from execution_accelerator.nodes import (
     build_ingest_and_parse_jira_node,
     build_load_repository_context_node,
     build_preflight_validation_node,
+    build_prepare_complex_remediation_node,
     build_remediate_simple_node,
     build_remediate_transitive_node,
     build_verify_advisory_node,
@@ -47,10 +49,11 @@ def build_remediation_graph(
     repository_inventory_adapter: RepositoryInventoryAdapter,
     advisory_verification_adapter: AdvisoryVerificationAdapter,
     maven_verification_adapter: MavenVerificationAdapter,
+    complex_remediation_adapter: ComplexRemediationAdapter,
     pom_mutation_adapter: PomMutationAdapter,
     preflight_resolution_adapter: PreflightResolutionAdapter,
 ) -> StateGraph:
-    """Build the Day 6 stateful remediation graph."""
+    """Build the Day 7 stateful remediation graph."""
 
     builder = StateGraph(RemediationState)
     builder.add_node("bootstrap_state", bootstrap_state)
@@ -68,6 +71,10 @@ def build_remediation_graph(
         build_verify_maven_target_node(maven_verification_adapter),
     )
     builder.add_node("select_route", select_route)
+    builder.add_node(
+        "prepare_complex_remediation",
+        build_prepare_complex_remediation_node(complex_remediation_adapter),
+    )
     builder.add_node("remediate_simple", build_remediate_simple_node(pom_mutation_adapter))
     builder.add_node("remediate_transitive", build_remediate_transitive_node(pom_mutation_adapter))
     builder.add_node(
@@ -84,11 +91,13 @@ def build_remediation_graph(
         "select_route",
         _select_remediation_node,
         {
+            "prepare_complex_remediation": "prepare_complex_remediation",
             "remediate_simple": "remediate_simple",
             "remediate_transitive": "remediate_transitive",
             END: END,
         },
     )
+    builder.add_edge("prepare_complex_remediation", END)
     builder.add_edge("remediate_simple", "preflight_validate")
     builder.add_edge("remediate_transitive", "preflight_validate")
     builder.add_edge("preflight_validate", END)
@@ -101,6 +110,7 @@ def compile_remediation_graph(
     repository_inventory_adapter: RepositoryInventoryAdapter,
     advisory_verification_adapter: AdvisoryVerificationAdapter,
     maven_verification_adapter: MavenVerificationAdapter,
+    complex_remediation_adapter: ComplexRemediationAdapter,
     pom_mutation_adapter: PomMutationAdapter,
     preflight_resolution_adapter: PreflightResolutionAdapter,
     checkpointer: Any | None = None,
@@ -112,6 +122,7 @@ def compile_remediation_graph(
         repository_inventory_adapter=repository_inventory_adapter,
         advisory_verification_adapter=advisory_verification_adapter,
         maven_verification_adapter=maven_verification_adapter,
+        complex_remediation_adapter=complex_remediation_adapter,
         pom_mutation_adapter=pom_mutation_adapter,
         preflight_resolution_adapter=preflight_resolution_adapter,
     ).compile(checkpointer=checkpointer, name="execution_accelerator")
@@ -131,6 +142,7 @@ def bootstrap_ticket_run(
     repository_inventory_adapter = RepositoryInventoryAdapter.from_runtime_config(runtime_config)
     advisory_verification_adapter = AdvisoryVerificationAdapter.from_runtime_config(runtime_config)
     maven_verification_adapter = MavenVerificationAdapter.from_runtime_config(runtime_config)
+    complex_remediation_adapter = ComplexRemediationAdapter.from_runtime_config(runtime_config)
     pom_mutation_adapter = PomMutationAdapter.from_runtime_config(runtime_config)
     preflight_resolution_adapter = PreflightResolutionAdapter.from_runtime_config(runtime_config)
 
@@ -140,6 +152,7 @@ def bootstrap_ticket_run(
             repository_inventory_adapter=repository_inventory_adapter,
             advisory_verification_adapter=advisory_verification_adapter,
             maven_verification_adapter=maven_verification_adapter,
+            complex_remediation_adapter=complex_remediation_adapter,
             pom_mutation_adapter=pom_mutation_adapter,
             preflight_resolution_adapter=preflight_resolution_adapter,
             checkpointer=checkpointer,
@@ -163,6 +176,7 @@ def load_remediation_state(*, runtime_config: RuntimeConfig, thread_id: str) -> 
     repository_inventory_adapter = RepositoryInventoryAdapter.from_runtime_config(runtime_config)
     advisory_verification_adapter = AdvisoryVerificationAdapter.from_runtime_config(runtime_config)
     maven_verification_adapter = MavenVerificationAdapter.from_runtime_config(runtime_config)
+    complex_remediation_adapter = ComplexRemediationAdapter.from_runtime_config(runtime_config)
     pom_mutation_adapter = PomMutationAdapter.from_runtime_config(runtime_config)
     preflight_resolution_adapter = PreflightResolutionAdapter.from_runtime_config(runtime_config)
     with sqlite_checkpointer(runtime_config) as checkpointer:
@@ -171,6 +185,7 @@ def load_remediation_state(*, runtime_config: RuntimeConfig, thread_id: str) -> 
             repository_inventory_adapter=repository_inventory_adapter,
             advisory_verification_adapter=advisory_verification_adapter,
             maven_verification_adapter=maven_verification_adapter,
+            complex_remediation_adapter=complex_remediation_adapter,
             pom_mutation_adapter=pom_mutation_adapter,
             preflight_resolution_adapter=preflight_resolution_adapter,
             checkpointer=checkpointer,
@@ -186,4 +201,6 @@ def _select_remediation_node(state: RemediationState) -> str:
         return "remediate_simple"
     if state.route_decision.strategy == RemediationStrategy.TRANSITIVE_OVERRIDE:
         return "remediate_transitive"
+    if state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR:
+        return "prepare_complex_remediation"
     return END
