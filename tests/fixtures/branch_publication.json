@@ -1,0 +1,7 @@
+{
+  "repository": "payments-service",
+  "branch_name": "sec-123-remediate-legacy-json",
+  "commit_sha": "28520fe4d8a1c9b76d9d6c73d0b2e2d37f0a1234",
+  "commit_message": "Apply automated remediation for SEC-123",
+  "pushed": true
+}

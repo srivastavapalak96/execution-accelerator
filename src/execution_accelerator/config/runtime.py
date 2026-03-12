@@ -39,6 +39,11 @@ class RuntimeConfig:
     decompiled_artifact_fixture_path: Path | None
     symbol_mapping_fixture_path: Path | None
     code_change_plan_fixture_path: Path | None
+    validation_result_fixture_path: Path | None
+    rollback_fixture_path: Path | None
+    branch_publication_fixture_path: Path | None
+    pull_request_fixture_path: Path | None
+    jira_completion_fixture_path: Path | None
     github_owner: str | None
 
 
@@ -110,6 +115,26 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         "EA_CODE_CHANGE_PLAN_FIXTURE_PATH",
         str(resolved_root / "tests" / "fixtures" / "code_change_plan.json"),
     )
+    validation_result_fixture_path_value = os.getenv(
+        "EA_VALIDATION_RESULT_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "validation_result.json"),
+    )
+    rollback_fixture_path_value = os.getenv(
+        "EA_ROLLBACK_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "rollback_plan.json"),
+    )
+    branch_publication_fixture_path_value = os.getenv(
+        "EA_BRANCH_PUBLICATION_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "branch_publication.json"),
+    )
+    pull_request_fixture_path_value = os.getenv(
+        "EA_PULL_REQUEST_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "pull_request.json"),
+    )
+    jira_completion_fixture_path_value = os.getenv(
+        "EA_JIRA_COMPLETION_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "jira_completion.json"),
+    )
 
     return RuntimeConfig(
         repo_root=resolved_root,
@@ -177,6 +202,31 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         code_change_plan_fixture_path=(
             _resolve_path_setting(code_change_plan_fixture_path_value, repo_root=resolved_root)
             if code_change_plan_fixture_path_value
+            else None
+        ),
+        validation_result_fixture_path=(
+            _resolve_path_setting(validation_result_fixture_path_value, repo_root=resolved_root)
+            if validation_result_fixture_path_value
+            else None
+        ),
+        rollback_fixture_path=(
+            _resolve_path_setting(rollback_fixture_path_value, repo_root=resolved_root)
+            if rollback_fixture_path_value
+            else None
+        ),
+        branch_publication_fixture_path=(
+            _resolve_path_setting(branch_publication_fixture_path_value, repo_root=resolved_root)
+            if branch_publication_fixture_path_value
+            else None
+        ),
+        pull_request_fixture_path=(
+            _resolve_path_setting(pull_request_fixture_path_value, repo_root=resolved_root)
+            if pull_request_fixture_path_value
+            else None
+        ),
+        jira_completion_fixture_path=(
+            _resolve_path_setting(jira_completion_fixture_path_value, repo_root=resolved_root)
+            if jira_completion_fixture_path_value
             else None
         ),
         github_owner=os.getenv("EA_GITHUB_OWNER"),

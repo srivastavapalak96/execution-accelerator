@@ -1,6 +1,6 @@
 PYTHON ?= $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
 
-.PHONY: install test smoke intake-smoke verify-smoke remediate-smoke transitive-smoke complex-smoke run
+.PHONY: install test smoke intake-smoke verify-smoke remediate-smoke transitive-smoke complex-smoke validation-failure-smoke run
 
 install:
 	$(PYTHON) -m pip install -e .[dev]
@@ -50,6 +50,14 @@ complex-smoke:
 	EA_SYMBOL_MAPPING_FIXTURE_PATH=tests/fixtures/symbol_mappings.json \
 	EA_CODE_CHANGE_PLAN_FIXTURE_PATH=tests/fixtures/code_change_plan.json \
 	$(PYTHON) -m execution_accelerator --show-thread-state sec-123-complex
+
+validation-failure-smoke:
+	EA_VALIDATION_RESULT_FIXTURE_PATH=tests/fixtures/validation_result_failure.json \
+	EA_ROLLBACK_FIXTURE_PATH=tests/fixtures/rollback_plan.json \
+	$(PYTHON) -m execution_accelerator --bootstrap-ticket SEC-123 --thread-id sec-123-validation-failure
+	EA_VALIDATION_RESULT_FIXTURE_PATH=tests/fixtures/validation_result_failure.json \
+	EA_ROLLBACK_FIXTURE_PATH=tests/fixtures/rollback_plan.json \
+	$(PYTHON) -m execution_accelerator --show-thread-state sec-123-validation-failure
 
 run:
 	$(PYTHON) -m execution_accelerator

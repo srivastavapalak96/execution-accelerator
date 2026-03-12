@@ -11,11 +11,13 @@ from pydantic import BaseModel
 from execution_accelerator.adapters import (
     AdvisoryVerificationAdapter,
     ComplexRemediationAdapter,
+    DeliveryAdapter,
     JiraAdapter,
     MavenVerificationAdapter,
     PomMutationAdapter,
     PreflightResolutionAdapter,
     RepositoryInventoryAdapter,
+    ValidationAdapter,
 )
 from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.nodes import (
@@ -25,8 +27,11 @@ from execution_accelerator.nodes import (
     build_load_repository_context_node,
     build_preflight_validation_node,
     build_prepare_complex_remediation_node,
+    build_publish_remediation_node,
     build_remediate_simple_node,
     build_remediate_transitive_node,
+    build_handle_validation_failure_node,
+    build_validate_remediation_node,
     build_verify_advisory_node,
     build_verify_maven_target_node,
     select_route,
@@ -53,8 +58,10 @@ def build_remediation_graph(
     complex_remediation_adapter: ComplexRemediationAdapter,
     pom_mutation_adapter: PomMutationAdapter,
     preflight_resolution_adapter: PreflightResolutionAdapter,
+    validation_adapter: ValidationAdapter,
+    delivery_adapter: DeliveryAdapter,
 ) -> StateGraph:
-    """Build the Day 8 stateful remediation graph."""
+    """Build the Day 10 stateful remediation graph."""
 
     builder = StateGraph(RemediationState)
     builder.add_node("bootstrap_state", bootstrap_state)
@@ -86,6 +93,12 @@ def build_remediation_graph(
         "preflight_validate",
         build_preflight_validation_node(preflight_resolution_adapter),
     )
+    builder.add_node("validate_remediation", build_validate_remediation_node(validation_adapter))
+    builder.add_node(
+        "handle_validation_failure",
+        build_handle_validation_failure_node(validation_adapter),
+    )
+    builder.add_node("publish_remediation", build_publish_remediation_node(delivery_adapter))
     builder.add_edge(START, "bootstrap_state")
     builder.add_edge("bootstrap_state", "ingest_and_parse_jira")
     builder.add_edge("ingest_and_parse_jira", "load_repository_context")
@@ -103,10 +116,20 @@ def build_remediation_graph(
         },
     )
     builder.add_edge("prepare_complex_remediation", "execute_complex_scaffold")
-    builder.add_edge("execute_complex_scaffold", END)
+    builder.add_edge("execute_complex_scaffold", "validate_remediation")
     builder.add_edge("remediate_simple", "preflight_validate")
     builder.add_edge("remediate_transitive", "preflight_validate")
-    builder.add_edge("preflight_validate", END)
+    builder.add_edge("preflight_validate", "validate_remediation")
+    builder.add_conditional_edges(
+        "validate_remediation",
+        _select_post_validation_node,
+        {
+            "handle_validation_failure": "handle_validation_failure",
+            "publish_remediation": "publish_remediation",
+        },
+    )
+    builder.add_edge("publish_remediation", END)
+    builder.add_edge("handle_validation_failure", END)
     return builder
 
 
@@ -119,6 +142,8 @@ def compile_remediation_graph(
     complex_remediation_adapter: ComplexRemediationAdapter,
     pom_mutation_adapter: PomMutationAdapter,
     preflight_resolution_adapter: PreflightResolutionAdapter,
+    validation_adapter: ValidationAdapter,
+    delivery_adapter: DeliveryAdapter,
     checkpointer: Any | None = None,
 ):
     """Compile the remediation graph, optionally with persistence."""
@@ -131,6 +156,8 @@ def compile_remediation_graph(
         complex_remediation_adapter=complex_remediation_adapter,
         pom_mutation_adapter=pom_mutation_adapter,
         preflight_resolution_adapter=preflight_resolution_adapter,
+        validation_adapter=validation_adapter,
+        delivery_adapter=delivery_adapter,
     ).compile(checkpointer=checkpointer, name="execution_accelerator")
 
 
@@ -151,6 +178,8 @@ def bootstrap_ticket_run(
     complex_remediation_adapter = ComplexRemediationAdapter.from_runtime_config(runtime_config)
     pom_mutation_adapter = PomMutationAdapter.from_runtime_config(runtime_config)
     preflight_resolution_adapter = PreflightResolutionAdapter.from_runtime_config(runtime_config)
+    validation_adapter = ValidationAdapter.from_runtime_config(runtime_config)
+    delivery_adapter = DeliveryAdapter.from_runtime_config(runtime_config)
 
     with sqlite_checkpointer(runtime_config) as checkpointer:
         graph = compile_remediation_graph(
@@ -161,6 +190,8 @@ def bootstrap_ticket_run(
             complex_remediation_adapter=complex_remediation_adapter,
             pom_mutation_adapter=pom_mutation_adapter,
             preflight_resolution_adapter=preflight_resolution_adapter,
+            validation_adapter=validation_adapter,
+            delivery_adapter=delivery_adapter,
             checkpointer=checkpointer,
         )
         result = graph.invoke(
@@ -185,6 +216,8 @@ def load_remediation_state(*, runtime_config: RuntimeConfig, thread_id: str) -> 
     complex_remediation_adapter = ComplexRemediationAdapter.from_runtime_config(runtime_config)
     pom_mutation_adapter = PomMutationAdapter.from_runtime_config(runtime_config)
     preflight_resolution_adapter = PreflightResolutionAdapter.from_runtime_config(runtime_config)
+    validation_adapter = ValidationAdapter.from_runtime_config(runtime_config)
+    delivery_adapter = DeliveryAdapter.from_runtime_config(runtime_config)
     with sqlite_checkpointer(runtime_config) as checkpointer:
         graph = compile_remediation_graph(
             jira_adapter=jira_adapter,
@@ -194,6 +227,8 @@ def load_remediation_state(*, runtime_config: RuntimeConfig, thread_id: str) -> 
             complex_remediation_adapter=complex_remediation_adapter,
             pom_mutation_adapter=pom_mutation_adapter,
             preflight_resolution_adapter=preflight_resolution_adapter,
+            validation_adapter=validation_adapter,
+            delivery_adapter=delivery_adapter,
             checkpointer=checkpointer,
         )
         snapshot = graph.get_state(build_thread_config(thread_id))
@@ -210,3 +245,11 @@ def _select_remediation_node(state: RemediationState) -> str:
     if state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR:
         return "prepare_complex_remediation"
     return END
+
+
+def _select_post_validation_node(state: RemediationState) -> str:
+    assert state.validation_results
+
+    if state.validation_results[-1].status == "failed":
+        return "handle_validation_failure"
+    return "publish_remediation"

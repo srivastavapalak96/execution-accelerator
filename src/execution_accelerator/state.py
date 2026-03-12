@@ -10,10 +10,12 @@ from execution_accelerator.schemas import (
     ArtifactCandidate,
     AuditEvent,
     BaseSchemaModel,
+    BranchPublicationResult,
     ComplexCodeChangePlan,
     CompatibilityDiffResult,
     ComplexRemediationPlan,
     DecompiledArtifactSummary,
+    JiraCompletionResult,
     MavenVerification,
     HumanFeedback,
     PomMutationPlan,
@@ -21,6 +23,8 @@ from execution_accelerator.schemas import (
     RemediationPlan,
     RemediationRouteDecision,
     RepositoryValidationResult,
+    RollbackPlan,
+    PullRequestSummary,
     SymbolMappingEntry,
     VulnerabilityDetails,
     WorkflowStatus,
@@ -91,6 +95,10 @@ class RemediationState(BaseSchemaModel):
     modified_files: list[str] = Field(default_factory=list)
     code_diffs: list[CodeDiffSummary] = Field(default_factory=list)
     validation_results: list[RepositoryValidationResult] = Field(default_factory=list)
+    rollback_plan: RollbackPlan | None = None
+    branch_publication: BranchPublicationResult | None = None
+    pull_request_summary: PullRequestSummary | None = None
+    jira_completion: JiraCompletionResult | None = None
     errors: list[WorkflowError] = Field(default_factory=list)
     retry_count: int = Field(default=0, ge=0)
     requires_human_approval: bool = False

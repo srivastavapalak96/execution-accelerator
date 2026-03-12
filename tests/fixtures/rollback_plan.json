@@ -1,0 +1,9 @@
+{
+  "repository": "payments-service",
+  "status": "applied",
+  "reason": "Compile validation failed after remediation execution.",
+  "files_to_restore": [
+    "pom.xml",
+    "src/main/java/com/example/payments/LegacyJsonAdapter.java"
+  ]
+}

@@ -27,6 +27,8 @@ from execution_accelerator.schemas import (
     RemediationPlan,
     RemediationRouteDecision,
     RemediationStrategy,
+    RollbackPlan,
+    RollbackStatus,
     RepositoryInventoryPayload,
     Severity,
     SymbolMappingEntry,
@@ -234,6 +236,18 @@ def test_complex_code_change_plan_captures_target_files_and_mappings() -> None:
     assert decompiled.symbol_count == 184
     assert plan.target_files[0].file_path.endswith("LegacyJsonAdapter.java")
     assert plan.symbol_mappings[0].confidence == 0.94
+
+
+def test_rollback_plan_captures_validation_failure_follow_up() -> None:
+    plan = RollbackPlan(
+        repository="payments-service",
+        status=RollbackStatus.APPLIED,
+        reason="Compile validation failed after remediation execution.",
+        files_to_restore=["pom.xml", "src/main/java/com/example/payments/LegacyJsonAdapter.java"],
+    )
+
+    assert plan.status == RollbackStatus.APPLIED
+    assert len(plan.files_to_restore) == 2
 
 
 def test_preflight_resolution_fixture_parses_into_typed_payload() -> None:

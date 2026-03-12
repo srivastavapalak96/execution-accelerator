@@ -54,6 +54,14 @@ class ValidationStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class RollbackStatus(StrEnum):
+    """Status of rollback work after validation failure."""
+
+    PENDING = "pending"
+    APPLIED = "applied"
+    SKIPPED = "skipped"
+
+
 class VerificationStatus(StrEnum):
     """Status for advisory and Maven verification steps."""
 
@@ -335,6 +343,43 @@ class ComplexCodeChangePlan(BaseSchemaModel):
     target_files: list[CodeChangeTarget] = Field(default_factory=list)
     symbol_mappings: list[SymbolMappingEntry] = Field(default_factory=list)
     open_questions: list[str] = Field(default_factory=list)
+
+
+class RollbackPlan(BaseSchemaModel):
+    """Placeholder rollback plan emitted after validation failure."""
+
+    repository: str = Field(min_length=1)
+    status: RollbackStatus = RollbackStatus.PENDING
+    reason: str = Field(min_length=1)
+    files_to_restore: list[str] = Field(default_factory=list)
+
+
+class BranchPublicationResult(BaseSchemaModel):
+    """Placeholder branch/commit publication metadata for a completed remediation."""
+
+    repository: str = Field(min_length=1)
+    branch_name: str = Field(min_length=1)
+    commit_sha: str = Field(min_length=1)
+    commit_message: str = Field(min_length=1)
+    pushed: bool = True
+
+
+class PullRequestSummary(BaseSchemaModel):
+    """Placeholder pull request metadata emitted after publication."""
+
+    repository: str = Field(min_length=1)
+    number: int = Field(ge=1)
+    url: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    status: str = Field(min_length=1)
+
+
+class JiraCompletionResult(BaseSchemaModel):
+    """Placeholder Jira completion metadata for a finished remediation."""
+
+    ticket_id: str = Field(min_length=1)
+    status: str = Field(min_length=1)
+    comment: str = Field(min_length=1)
 
 
 class RemediationPlan(BaseSchemaModel):

@@ -57,6 +57,26 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
         "EA_CODE_CHANGE_PLAN_FIXTURE_PATH",
         str(tmp_path / "fixtures" / "code_change_plan.json"),
     )
+    monkeypatch.setenv(
+        "EA_VALIDATION_RESULT_FIXTURE_PATH",
+        str(tmp_path / "fixtures" / "validation_result.json"),
+    )
+    monkeypatch.setenv(
+        "EA_ROLLBACK_FIXTURE_PATH",
+        str(tmp_path / "fixtures" / "rollback_plan.json"),
+    )
+    monkeypatch.setenv(
+        "EA_BRANCH_PUBLICATION_FIXTURE_PATH",
+        str(tmp_path / "fixtures" / "branch_publication.json"),
+    )
+    monkeypatch.setenv(
+        "EA_PULL_REQUEST_FIXTURE_PATH",
+        str(tmp_path / "fixtures" / "pull_request.json"),
+    )
+    monkeypatch.setenv(
+        "EA_JIRA_COMPLETION_FIXTURE_PATH",
+        str(tmp_path / "fixtures" / "jira_completion.json"),
+    )
 
     exit_code = main()
 
@@ -88,6 +108,11 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     assert f"decompiled_artifact_fixture_path={tmp_path / 'fixtures' / 'decompiled_artifacts.json'}" in captured.out
     assert f"symbol_mapping_fixture_path={tmp_path / 'fixtures' / 'symbol_mappings.json'}" in captured.out
     assert f"code_change_plan_fixture_path={tmp_path / 'fixtures' / 'code_change_plan.json'}" in captured.out
+    assert f"validation_result_fixture_path={tmp_path / 'fixtures' / 'validation_result.json'}" in captured.out
+    assert f"rollback_fixture_path={tmp_path / 'fixtures' / 'rollback_plan.json'}" in captured.out
+    assert f"branch_publication_fixture_path={tmp_path / 'fixtures' / 'branch_publication.json'}" in captured.out
+    assert f"pull_request_fixture_path={tmp_path / 'fixtures' / 'pull_request.json'}" in captured.out
+    assert f"jira_completion_fixture_path={tmp_path / 'fixtures' / 'jira_completion.json'}" in captured.out
 
 
 def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
@@ -153,6 +178,26 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
         "EA_CODE_CHANGE_PLAN_FIXTURE_PATH",
         str(Path(__file__).parent / "fixtures" / "code_change_plan.json"),
     )
+    monkeypatch.setenv(
+        "EA_VALIDATION_RESULT_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "validation_result.json"),
+    )
+    monkeypatch.setenv(
+        "EA_ROLLBACK_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "rollback_plan.json"),
+    )
+    monkeypatch.setenv(
+        "EA_BRANCH_PUBLICATION_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "branch_publication.json"),
+    )
+    monkeypatch.setenv(
+        "EA_PULL_REQUEST_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "pull_request.json"),
+    )
+    monkeypatch.setenv(
+        "EA_JIRA_COMPLETION_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "jira_completion.json"),
+    )
 
     exit_code = main()
 
@@ -160,13 +205,14 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert exit_code == 0
     assert "thread_id=sec-401-dev" in captured.out
     assert f"checkpoint_path={tmp_path / 'state' / 'checkpoints.sqlite'}" in captured.out
-    assert "workflow_status=planning_ready" in captured.out
-    assert "audit_event_count=8" in captured.out
+    assert "workflow_status=completed" in captured.out
+    assert "audit_event_count=10" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
     assert "severity=high" in captured.out
     assert "recommended_fix_version=1.2.4" in captured.out
     assert "dependency_kind=direct" in captured.out
-    assert "pending_repos=payments-service" in captured.out
+    assert "pending_repos=" in captured.out
+    assert "completed_repos=payments-service" in captured.out
     assert "route_strategy=simple_update" in captured.out
     assert "route_confidence=0.93" in captured.out
     assert "plan_strategy=simple_update" in captured.out
@@ -178,6 +224,11 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "preflight_status=passed" in captured.out
     assert "preflight_dependency_kind=direct" in captured.out
     assert "preflight_resolved_version=1.2.4" in captured.out
+    assert "validation_status=passed" in captured.out
+    assert "validation_check_count=3" in captured.out
+    assert "branch_name=sec-123-remediate-legacy-json" in captured.out
+    assert "pull_request_number=42" in captured.out
+    assert "jira_ticket_status=done" in captured.out
 
 
 def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> None:
@@ -210,6 +261,11 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
     monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
     monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
+    monkeypatch.setenv("EA_VALIDATION_RESULT_FIXTURE_PATH", str(fixture_dir / "validation_result.json"))
+    monkeypatch.setenv("EA_ROLLBACK_FIXTURE_PATH", str(fixture_dir / "rollback_plan.json"))
+    monkeypatch.setenv("EA_BRANCH_PUBLICATION_FIXTURE_PATH", str(fixture_dir / "branch_publication.json"))
+    monkeypatch.setenv("EA_PULL_REQUEST_FIXTURE_PATH", str(fixture_dir / "pull_request.json"))
+    monkeypatch.setenv("EA_JIRA_COMPLETION_FIXTURE_PATH", str(fixture_dir / "jira_completion.json"))
 
     monkeypatch.setattr(
         "sys.argv",
@@ -237,10 +293,10 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "thread_id=sec-402-dev" in captured.out
-    assert "workflow_status=planning_ready" in captured.out
-    assert "pending_repos=payments-service" in captured.out
-    assert "completed_repos=" in captured.out
-    assert "audit_event_count=8" in captured.out
+    assert "workflow_status=completed" in captured.out
+    assert "pending_repos=" in captured.out
+    assert "completed_repos=payments-service" in captured.out
+    assert "audit_event_count=10" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
     assert "recommended_fix_version=1.2.4" in captured.out
     assert "route_strategy=simple_update" in captured.out
@@ -252,6 +308,11 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     assert "preflight_status=passed" in captured.out
     assert "preflight_dependency_kind=direct" in captured.out
     assert "preflight_resolved_version=1.2.4" in captured.out
+    assert "validation_status=passed" in captured.out
+    assert "validation_check_count=3" in captured.out
+    assert "branch_name=sec-123-remediate-legacy-json" in captured.out
+    assert "pull_request_number=42" in captured.out
+    assert "jira_ticket_status=done" in captured.out
 
 
 def test_main_bootstraps_transitive_ticket(monkeypatch, capsys, tmp_path) -> None:
@@ -288,6 +349,11 @@ def test_main_bootstraps_transitive_ticket(monkeypatch, capsys, tmp_path) -> Non
     monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
     monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
     monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
+    monkeypatch.setenv("EA_VALIDATION_RESULT_FIXTURE_PATH", str(fixture_dir / "validation_result.json"))
+    monkeypatch.setenv("EA_ROLLBACK_FIXTURE_PATH", str(fixture_dir / "rollback_plan.json"))
+    monkeypatch.setenv("EA_BRANCH_PUBLICATION_FIXTURE_PATH", str(fixture_dir / "branch_publication.json"))
+    monkeypatch.setenv("EA_PULL_REQUEST_FIXTURE_PATH", str(fixture_dir / "pull_request.json"))
+    monkeypatch.setenv("EA_JIRA_COMPLETION_FIXTURE_PATH", str(fixture_dir / "jira_completion.json"))
 
     exit_code = main()
 
@@ -302,6 +368,11 @@ def test_main_bootstraps_transitive_ticket(monkeypatch, capsys, tmp_path) -> Non
     assert "preflight_status=passed" in captured.out
     assert "preflight_dependency_kind=transitive" in captured.out
     assert "preflight_resolved_version=1.2.4" in captured.out
+    assert "validation_status=passed" in captured.out
+    assert "validation_check_count=3" in captured.out
+    assert "branch_name=sec-123-remediate-legacy-json" in captured.out
+    assert "pull_request_number=42" in captured.out
+    assert "jira_ticket_status=done" in captured.out
 
 
 def test_main_bootstraps_complex_ticket(monkeypatch, capsys, tmp_path) -> None:
@@ -332,6 +403,11 @@ def test_main_bootstraps_complex_ticket(monkeypatch, capsys, tmp_path) -> None:
     monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
     monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
     monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
+    monkeypatch.setenv("EA_VALIDATION_RESULT_FIXTURE_PATH", str(fixture_dir / "validation_result.json"))
+    monkeypatch.setenv("EA_ROLLBACK_FIXTURE_PATH", str(fixture_dir / "rollback_plan.json"))
+    monkeypatch.setenv("EA_BRANCH_PUBLICATION_FIXTURE_PATH", str(fixture_dir / "branch_publication.json"))
+    monkeypatch.setenv("EA_PULL_REQUEST_FIXTURE_PATH", str(fixture_dir / "pull_request.json"))
+    monkeypatch.setenv("EA_JIRA_COMPLETION_FIXTURE_PATH", str(fixture_dir / "jira_completion.json"))
 
     exit_code = main()
 
@@ -346,3 +422,8 @@ def test_main_bootstraps_complex_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "complex_decompiled_artifact_count=2" in captured.out
     assert "complex_symbol_mapping_count=2" in captured.out
     assert "complex_planned_file_count=2" in captured.out
+    assert "validation_status=passed" in captured.out
+    assert "validation_check_count=3" in captured.out
+    assert "branch_name=sec-123-remediate-legacy-json" in captured.out
+    assert "pull_request_number=42" in captured.out
+    assert "jira_ticket_status=done" in captured.out

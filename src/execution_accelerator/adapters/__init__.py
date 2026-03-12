@@ -6,6 +6,7 @@ from .complex import (
     ComplexRemediationAdapterError,
     ComplexRemediationConfigurationError,
 )
+from .delivery import DeliveryAdapter, DeliveryAdapterError, DeliveryConfigurationError
 from .repository_inventory import (
     RepositoryInventoryAdapter,
     RepositoryInventoryAdapterError,
@@ -27,6 +28,7 @@ from .verification import (
     VerificationAdapterError,
     VerificationConfigurationError,
 )
+from .validation import ValidationAdapter, ValidationAdapterError, ValidationConfigurationError
 
 __all__ = [
     "JiraAdapter",
@@ -36,6 +38,9 @@ __all__ = [
     "ComplexRemediationAdapter",
     "ComplexRemediationAdapterError",
     "ComplexRemediationConfigurationError",
+    "DeliveryAdapter",
+    "DeliveryAdapterError",
+    "DeliveryConfigurationError",
     "RepositoryInventoryAdapter",
     "RepositoryInventoryAdapterError",
     "RepositoryInventoryConfigurationError",
@@ -51,4 +56,7 @@ __all__ = [
     "MavenVerificationMismatchError",
     "VerificationAdapterError",
     "VerificationConfigurationError",
+    "ValidationAdapter",
+    "ValidationAdapterError",
+    "ValidationConfigurationError",
 ]

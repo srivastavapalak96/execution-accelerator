@@ -67,6 +67,11 @@ def main() -> int:
         print(f"decompiled_artifact_fixture_path={config.decompiled_artifact_fixture_path}")
         print(f"symbol_mapping_fixture_path={config.symbol_mapping_fixture_path}")
         print(f"code_change_plan_fixture_path={config.code_change_plan_fixture_path}")
+        print(f"validation_result_fixture_path={config.validation_result_fixture_path}")
+        print(f"rollback_fixture_path={config.rollback_fixture_path}")
+        print(f"branch_publication_fixture_path={config.branch_publication_fixture_path}")
+        print(f"pull_request_fixture_path={config.pull_request_fixture_path}")
+        print(f"jira_completion_fixture_path={config.jira_completion_fixture_path}")
         return 0
 
     if args.bootstrap_ticket:
@@ -88,6 +93,7 @@ def main() -> int:
         if result.state.maven_verification is not None:
             print(f"dependency_kind={result.state.maven_verification.dependency_kind}")
         print(f"pending_repos={','.join(result.state.pending_repos)}")
+        print(f"completed_repos={','.join(result.state.completed_repos)}")
         if result.state.route_decision is not None:
             print(f"route_strategy={result.state.route_decision.strategy}")
             print(f"route_confidence={result.state.route_decision.confidence:.2f}")
@@ -116,6 +122,21 @@ def main() -> int:
             print(f"preflight_status={result.state.preflight_resolution.status}")
             print(f"preflight_dependency_kind={result.state.preflight_resolution.dependency_kind}")
             print(f"preflight_resolved_version={result.state.preflight_resolution.resolved_version}")
+        if result.state.validation_results:
+            validation = result.state.validation_results[-1]
+            print(f"validation_status={validation.status}")
+            print(f"validation_check_count={len(validation.checks)}")
+        if result.state.rollback_plan is not None:
+            print(f"rollback_status={result.state.rollback_plan.status}")
+            print(f"rollback_reason={result.state.rollback_plan.reason}")
+        if result.state.branch_publication is not None:
+            print(f"branch_name={result.state.branch_publication.branch_name}")
+            print(f"branch_commit_sha={result.state.branch_publication.commit_sha}")
+        if result.state.pull_request_summary is not None:
+            print(f"pull_request_number={result.state.pull_request_summary.number}")
+            print(f"pull_request_url={result.state.pull_request_summary.url}")
+        if result.state.jira_completion is not None:
+            print(f"jira_ticket_status={result.state.jira_completion.status}")
         return 0
 
     if args.show_thread_state:
@@ -155,6 +176,21 @@ def main() -> int:
             print(f"preflight_status={state.preflight_resolution.status}")
             print(f"preflight_dependency_kind={state.preflight_resolution.dependency_kind}")
             print(f"preflight_resolved_version={state.preflight_resolution.resolved_version}")
+        if state.validation_results:
+            validation = state.validation_results[-1]
+            print(f"validation_status={validation.status}")
+            print(f"validation_check_count={len(validation.checks)}")
+        if state.rollback_plan is not None:
+            print(f"rollback_status={state.rollback_plan.status}")
+            print(f"rollback_reason={state.rollback_plan.reason}")
+        if state.branch_publication is not None:
+            print(f"branch_name={state.branch_publication.branch_name}")
+            print(f"branch_commit_sha={state.branch_publication.commit_sha}")
+        if state.pull_request_summary is not None:
+            print(f"pull_request_number={state.pull_request_summary.number}")
+            print(f"pull_request_url={state.pull_request_summary.url}")
+        if state.jira_completion is not None:
+            print(f"jira_ticket_status={state.jira_completion.status}")
         return 0
 
     parser.print_help()
