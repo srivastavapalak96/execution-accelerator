@@ -1,0 +1,26 @@
+{
+  "decompiled_artifacts": [
+    {
+      "coordinate": {
+        "group_id": "org.example",
+        "artifact_id": "legacy-json",
+        "version": "2.0.0"
+      },
+      "source_path": "artifacts/org.example-legacy-json-2.0.0.jar",
+      "package_count": 12,
+      "symbol_count": 184,
+      "notes": "Primary candidate decompiled for API comparison."
+    },
+    {
+      "coordinate": {
+        "group_id": "org.example",
+        "artifact_id": "legacy-json-modern",
+        "version": "2.1.0"
+      },
+      "source_path": "artifacts/org.example-legacy-json-modern-2.1.0.jar",
+      "package_count": 9,
+      "symbol_count": 143,
+      "notes": "Replacement candidate decompiled for migration planning."
+    }
+  ]
+}

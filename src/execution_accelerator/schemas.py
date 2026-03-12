@@ -244,6 +244,33 @@ class CompatibilityDiffResult(BaseSchemaModel):
     breaking_changes: list[CompatibilityDiffEntry] = Field(default_factory=list)
 
 
+class DecompiledArtifactSummary(BaseSchemaModel):
+    """Placeholder output from fetching and decompiling one candidate artifact."""
+
+    coordinate: DependencyCoordinate
+    source_path: str = Field(min_length=1)
+    package_count: int = Field(ge=0)
+    symbol_count: int = Field(ge=0)
+    notes: str = Field(min_length=1)
+
+
+class SymbolMappingEntry(BaseSchemaModel):
+    """Mapping between a legacy symbol and its target replacement."""
+
+    legacy_symbol: str = Field(min_length=1)
+    replacement_symbol: str = Field(min_length=1)
+    confidence: float = Field(ge=0.0, le=1.0)
+    rationale: str = Field(min_length=1)
+
+
+class CodeChangeTarget(BaseSchemaModel):
+    """One file-level change target derived from complex remediation analysis."""
+
+    file_path: str = Field(min_length=1)
+    change_summary: str = Field(min_length=1)
+    related_symbols: list[str] = Field(default_factory=list)
+
+
 class PomMutationKind(StrEnum):
     """Kinds of pom mutations supported by the Day 5 simple remediation flow."""
 
@@ -298,6 +325,16 @@ class ComplexRemediationPlan(BaseSchemaModel):
     artifact_candidates: list[ArtifactCandidate] = Field(default_factory=list)
     compatibility_diff: CompatibilityDiffResult
     requires_code_changes: bool = True
+
+
+class ComplexCodeChangePlan(BaseSchemaModel):
+    """Structured code-change planning placeholder for the complex remediation lane."""
+
+    repository: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    target_files: list[CodeChangeTarget] = Field(default_factory=list)
+    symbol_mappings: list[SymbolMappingEntry] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
 
 
 class RemediationPlan(BaseSchemaModel):

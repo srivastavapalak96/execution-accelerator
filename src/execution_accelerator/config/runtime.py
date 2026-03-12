@@ -36,6 +36,9 @@ class RuntimeConfig:
     preflight_resolution_fixture_path: Path | None
     complex_artifact_fixture_path: Path | None
     compatibility_diff_fixture_path: Path | None
+    decompiled_artifact_fixture_path: Path | None
+    symbol_mapping_fixture_path: Path | None
+    code_change_plan_fixture_path: Path | None
     github_owner: str | None
 
 
@@ -95,6 +98,18 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         "EA_COMPATIBILITY_DIFF_FIXTURE_PATH",
         str(resolved_root / "tests" / "fixtures" / "compatibility_diff.json"),
     )
+    decompiled_artifact_fixture_path_value = os.getenv(
+        "EA_DECOMPILED_ARTIFACT_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "decompiled_artifacts.json"),
+    )
+    symbol_mapping_fixture_path_value = os.getenv(
+        "EA_SYMBOL_MAPPING_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "symbol_mappings.json"),
+    )
+    code_change_plan_fixture_path_value = os.getenv(
+        "EA_CODE_CHANGE_PLAN_FIXTURE_PATH",
+        str(resolved_root / "tests" / "fixtures" / "code_change_plan.json"),
+    )
 
     return RuntimeConfig(
         repo_root=resolved_root,
@@ -147,6 +162,21 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         compatibility_diff_fixture_path=(
             _resolve_path_setting(compatibility_diff_fixture_path_value, repo_root=resolved_root)
             if compatibility_diff_fixture_path_value
+            else None
+        ),
+        decompiled_artifact_fixture_path=(
+            _resolve_path_setting(decompiled_artifact_fixture_path_value, repo_root=resolved_root)
+            if decompiled_artifact_fixture_path_value
+            else None
+        ),
+        symbol_mapping_fixture_path=(
+            _resolve_path_setting(symbol_mapping_fixture_path_value, repo_root=resolved_root)
+            if symbol_mapping_fixture_path_value
+            else None
+        ),
+        code_change_plan_fixture_path=(
+            _resolve_path_setting(code_change_plan_fixture_path_value, repo_root=resolved_root)
+            if code_change_plan_fixture_path_value
             else None
         ),
         github_owner=os.getenv("EA_GITHUB_OWNER"),

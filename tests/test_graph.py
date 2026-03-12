@@ -54,6 +54,9 @@ def _configure_runtime(monkeypatch, tmp_path, *, transitive: bool = False, compl
     )
     monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixtures_dir / "complex_artifacts.json"))
     monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixtures_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixtures_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixtures_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixtures_dir / "code_change_plan.json"))
 
 
 def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch) -> None:
@@ -159,8 +162,14 @@ def test_bootstrap_ticket_run_persists_complex_refactor_state(tmp_path, monkeypa
     assert len(result.state.complex_remediation_plan.artifact_candidates) == 2
     assert result.state.compatibility_diff is not None
     assert result.state.compatibility_diff.risk == "high"
+    assert len(result.state.decompiled_artifacts) == 2
+    assert len(result.state.symbol_mappings) == 2
+    assert result.state.code_change_plan is not None
+    assert len(result.state.code_change_plan.target_files) == 2
     assert result.state.preflight_resolution is None
     assert result.state.pom_mutation_plan is None
-    assert len(result.state.audit_events) == 7
+    assert len(result.state.audit_events) == 8
     assert loaded_state.complex_remediation_plan is not None
     assert loaded_state.complex_remediation_plan.compatibility_diff.target_version == "2.0.0"
+    assert loaded_state.code_change_plan is not None
+    assert loaded_state.code_change_plan.target_files[0].file_path.endswith("LegacyJsonAdapter.java")

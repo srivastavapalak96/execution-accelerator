@@ -20,6 +20,7 @@ from execution_accelerator.adapters import (
 from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.nodes import (
     bootstrap_state,
+    build_execute_complex_scaffold_node,
     build_ingest_and_parse_jira_node,
     build_load_repository_context_node,
     build_preflight_validation_node,
@@ -53,7 +54,7 @@ def build_remediation_graph(
     pom_mutation_adapter: PomMutationAdapter,
     preflight_resolution_adapter: PreflightResolutionAdapter,
 ) -> StateGraph:
-    """Build the Day 7 stateful remediation graph."""
+    """Build the Day 8 stateful remediation graph."""
 
     builder = StateGraph(RemediationState)
     builder.add_node("bootstrap_state", bootstrap_state)
@@ -74,6 +75,10 @@ def build_remediation_graph(
     builder.add_node(
         "prepare_complex_remediation",
         build_prepare_complex_remediation_node(complex_remediation_adapter),
+    )
+    builder.add_node(
+        "execute_complex_scaffold",
+        build_execute_complex_scaffold_node(complex_remediation_adapter),
     )
     builder.add_node("remediate_simple", build_remediate_simple_node(pom_mutation_adapter))
     builder.add_node("remediate_transitive", build_remediate_transitive_node(pom_mutation_adapter))
@@ -97,7 +102,8 @@ def build_remediation_graph(
             END: END,
         },
     )
-    builder.add_edge("prepare_complex_remediation", END)
+    builder.add_edge("prepare_complex_remediation", "execute_complex_scaffold")
+    builder.add_edge("execute_complex_scaffold", END)
     builder.add_edge("remediate_simple", "preflight_validate")
     builder.add_edge("remediate_transitive", "preflight_validate")
     builder.add_edge("preflight_validate", END)

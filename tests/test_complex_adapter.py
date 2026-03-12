@@ -16,6 +16,9 @@ def test_complex_remediation_adapter_loads_artifact_candidates(tmp_path, monkeyp
     fixture_dir = Path(__file__).parent / "fixtures"
     monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "complex_artifacts.json"))
     monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixture_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
     config = load_runtime_config(repo_root=tmp_path)
     adapter = ComplexRemediationAdapter.from_runtime_config(config)
 
@@ -29,6 +32,9 @@ def test_complex_remediation_adapter_loads_compatibility_diff(tmp_path, monkeypa
     fixture_dir = Path(__file__).parent / "fixtures"
     monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "complex_artifacts.json"))
     monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixture_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
     config = load_runtime_config(repo_root=tmp_path)
     adapter = ComplexRemediationAdapter.from_runtime_config(config)
 
@@ -36,6 +42,25 @@ def test_complex_remediation_adapter_loads_compatibility_diff(tmp_path, monkeypa
 
     assert diff.risk == CompatibilityRisk.HIGH
     assert diff.breaking_changes[0].symbol == "org.example.LegacyParser#parse"
+
+
+def test_complex_remediation_adapter_loads_execution_scaffold_fixtures(tmp_path, monkeypatch) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "complex_artifacts.json"))
+    monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixture_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
+    config = load_runtime_config(repo_root=tmp_path)
+    adapter = ComplexRemediationAdapter.from_runtime_config(config)
+
+    decompiled_artifacts = adapter.load_decompiled_artifacts()
+    symbol_mappings = adapter.load_symbol_mappings()
+    code_change_plan = adapter.load_code_change_plan()
+
+    assert decompiled_artifacts[0].symbol_count == 184
+    assert symbol_mappings[0].confidence == 0.94
+    assert len(code_change_plan.target_files) == 2
 
 
 def test_complex_remediation_adapter_requires_configuration() -> None:

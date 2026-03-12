@@ -12,6 +12,7 @@ from execution_accelerator.adapters import (
     RepositoryInventoryAdapter,
 )
 from execution_accelerator.nodes import (
+    build_execute_complex_scaffold_node,
     build_load_repository_context_node,
     build_preflight_validation_node,
     build_prepare_complex_remediation_node,
@@ -132,3 +133,25 @@ def test_prepare_complex_remediation_node_records_analysis_placeholders(tmp_path
     assert update["compatibility_diff"].risk == "high"
     assert update["complex_remediation_plan"].strategy == "complex_refactor"
     assert update["audit_events"][-1].event_type == "remediation.complex_prepare"
+
+
+def test_execute_complex_scaffold_node_records_decompile_and_change_plan(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    adapter = ComplexRemediationAdapter(
+        artifact_fixture_path=fixture_dir / "complex_artifacts.json",
+        compatibility_diff_fixture_path=fixture_dir / "compatibility_diff.json",
+        decompiled_artifact_fixture_path=fixture_dir / "decompiled_artifacts.json",
+        symbol_mapping_fixture_path=fixture_dir / "symbol_mappings.json",
+        code_change_plan_fixture_path=fixture_dir / "code_change_plan.json",
+    )
+    prepare_node = build_prepare_complex_remediation_node(adapter)
+    scaffold_node = build_execute_complex_scaffold_node(adapter)
+    base_state = build_state(tmp_path, complex_refactor=True)
+    prepared_state = base_state.model_copy(update=prepare_node(base_state))
+
+    update = scaffold_node(prepared_state)
+
+    assert len(update["decompiled_artifacts"]) == 2
+    assert len(update["symbol_mappings"]) == 2
+    assert update["code_change_plan"].target_files[0].file_path.endswith("LegacyJsonAdapter.java")
+    assert update["audit_events"][-1].event_type == "remediation.complex_scaffold"

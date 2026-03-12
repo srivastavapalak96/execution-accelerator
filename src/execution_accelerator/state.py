@@ -10,8 +10,10 @@ from execution_accelerator.schemas import (
     ArtifactCandidate,
     AuditEvent,
     BaseSchemaModel,
+    ComplexCodeChangePlan,
     CompatibilityDiffResult,
     ComplexRemediationPlan,
+    DecompiledArtifactSummary,
     MavenVerification,
     HumanFeedback,
     PomMutationPlan,
@@ -19,6 +21,7 @@ from execution_accelerator.schemas import (
     RemediationPlan,
     RemediationRouteDecision,
     RepositoryValidationResult,
+    SymbolMappingEntry,
     VulnerabilityDetails,
     WorkflowStatus,
 )
@@ -76,6 +79,9 @@ class RemediationState(BaseSchemaModel):
     artifact_candidates: list[ArtifactCandidate] = Field(default_factory=list)
     compatibility_diff: CompatibilityDiffResult | None = None
     complex_remediation_plan: ComplexRemediationPlan | None = None
+    decompiled_artifacts: list[DecompiledArtifactSummary] = Field(default_factory=list)
+    symbol_mappings: list[SymbolMappingEntry] = Field(default_factory=list)
+    code_change_plan: ComplexCodeChangePlan | None = None
     repo_map: dict[str, RepositoryWorkspace] = Field(default_factory=dict)
     pending_repos: list[str] = Field(default_factory=list)
     current_working_repo: str | None = None

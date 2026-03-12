@@ -1,0 +1,40 @@
+{
+  "repository": "payments-service",
+  "summary": "Update parser construction and serializer wiring for the major-version jump.",
+  "target_files": [
+    {
+      "file_path": "src/main/java/com/example/payments/LegacyJsonAdapter.java",
+      "change_summary": "Replace removed parser entry point with the builder-backed parser.",
+      "related_symbols": [
+        "org.example.LegacyParser#parse",
+        "org.example.JsonParserBuilder#create().parse"
+      ]
+    },
+    {
+      "file_path": "src/main/java/com/example/payments/LegacySerializerConfig.java",
+      "change_summary": "Introduce SerializationConfig factory and pass it into serializer construction.",
+      "related_symbols": [
+        "org.example.LegacySerializer.<init>(boolean)",
+        "org.example.SerializationConfigFactory#create"
+      ]
+    }
+  ],
+  "symbol_mappings": [
+    {
+      "legacy_symbol": "org.example.LegacyParser#parse",
+      "replacement_symbol": "org.example.JsonParserBuilder#create().parse",
+      "confidence": 0.94,
+      "rationale": "Builder factory replaces the removed static parser entry point."
+    },
+    {
+      "legacy_symbol": "org.example.LegacySerializer.<init>(boolean)",
+      "replacement_symbol": "org.example.SerializationConfigFactory#create",
+      "confidence": 0.81,
+      "rationale": "Serializer construction now depends on an explicit config object."
+    }
+  ],
+  "open_questions": [
+    "Should adapter construction move behind a Spring bean factory?",
+    "Do downstream services depend on the removed serializer constructor defaults?"
+  ]
+}

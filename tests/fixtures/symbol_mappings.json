@@ -1,0 +1,16 @@
+{
+  "symbol_mappings": [
+    {
+      "legacy_symbol": "org.example.LegacyParser#parse",
+      "replacement_symbol": "org.example.JsonParserBuilder#create().parse",
+      "confidence": 0.94,
+      "rationale": "Builder factory replaces the removed static parser entry point."
+    },
+    {
+      "legacy_symbol": "org.example.LegacySerializer.<init>(boolean)",
+      "replacement_symbol": "org.example.SerializationConfigFactory#create",
+      "confidence": 0.81,
+      "rationale": "Serializer construction now depends on an explicit config object."
+    }
+  ]
+}

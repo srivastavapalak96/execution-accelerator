@@ -6,7 +6,13 @@ import json
 from pathlib import Path
 
 from execution_accelerator.config import RuntimeConfig
-from execution_accelerator.schemas import ArtifactCandidate, CompatibilityDiffResult
+from execution_accelerator.schemas import (
+    ArtifactCandidate,
+    ComplexCodeChangePlan,
+    CompatibilityDiffResult,
+    DecompiledArtifactSummary,
+    SymbolMappingEntry,
+)
 
 
 class ComplexRemediationAdapterError(RuntimeError):
@@ -25,9 +31,15 @@ class ComplexRemediationAdapter:
         *,
         artifact_fixture_path: Path | None = None,
         compatibility_diff_fixture_path: Path | None = None,
+        decompiled_artifact_fixture_path: Path | None = None,
+        symbol_mapping_fixture_path: Path | None = None,
+        code_change_plan_fixture_path: Path | None = None,
     ) -> None:
         self.artifact_fixture_path = artifact_fixture_path
         self.compatibility_diff_fixture_path = compatibility_diff_fixture_path
+        self.decompiled_artifact_fixture_path = decompiled_artifact_fixture_path
+        self.symbol_mapping_fixture_path = symbol_mapping_fixture_path
+        self.code_change_plan_fixture_path = code_change_plan_fixture_path
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "ComplexRemediationAdapter":
@@ -36,6 +48,9 @@ class ComplexRemediationAdapter:
         return cls(
             artifact_fixture_path=config.complex_artifact_fixture_path,
             compatibility_diff_fixture_path=config.compatibility_diff_fixture_path,
+            decompiled_artifact_fixture_path=config.decompiled_artifact_fixture_path,
+            symbol_mapping_fixture_path=config.symbol_mapping_fixture_path,
+            code_change_plan_fixture_path=config.code_change_plan_fixture_path,
         )
 
     def load_artifact_candidates(self, *, fixture_path: Path | None = None) -> list[ArtifactCandidate]:
@@ -62,3 +77,45 @@ class ComplexRemediationAdapter:
             )
 
         return CompatibilityDiffResult.model_validate(json.loads(resolved_fixture_path.read_text()))
+
+    def load_decompiled_artifacts(
+        self,
+        *,
+        fixture_path: Path | None = None,
+    ) -> list[DecompiledArtifactSummary]:
+        """Load placeholder decompiled-artifact summaries."""
+
+        resolved_fixture_path = fixture_path or self.decompiled_artifact_fixture_path
+        if resolved_fixture_path is None:
+            raise ComplexRemediationConfigurationError(
+                "Decompiled artifact fixture path is not configured. "
+                "Set EA_DECOMPILED_ARTIFACT_FIXTURE_PATH for local Day 8 remediation."
+            )
+
+        payload = json.loads(resolved_fixture_path.read_text())
+        return [DecompiledArtifactSummary.model_validate(item) for item in payload["decompiled_artifacts"]]
+
+    def load_symbol_mappings(self, *, fixture_path: Path | None = None) -> list[SymbolMappingEntry]:
+        """Load placeholder symbol mappings for the complex remediation lane."""
+
+        resolved_fixture_path = fixture_path or self.symbol_mapping_fixture_path
+        if resolved_fixture_path is None:
+            raise ComplexRemediationConfigurationError(
+                "Symbol mapping fixture path is not configured. "
+                "Set EA_SYMBOL_MAPPING_FIXTURE_PATH for local Day 8 remediation."
+            )
+
+        payload = json.loads(resolved_fixture_path.read_text())
+        return [SymbolMappingEntry.model_validate(item) for item in payload["symbol_mappings"]]
+
+    def load_code_change_plan(self, *, fixture_path: Path | None = None) -> ComplexCodeChangePlan:
+        """Load the placeholder code-change plan for the complex remediation lane."""
+
+        resolved_fixture_path = fixture_path or self.code_change_plan_fixture_path
+        if resolved_fixture_path is None:
+            raise ComplexRemediationConfigurationError(
+                "Code change plan fixture path is not configured. "
+                "Set EA_CODE_CHANGE_PLAN_FIXTURE_PATH for local Day 8 remediation."
+            )
+
+        return ComplexCodeChangePlan.model_validate(json.loads(resolved_fixture_path.read_text()))

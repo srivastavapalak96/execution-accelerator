@@ -1,4 +1,4 @@
-PYTHON ?= python3
+PYTHON ?= $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
 
 .PHONY: install test smoke intake-smoke verify-smoke remediate-smoke transitive-smoke complex-smoke run
 
@@ -38,11 +38,17 @@ complex-smoke:
 	EA_MAVEN_VERIFICATION_FIXTURE_PATH=tests/fixtures/maven_verification_complex.json \
 	EA_COMPLEX_ARTIFACT_FIXTURE_PATH=tests/fixtures/complex_artifacts.json \
 	EA_COMPATIBILITY_DIFF_FIXTURE_PATH=tests/fixtures/compatibility_diff.json \
+	EA_DECOMPILED_ARTIFACT_FIXTURE_PATH=tests/fixtures/decompiled_artifacts.json \
+	EA_SYMBOL_MAPPING_FIXTURE_PATH=tests/fixtures/symbol_mappings.json \
+	EA_CODE_CHANGE_PLAN_FIXTURE_PATH=tests/fixtures/code_change_plan.json \
 	$(PYTHON) -m execution_accelerator --bootstrap-ticket SEC-123 --thread-id sec-123-complex
 	EA_ADVISORY_FIXTURE_PATH=tests/fixtures/advisory_verification_complex.json \
 	EA_MAVEN_VERIFICATION_FIXTURE_PATH=tests/fixtures/maven_verification_complex.json \
 	EA_COMPLEX_ARTIFACT_FIXTURE_PATH=tests/fixtures/complex_artifacts.json \
 	EA_COMPATIBILITY_DIFF_FIXTURE_PATH=tests/fixtures/compatibility_diff.json \
+	EA_DECOMPILED_ARTIFACT_FIXTURE_PATH=tests/fixtures/decompiled_artifacts.json \
+	EA_SYMBOL_MAPPING_FIXTURE_PATH=tests/fixtures/symbol_mappings.json \
+	EA_CODE_CHANGE_PLAN_FIXTURE_PATH=tests/fixtures/code_change_plan.json \
 	$(PYTHON) -m execution_accelerator --show-thread-state sec-123-complex
 
 run:

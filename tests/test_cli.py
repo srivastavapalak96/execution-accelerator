@@ -45,6 +45,18 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
         "EA_COMPATIBILITY_DIFF_FIXTURE_PATH",
         str(tmp_path / "fixtures" / "compatibility_diff.json"),
     )
+    monkeypatch.setenv(
+        "EA_DECOMPILED_ARTIFACT_FIXTURE_PATH",
+        str(tmp_path / "fixtures" / "decompiled_artifacts.json"),
+    )
+    monkeypatch.setenv(
+        "EA_SYMBOL_MAPPING_FIXTURE_PATH",
+        str(tmp_path / "fixtures" / "symbol_mappings.json"),
+    )
+    monkeypatch.setenv(
+        "EA_CODE_CHANGE_PLAN_FIXTURE_PATH",
+        str(tmp_path / "fixtures" / "code_change_plan.json"),
+    )
 
     exit_code = main()
 
@@ -73,6 +85,9 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     )
     assert f"complex_artifact_fixture_path={tmp_path / 'fixtures' / 'complex_artifacts.json'}" in captured.out
     assert f"compatibility_diff_fixture_path={tmp_path / 'fixtures' / 'compatibility_diff.json'}" in captured.out
+    assert f"decompiled_artifact_fixture_path={tmp_path / 'fixtures' / 'decompiled_artifacts.json'}" in captured.out
+    assert f"symbol_mapping_fixture_path={tmp_path / 'fixtures' / 'symbol_mappings.json'}" in captured.out
+    assert f"code_change_plan_fixture_path={tmp_path / 'fixtures' / 'code_change_plan.json'}" in captured.out
 
 
 def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
@@ -125,6 +140,18 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     monkeypatch.setenv(
         "EA_COMPATIBILITY_DIFF_FIXTURE_PATH",
         str(Path(__file__).parent / "fixtures" / "compatibility_diff.json"),
+    )
+    monkeypatch.setenv(
+        "EA_DECOMPILED_ARTIFACT_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "decompiled_artifacts.json"),
+    )
+    monkeypatch.setenv(
+        "EA_SYMBOL_MAPPING_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "symbol_mappings.json"),
+    )
+    monkeypatch.setenv(
+        "EA_CODE_CHANGE_PLAN_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "code_change_plan.json"),
     )
 
     exit_code = main()
@@ -180,6 +207,9 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     )
     monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "complex_artifacts.json"))
     monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixture_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
 
     monkeypatch.setattr(
         "sys.argv",
@@ -255,6 +285,9 @@ def test_main_bootstraps_transitive_ticket(monkeypatch, capsys, tmp_path) -> Non
     )
     monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "complex_artifacts.json"))
     monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixture_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
 
     exit_code = main()
 
@@ -296,6 +329,9 @@ def test_main_bootstraps_complex_ticket(monkeypatch, capsys, tmp_path) -> None:
     monkeypatch.setenv("EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH", str(fixture_dir / "preflight_resolution.json"))
     monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "complex_artifacts.json"))
     monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixture_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
 
     exit_code = main()
 
@@ -307,3 +343,6 @@ def test_main_bootstraps_complex_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "plan_strategy=complex_refactor" in captured.out
     assert "complex_candidate_count=2" in captured.out
     assert "complex_breaking_change_count=2" in captured.out
+    assert "complex_decompiled_artifact_count=2" in captured.out
+    assert "complex_symbol_mapping_count=2" in captured.out
+    assert "complex_planned_file_count=2" in captured.out

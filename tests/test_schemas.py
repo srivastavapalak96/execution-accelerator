@@ -11,7 +11,10 @@ from execution_accelerator.schemas import (
     CompatibilityChangeType,
     CompatibilityDiffEntry,
     CompatibilityDiffResult,
+    ComplexCodeChangePlan,
     ComplexRemediationPlan,
+    CodeChangeTarget,
+    DecompiledArtifactSummary,
     DependencyCoordinate,
     JiraIssuePayload,
     MavenDependencyKind,
@@ -26,6 +29,7 @@ from execution_accelerator.schemas import (
     RemediationStrategy,
     RepositoryInventoryPayload,
     Severity,
+    SymbolMappingEntry,
     ValidationCheck,
     ValidationStatus,
     VulnerabilityDetails,
@@ -194,6 +198,42 @@ def test_complex_remediation_plan_captures_artifact_candidates_and_diff() -> Non
     assert plan.strategy == RemediationStrategy.COMPLEX_REFACTOR
     assert plan.artifact_candidates[0].coordinate.version == "2.0.0"
     assert plan.compatibility_diff.breaking_changes[0].change_type == CompatibilityChangeType.REMOVED
+
+
+def test_complex_code_change_plan_captures_target_files_and_mappings() -> None:
+    mapping = SymbolMappingEntry(
+        legacy_symbol="org.example.LegacyParser#parse",
+        replacement_symbol="org.example.JsonParserBuilder#create().parse",
+        confidence=0.94,
+        rationale="Builder factory replaces the removed parser entry point.",
+    )
+    decompiled = DecompiledArtifactSummary(
+        coordinate=DependencyCoordinate(
+            group_id="org.example",
+            artifact_id="legacy-json",
+            version="2.0.0",
+        ),
+        source_path="artifacts/org.example-legacy-json-2.0.0.jar",
+        package_count=12,
+        symbol_count=184,
+        notes="Primary candidate decompiled for API comparison.",
+    )
+    plan = ComplexCodeChangePlan(
+        repository="payments-service",
+        summary="Update parser construction and serializer wiring.",
+        target_files=[
+            CodeChangeTarget(
+                file_path="src/main/java/com/example/payments/LegacyJsonAdapter.java",
+                change_summary="Replace the removed parser entry point.",
+                related_symbols=[mapping.legacy_symbol, mapping.replacement_symbol],
+            )
+        ],
+        symbol_mappings=[mapping],
+    )
+
+    assert decompiled.symbol_count == 184
+    assert plan.target_files[0].file_path.endswith("LegacyJsonAdapter.java")
+    assert plan.symbol_mappings[0].confidence == 0.94
 
 
 def test_preflight_resolution_fixture_parses_into_typed_payload() -> None:

@@ -237,6 +237,7 @@ flowchart TD
 - decompile JARs
 - derive compatibility diff
 - build old-to-new symbol mapping
+- generate a structured file-level code-change plan
 - apply deterministic migration where possible
 - use bounded code generation for residual gaps
 

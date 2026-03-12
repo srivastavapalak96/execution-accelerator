@@ -11,12 +11,12 @@ from execution_accelerator.adapters import (
 )
 from execution_accelerator.schemas import (
     AuditEvent,
+    ComplexRemediationPlan,
     DependencyCoordinate,
     PomMutationChange,
     PomMutationKind,
     PomMutationPlan,
     PomSectionTarget,
-    ComplexRemediationPlan,
     RemediationStrategy,
 )
 from execution_accelerator.state import CodeDiffSummary, RemediationState
@@ -180,6 +180,43 @@ def build_prepare_complex_remediation_node(complex_adapter: ComplexRemediationAd
         }
 
     return prepare_complex_remediation
+
+
+def build_execute_complex_scaffold_node(complex_adapter: ComplexRemediationAdapter):
+    """Create a node that expands the Day 8 complex analysis into an execution scaffold."""
+
+    def execute_complex_scaffold(state: RemediationState) -> dict[str, object]:
+        assert state.route_decision is not None
+        assert state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR
+        assert state.current_working_repo is not None
+        assert state.complex_remediation_plan is not None
+
+        decompiled_artifacts = complex_adapter.load_decompiled_artifacts()
+        symbol_mappings = complex_adapter.load_symbol_mappings()
+        code_change_plan = complex_adapter.load_code_change_plan()
+
+        audit_events = list(state.audit_events)
+        audit_events.append(
+            AuditEvent(
+                event_type="remediation.complex_scaffold",
+                message=f"Built complex execution scaffold for {state.current_working_repo}.",
+                details={
+                    "repository": state.current_working_repo,
+                    "decompiled_artifact_count": len(decompiled_artifacts),
+                    "symbol_mapping_count": len(symbol_mappings),
+                    "planned_file_count": len(code_change_plan.target_files),
+                },
+            )
+        )
+
+        return {
+            "decompiled_artifacts": decompiled_artifacts,
+            "symbol_mappings": symbol_mappings,
+            "code_change_plan": code_change_plan,
+            "audit_events": audit_events,
+        }
+
+    return execute_complex_scaffold
 
 
 def _build_simple_plan(state: RemediationState, repository: str) -> PomMutationPlan:
