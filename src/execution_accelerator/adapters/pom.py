@@ -59,7 +59,10 @@ class PomMutationAdapter:
     def apply_plan(self, xml_text: str, plan: PomMutationPlan) -> str:
         """Apply the simple remediation plan to the provided pom.xml text."""
 
-        root = ET.fromstring(xml_text)
+        root = ET.fromstring(
+            xml_text,
+            parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)),
+        )
 
         for change in plan.changes:
             if change.target_section == "dependency_management":

@@ -22,6 +22,10 @@ from execution_accelerator.schemas import (
 from execution_accelerator.state import CodeDiffSummary, RemediationState
 
 
+class WorkspaceError(RuntimeError):
+    """Raised when the expected workspace manifest is missing."""
+
+
 def build_remediate_simple_node(pom_adapter: PomMutationAdapter):
     """Create a node that applies the Day 5 simple remediation plan."""
 
@@ -35,8 +39,8 @@ def build_remediate_simple_node(pom_adapter: PomMutationAdapter):
         plan = _build_simple_plan(state, repository)
 
         pom_path = Path(workspace.local_path) / plan.changes[0].file_path
-        pom_path.parent.mkdir(parents=True, exist_ok=True)
-        pom_path.write_text(pom_adapter.load_fixture_before())
+        if not pom_path.exists():
+            raise WorkspaceError("workspace pom missing; clone failed")
         mutated_xml = pom_adapter.apply_plan(pom_path.read_text(), plan)
         pom_path.write_text(mutated_xml)
 
@@ -77,8 +81,8 @@ def build_remediate_transitive_node(pom_adapter: PomMutationAdapter):
         plan = _build_transitive_plan(state, repository)
 
         pom_path = Path(workspace.local_path) / plan.changes[0].file_path
-        pom_path.parent.mkdir(parents=True, exist_ok=True)
-        pom_path.write_text(pom_adapter.load_fixture_before())
+        if not pom_path.exists():
+            raise WorkspaceError("workspace pom missing; clone failed")
         mutated_xml = pom_adapter.apply_plan(pom_path.read_text(), plan)
         pom_path.write_text(mutated_xml)
 

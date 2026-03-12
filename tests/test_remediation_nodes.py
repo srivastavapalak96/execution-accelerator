@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from execution_accelerator.adapters import (
     AdvisoryVerificationAdapter,
     ComplexRemediationAdapter,
@@ -19,8 +21,10 @@ from execution_accelerator.nodes import (
     build_remediate_simple_node,
     build_remediate_transitive_node,
 )
+from execution_accelerator.nodes.remediation import WorkspaceError
 from execution_accelerator.nodes.verification import select_route
 from execution_accelerator.state import RemediationState
+from tests.conftest import seed_workspace_pom
 
 
 def build_state(tmp_path: Path, *, transitive: bool = False, complex_refactor: bool = False) -> RemediationState:
@@ -70,6 +74,8 @@ def test_remediate_simple_node_applies_pom_change(tmp_path) -> None:
         )
     )
     state = build_state(tmp_path)
+    workspace = Path(state.repo_map["payments-service"].local_path)
+    seed_workspace_pom(workspace, fixture_dir / "pom_before.xml")
 
     update = node(state)
 
@@ -89,6 +95,8 @@ def test_remediate_transitive_node_applies_dependency_management_override(tmp_pa
         )
     )
     state = build_state(tmp_path, transitive=True)
+    workspace = Path(state.repo_map["payments-service"].local_path)
+    seed_workspace_pom(workspace, fixture_dir / "pom_transitive_before.xml")
 
     update = node(state)
 
@@ -98,6 +106,20 @@ def test_remediate_transitive_node_applies_dependency_management_override(tmp_pa
     assert Path(update["modified_files"][0]).read_text().count("1.2.4") == 1
     assert update["code_diffs"][0].change_summary.startswith("Added dependencyManagement override")
     assert update["audit_events"][-1].event_type == "remediation.transitive_override"
+
+
+def test_remediation_nodes_require_workspace_pom(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    node = build_remediate_simple_node(
+        PomMutationAdapter(
+            fixture_before_path=fixture_dir / "pom_before.xml",
+            fixture_after_path=fixture_dir / "pom_after.xml",
+        )
+    )
+    state = build_state(tmp_path)
+
+    with pytest.raises(WorkspaceError, match="workspace pom missing; clone failed"):
+        node(state)
 
 
 def test_preflight_validation_node_loads_fixture_result() -> None:
