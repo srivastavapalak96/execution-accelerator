@@ -45,6 +45,13 @@ class WorkflowStatus(StrEnum):
     FAILED = "failed"
 
 
+class ExecutionMode(StrEnum):
+    """Top-level execution mode for fixture-backed versus live integrations."""
+
+    FIXTURE = "fixture"
+    LIVE = "live"
+
+
 class ValidationStatus(StrEnum):
     """Status for validation checks and repo-level validation."""
 

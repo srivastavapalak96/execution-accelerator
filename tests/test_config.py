@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from execution_accelerator.config import load_runtime_config
+from execution_accelerator.schemas import ExecutionMode
 
 
 def test_load_runtime_config_uses_repo_relative_defaults(tmp_path, monkeypatch) -> None:
@@ -14,6 +15,7 @@ def test_load_runtime_config_uses_repo_relative_defaults(tmp_path, monkeypatch) 
     config = load_runtime_config(repo_root=tmp_path)
 
     assert config.repo_root == tmp_path
+    assert config.execution_mode == ExecutionMode.FIXTURE
     assert config.data_dir == Path(tmp_path / ".local" / "data")
     assert config.workspace_dir == Path(tmp_path / ".local" / "workspace")
     assert config.logs_dir == Path(tmp_path / ".local" / "logs")
@@ -32,6 +34,14 @@ def test_load_runtime_config_reads_optional_environment(tmp_path, monkeypatch) -
     assert config.jira_project_key == "SEC"
     assert config.github_owner == "srivastavapalak96"
     assert config.checkpoints_path == Path(tmp_path / "checkpoints.sqlite")
+
+
+def test_load_runtime_config_reads_execution_mode(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("EA_MODE", "live")
+
+    config = load_runtime_config(repo_root=tmp_path)
+
+    assert config.execution_mode == ExecutionMode.LIVE
 
 
 def test_load_runtime_config_resolves_relative_environment_paths(tmp_path, monkeypatch) -> None:

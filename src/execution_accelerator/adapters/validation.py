@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig
-from execution_accelerator.schemas import RepositoryValidationResult, RollbackPlan
+from execution_accelerator.schemas import ExecutionMode, RepositoryValidationResult, RollbackPlan
 
 
 class ValidationAdapterError(RuntimeError):
@@ -25,9 +26,11 @@ class ValidationAdapter:
         *,
         validation_result_fixture_path: Path | None = None,
         rollback_fixture_path: Path | None = None,
+        mode: ExecutionMode = ExecutionMode.FIXTURE,
     ) -> None:
         self.validation_result_fixture_path = validation_result_fixture_path
         self.rollback_fixture_path = rollback_fixture_path
+        self.mode = mode
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "ValidationAdapter":
@@ -36,6 +39,7 @@ class ValidationAdapter:
         return cls(
             validation_result_fixture_path=config.validation_result_fixture_path,
             rollback_fixture_path=config.rollback_fixture_path,
+            mode=config.execution_mode,
         )
 
     def load_validation_result(
@@ -46,6 +50,7 @@ class ValidationAdapter:
     ) -> RepositoryValidationResult:
         """Load the placeholder validation result for one repository."""
 
+        require_fixture_mode(self.mode, capability="Validation live execution")
         resolved_fixture_path = fixture_path or self.validation_result_fixture_path
         if resolved_fixture_path is None:
             raise ValidationConfigurationError(
@@ -64,6 +69,7 @@ class ValidationAdapter:
     ) -> RollbackPlan:
         """Load the placeholder rollback plan for one repository."""
 
+        require_fixture_mode(self.mode, capability="Rollback live execution")
         resolved_fixture_path = fixture_path or self.rollback_fixture_path
         if resolved_fixture_path is None:
             raise ValidationConfigurationError(

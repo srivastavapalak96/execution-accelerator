@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import os
 
+from execution_accelerator.schemas import ExecutionMode
+
 
 def _resolve_path_setting(value: str | Path, *, repo_root: Path) -> Path:
     """Resolve path settings relative to the repository root when needed."""
@@ -25,6 +27,7 @@ class RuntimeConfig:
     workspace_dir: Path
     logs_dir: Path
     checkpoints_path: Path
+    execution_mode: ExecutionMode
     jira_base_url: str | None
     jira_project_key: str | None
     jira_fixture_path: Path | None
@@ -67,6 +70,7 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         os.getenv("EA_CHECKPOINTS_PATH", data_dir / "checkpoints.sqlite"),
         repo_root=resolved_root,
     )
+    execution_mode = ExecutionMode(os.getenv("EA_MODE", ExecutionMode.FIXTURE))
     jira_fixture_path_value = os.getenv(
         "EA_JIRA_FIXTURE_PATH",
         str(resolved_root / "tests" / "fixtures" / "jira_issue.json"),
@@ -142,6 +146,7 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         workspace_dir=workspace_dir,
         logs_dir=logs_dir,
         checkpoints_path=checkpoints_path,
+        execution_mode=execution_mode,
         jira_base_url=os.getenv("EA_JIRA_BASE_URL"),
         jira_project_key=os.getenv("EA_JIRA_PROJECT_KEY"),
         jira_fixture_path=(

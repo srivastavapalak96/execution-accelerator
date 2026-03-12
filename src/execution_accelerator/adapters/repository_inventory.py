@@ -6,8 +6,14 @@ import json
 from pathlib import Path
 import re
 
+from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig
-from execution_accelerator.schemas import RepositoryInventoryPayload, RepositoryInventoryRecord, VulnerabilityDetails
+from execution_accelerator.schemas import (
+    ExecutionMode,
+    RepositoryInventoryPayload,
+    RepositoryInventoryRecord,
+    VulnerabilityDetails,
+)
 from execution_accelerator.state import RepositoryWorkspace
 
 
@@ -29,9 +35,16 @@ class RepositoryInventoryLookupError(RepositoryInventoryAdapterError):
 class RepositoryInventoryAdapter:
     """Load fixture-backed inventory and prepare local repository workspaces."""
 
-    def __init__(self, *, fixture_path: Path | None = None, workspace_root: Path | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        fixture_path: Path | None = None,
+        workspace_root: Path | None = None,
+        mode: ExecutionMode = ExecutionMode.FIXTURE,
+    ) -> None:
         self.fixture_path = fixture_path
         self.workspace_root = workspace_root
+        self.mode = mode
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "RepositoryInventoryAdapter":
@@ -40,11 +53,13 @@ class RepositoryInventoryAdapter:
         return cls(
             fixture_path=config.repository_inventory_fixture_path,
             workspace_root=config.workspace_dir,
+            mode=config.execution_mode,
         )
 
     def load_inventory(self, *, fixture_path: Path | None = None) -> RepositoryInventoryPayload:
         """Load the repository inventory fixture."""
 
+        require_fixture_mode(self.mode, capability="Repository inventory live resolution")
         resolved_fixture_path = fixture_path or self.fixture_path
         if resolved_fixture_path is None:
             raise RepositoryInventoryConfigurationError(
@@ -84,6 +99,7 @@ class RepositoryInventoryAdapter:
     ) -> RepositoryWorkspace:
         """Create a local workspace directory for a resolved repository."""
 
+        require_fixture_mode(self.mode, capability="Repository live clone preparation")
         resolved_workspace_root = workspace_root or self.workspace_root
         if resolved_workspace_root is None:
             raise RepositoryInventoryConfigurationError("Workspace root is not configured for repository intake.")

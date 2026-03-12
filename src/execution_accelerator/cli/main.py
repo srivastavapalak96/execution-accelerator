@@ -51,6 +51,7 @@ def main() -> int:
     if args.show_config:
         config = load_runtime_config()
         print(f"repo_root={config.repo_root}")
+        print(f"execution_mode={config.execution_mode}")
         print(f"data_dir={config.data_dir}")
         print(f"workspace_dir={config.workspace_dir}")
         print(f"logs_dir={config.logs_dir}")

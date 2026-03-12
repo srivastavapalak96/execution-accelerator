@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.schemas import (
+    ExecutionMode,
     ArtifactCandidate,
     ComplexCodeChangePlan,
     CompatibilityDiffResult,
@@ -34,12 +36,14 @@ class ComplexRemediationAdapter:
         decompiled_artifact_fixture_path: Path | None = None,
         symbol_mapping_fixture_path: Path | None = None,
         code_change_plan_fixture_path: Path | None = None,
+        mode: ExecutionMode = ExecutionMode.FIXTURE,
     ) -> None:
         self.artifact_fixture_path = artifact_fixture_path
         self.compatibility_diff_fixture_path = compatibility_diff_fixture_path
         self.decompiled_artifact_fixture_path = decompiled_artifact_fixture_path
         self.symbol_mapping_fixture_path = symbol_mapping_fixture_path
         self.code_change_plan_fixture_path = code_change_plan_fixture_path
+        self.mode = mode
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "ComplexRemediationAdapter":
@@ -51,11 +55,13 @@ class ComplexRemediationAdapter:
             decompiled_artifact_fixture_path=config.decompiled_artifact_fixture_path,
             symbol_mapping_fixture_path=config.symbol_mapping_fixture_path,
             code_change_plan_fixture_path=config.code_change_plan_fixture_path,
+            mode=config.execution_mode,
         )
 
     def load_artifact_candidates(self, *, fixture_path: Path | None = None) -> list[ArtifactCandidate]:
         """Load candidate artifacts for the complex remediation lane."""
 
+        require_fixture_mode(self.mode, capability="Complex live artifact analysis")
         resolved_fixture_path = fixture_path or self.artifact_fixture_path
         if resolved_fixture_path is None:
             raise ComplexRemediationConfigurationError(
@@ -69,6 +75,7 @@ class ComplexRemediationAdapter:
     def load_compatibility_diff(self, *, fixture_path: Path | None = None) -> CompatibilityDiffResult:
         """Load the placeholder compatibility diff result."""
 
+        require_fixture_mode(self.mode, capability="Complex live compatibility diffing")
         resolved_fixture_path = fixture_path or self.compatibility_diff_fixture_path
         if resolved_fixture_path is None:
             raise ComplexRemediationConfigurationError(
@@ -85,6 +92,7 @@ class ComplexRemediationAdapter:
     ) -> list[DecompiledArtifactSummary]:
         """Load placeholder decompiled-artifact summaries."""
 
+        require_fixture_mode(self.mode, capability="Complex live decompilation")
         resolved_fixture_path = fixture_path or self.decompiled_artifact_fixture_path
         if resolved_fixture_path is None:
             raise ComplexRemediationConfigurationError(
@@ -98,6 +106,7 @@ class ComplexRemediationAdapter:
     def load_symbol_mappings(self, *, fixture_path: Path | None = None) -> list[SymbolMappingEntry]:
         """Load placeholder symbol mappings for the complex remediation lane."""
 
+        require_fixture_mode(self.mode, capability="Complex live symbol mapping")
         resolved_fixture_path = fixture_path or self.symbol_mapping_fixture_path
         if resolved_fixture_path is None:
             raise ComplexRemediationConfigurationError(
@@ -111,6 +120,7 @@ class ComplexRemediationAdapter:
     def load_code_change_plan(self, *, fixture_path: Path | None = None) -> ComplexCodeChangePlan:
         """Load the placeholder code-change plan for the complex remediation lane."""
 
+        require_fixture_mode(self.mode, capability="Complex live code-change planning")
         resolved_fixture_path = fixture_path or self.code_change_plan_fixture_path
         if resolved_fixture_path is None:
             raise ComplexRemediationConfigurationError(

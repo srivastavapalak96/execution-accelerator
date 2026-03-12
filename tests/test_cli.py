@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from execution_accelerator.cli.main import main
+from tests.conftest import seed_bootstrap_workspace_pom
 
 
 def test_main_prints_version(monkeypatch, capsys) -> None:
@@ -17,6 +18,7 @@ def test_main_prints_version(monkeypatch, capsys) -> None:
 
 def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     monkeypatch.setattr("sys.argv", ["execution-accelerator", "--show-config"])
+    monkeypatch.setenv("EA_MODE", "fixture")
     monkeypatch.setenv("EA_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
     monkeypatch.setenv("EA_LOGS_DIR", str(tmp_path / "logs"))
@@ -83,6 +85,7 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "repo_root=" in captured.out
+    assert "execution_mode=fixture" in captured.out
     assert f"data_dir={tmp_path / 'data'}" in captured.out
     assert f"workspace_dir={tmp_path / 'workspace'}" in captured.out
     assert f"logs_dir={tmp_path / 'logs'}" in captured.out
@@ -198,6 +201,12 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
         "EA_JIRA_COMPLETION_FIXTURE_PATH",
         str(Path(__file__).parent / "fixtures" / "jira_completion.json"),
     )
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-401",
+        repository_name="payments-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_before.xml",
+    )
 
     exit_code = main()
 
@@ -266,6 +275,12 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     monkeypatch.setenv("EA_BRANCH_PUBLICATION_FIXTURE_PATH", str(fixture_dir / "branch_publication.json"))
     monkeypatch.setenv("EA_PULL_REQUEST_FIXTURE_PATH", str(fixture_dir / "pull_request.json"))
     monkeypatch.setenv("EA_JIRA_COMPLETION_FIXTURE_PATH", str(fixture_dir / "jira_completion.json"))
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-402",
+        repository_name="payments-service",
+        fixture_path=fixture_dir / "pom_before.xml",
+    )
 
     monkeypatch.setattr(
         "sys.argv",
@@ -354,6 +369,12 @@ def test_main_bootstraps_transitive_ticket(monkeypatch, capsys, tmp_path) -> Non
     monkeypatch.setenv("EA_BRANCH_PUBLICATION_FIXTURE_PATH", str(fixture_dir / "branch_publication.json"))
     monkeypatch.setenv("EA_PULL_REQUEST_FIXTURE_PATH", str(fixture_dir / "pull_request.json"))
     monkeypatch.setenv("EA_JIRA_COMPLETION_FIXTURE_PATH", str(fixture_dir / "jira_completion.json"))
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-499",
+        repository_name="payments-service",
+        fixture_path=fixture_dir / "pom_transitive_before.xml",
+    )
 
     exit_code = main()
 

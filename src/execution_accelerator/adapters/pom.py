@@ -6,8 +6,9 @@ import json
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig
-from execution_accelerator.schemas import PomMutationPlan, PreflightResolutionResult
+from execution_accelerator.schemas import ExecutionMode, PomMutationPlan, PreflightResolutionResult
 
 
 MAVEN_NAMESPACE = {"m": "http://maven.apache.org/POM/4.0.0"}
@@ -33,9 +34,11 @@ class PomMutationAdapter:
         *,
         fixture_before_path: Path | None = None,
         fixture_after_path: Path | None = None,
+        mode: ExecutionMode = ExecutionMode.FIXTURE,
     ) -> None:
         self.fixture_before_path = fixture_before_path
         self.fixture_after_path = fixture_after_path
+        self.mode = mode
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "PomMutationAdapter":
@@ -44,11 +47,13 @@ class PomMutationAdapter:
         return cls(
             fixture_before_path=config.pom_fixture_before_path,
             fixture_after_path=config.pom_fixture_after_path,
+            mode=config.execution_mode,
         )
 
     def load_fixture_before(self, *, fixture_path: Path | None = None) -> str:
         """Load the baseline pom fixture."""
 
+        require_fixture_mode(self.mode, capability="Pom live mutation seeding")
         resolved_fixture_path = fixture_path or self.fixture_before_path
         if resolved_fixture_path is None:
             raise PomMutationConfigurationError(
@@ -59,6 +64,7 @@ class PomMutationAdapter:
     def apply_plan(self, xml_text: str, plan: PomMutationPlan) -> str:
         """Apply the simple remediation plan to the provided pom.xml text."""
 
+        require_fixture_mode(self.mode, capability="Pom live mutation")
         root = ET.fromstring(
             xml_text,
             parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)),
@@ -123,6 +129,7 @@ class PomMutationAdapter:
     def expected_fixture_after(self, *, fixture_path: Path | None = None) -> str:
         """Load the expected mutated pom fixture for local verification."""
 
+        require_fixture_mode(self.mode, capability="Pom live mutation verification")
         resolved_fixture_path = fixture_path or self.fixture_after_path
         if resolved_fixture_path is None:
             raise PomMutationConfigurationError(
@@ -134,14 +141,20 @@ class PomMutationAdapter:
 class PreflightResolutionAdapter:
     """Load fixture-backed preflight resolution results."""
 
-    def __init__(self, *, fixture_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        fixture_path: Path | None = None,
+        mode: ExecutionMode = ExecutionMode.FIXTURE,
+    ) -> None:
         self.fixture_path = fixture_path
+        self.mode = mode
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "PreflightResolutionAdapter":
         """Create the preflight adapter from runtime configuration."""
 
-        return cls(fixture_path=config.preflight_resolution_fixture_path)
+        return cls(fixture_path=config.preflight_resolution_fixture_path, mode=config.execution_mode)
 
     def load_result(
         self,
@@ -151,6 +164,7 @@ class PreflightResolutionAdapter:
     ) -> PreflightResolutionResult:
         """Load the fixture-backed preflight resolution result."""
 
+        require_fixture_mode(self.mode, capability="Preflight live validation")
         resolved_fixture_path = fixture_path or self.fixture_path
         if resolved_fixture_path is None:
             raise PomMutationConfigurationError(

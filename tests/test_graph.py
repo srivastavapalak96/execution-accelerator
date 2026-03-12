@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from execution_accelerator.config import load_runtime_config
 from execution_accelerator.graph import bootstrap_ticket_run, load_remediation_state
 from execution_accelerator.schemas import WorkflowStatus
+from tests.conftest import seed_bootstrap_workspace_pom
 
 
 def _configure_runtime(monkeypatch, tmp_path, *, transitive: bool = False, complex_refactor: bool = False) -> None:
@@ -66,6 +67,12 @@ def _configure_runtime(monkeypatch, tmp_path, *, transitive: bool = False, compl
 
 def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch) -> None:
     _configure_runtime(monkeypatch, tmp_path)
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-42",
+        repository_name="payments-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_before.xml",
+    )
     config = load_runtime_config(repo_root=tmp_path)
 
     result = bootstrap_ticket_run(
@@ -117,6 +124,12 @@ def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch)
 
 def test_bootstrap_ticket_run_persists_transitive_override_state(tmp_path, monkeypatch) -> None:
     _configure_runtime(monkeypatch, tmp_path, transitive=True)
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-420",
+        repository_name="payments-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_transitive_before.xml",
+    )
     config = load_runtime_config(repo_root=tmp_path)
 
     result = bootstrap_ticket_run(
@@ -201,6 +214,12 @@ def test_bootstrap_ticket_run_records_failure_and_rollback_state(tmp_path, monke
     monkeypatch.setenv(
         "EA_VALIDATION_RESULT_FIXTURE_PATH",
         str(Path(__file__).parent / "fixtures" / "validation_result_failure.json"),
+    )
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-500",
+        repository_name="payments-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_before.xml",
     )
     config = load_runtime_config(repo_root=tmp_path)
 

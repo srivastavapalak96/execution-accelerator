@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.schemas import (
     BranchPublicationResult,
+    ExecutionMode,
     JiraCompletionResult,
     PullRequestSummary,
 )
@@ -30,10 +32,12 @@ class DeliveryAdapter:
         branch_publication_fixture_path: Path | None = None,
         pull_request_fixture_path: Path | None = None,
         jira_completion_fixture_path: Path | None = None,
+        mode: ExecutionMode = ExecutionMode.FIXTURE,
     ) -> None:
         self.branch_publication_fixture_path = branch_publication_fixture_path
         self.pull_request_fixture_path = pull_request_fixture_path
         self.jira_completion_fixture_path = jira_completion_fixture_path
+        self.mode = mode
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "DeliveryAdapter":
@@ -43,6 +47,7 @@ class DeliveryAdapter:
             branch_publication_fixture_path=config.branch_publication_fixture_path,
             pull_request_fixture_path=config.pull_request_fixture_path,
             jira_completion_fixture_path=config.jira_completion_fixture_path,
+            mode=config.execution_mode,
         )
 
     def load_branch_publication(
@@ -53,6 +58,7 @@ class DeliveryAdapter:
     ) -> BranchPublicationResult:
         """Load placeholder branch and commit publication metadata."""
 
+        require_fixture_mode(self.mode, capability="Delivery live publication")
         resolved_fixture_path = fixture_path or self.branch_publication_fixture_path
         if resolved_fixture_path is None:
             raise DeliveryConfigurationError(
@@ -71,6 +77,7 @@ class DeliveryAdapter:
     ) -> PullRequestSummary:
         """Load placeholder pull request metadata."""
 
+        require_fixture_mode(self.mode, capability="Delivery live pull-request creation")
         resolved_fixture_path = fixture_path or self.pull_request_fixture_path
         if resolved_fixture_path is None:
             raise DeliveryConfigurationError(
@@ -89,6 +96,7 @@ class DeliveryAdapter:
     ) -> JiraCompletionResult:
         """Load placeholder Jira completion metadata."""
 
+        require_fixture_mode(self.mode, capability="Delivery live Jira completion")
         resolved_fixture_path = fixture_path or self.jira_completion_fixture_path
         if resolved_fixture_path is None:
             raise DeliveryConfigurationError(

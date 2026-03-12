@@ -5,8 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig
-from execution_accelerator.schemas import AdvisoryVerification, MavenVerification, VulnerabilityDetails
+from execution_accelerator.schemas import (
+    AdvisoryVerification,
+    ExecutionMode,
+    MavenVerification,
+    VulnerabilityDetails,
+)
 
 
 class VerificationAdapterError(RuntimeError):
@@ -28,14 +34,20 @@ class MavenVerificationMismatchError(VerificationAdapterError):
 class AdvisoryVerificationAdapter:
     """Load normalized advisory verification data from a local fixture."""
 
-    def __init__(self, *, fixture_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        fixture_path: Path | None = None,
+        mode: ExecutionMode = ExecutionMode.FIXTURE,
+    ) -> None:
         self.fixture_path = fixture_path
+        self.mode = mode
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "AdvisoryVerificationAdapter":
         """Create the advisory adapter from runtime configuration."""
 
-        return cls(fixture_path=config.advisory_fixture_path)
+        return cls(fixture_path=config.advisory_fixture_path, mode=config.execution_mode)
 
     def load_verification(
         self,
@@ -45,6 +57,7 @@ class AdvisoryVerificationAdapter:
     ) -> AdvisoryVerification:
         """Load advisory verification data for the requested vulnerability."""
 
+        require_fixture_mode(self.mode, capability="Advisory live verification")
         resolved_fixture_path = fixture_path or self.fixture_path
         if resolved_fixture_path is None:
             raise VerificationConfigurationError(
@@ -63,14 +76,20 @@ class AdvisoryVerificationAdapter:
 class MavenVerificationAdapter:
     """Load Maven verification data from a local fixture."""
 
-    def __init__(self, *, fixture_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        fixture_path: Path | None = None,
+        mode: ExecutionMode = ExecutionMode.FIXTURE,
+    ) -> None:
         self.fixture_path = fixture_path
+        self.mode = mode
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "MavenVerificationAdapter":
         """Create the Maven verification adapter from runtime configuration."""
 
-        return cls(fixture_path=config.maven_verification_fixture_path)
+        return cls(fixture_path=config.maven_verification_fixture_path, mode=config.execution_mode)
 
     def load_verification(
         self,
@@ -81,6 +100,7 @@ class MavenVerificationAdapter:
     ) -> MavenVerification:
         """Load Maven verification data for the selected remediation target."""
 
+        require_fixture_mode(self.mode, capability="Maven live verification")
         resolved_fixture_path = fixture_path or self.fixture_path
         if resolved_fixture_path is None:
             raise VerificationConfigurationError(

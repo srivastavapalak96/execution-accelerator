@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig
-from execution_accelerator.schemas import JiraIssuePayload, VulnerabilityDetails
+from execution_accelerator.schemas import ExecutionMode, JiraIssuePayload, VulnerabilityDetails
 
 
 class JiraAdapterError(RuntimeError):
@@ -30,10 +31,12 @@ class JiraAdapter:
         base_url: str | None = None,
         project_key: str | None = None,
         fixture_path: Path | None = None,
+        mode: ExecutionMode = ExecutionMode.FIXTURE,
     ) -> None:
         self.base_url = base_url
         self.project_key = project_key
         self.fixture_path = fixture_path
+        self.mode = mode
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "JiraAdapter":
@@ -43,6 +46,7 @@ class JiraAdapter:
             base_url=config.jira_base_url,
             project_key=config.jira_project_key,
             fixture_path=config.jira_fixture_path,
+            mode=config.execution_mode,
         )
 
     def load_issue(
@@ -54,6 +58,7 @@ class JiraAdapter:
     ) -> JiraIssuePayload:
         """Load a Jira issue payload for the provided ticket id."""
 
+        require_fixture_mode(self.mode, capability="Jira live intake")
         resolved_fixture_path = fixture_path or self.fixture_path
         if resolved_fixture_path is None:
             raise JiraConfigurationError(
