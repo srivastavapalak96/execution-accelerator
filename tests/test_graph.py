@@ -233,6 +233,7 @@ def test_bootstrap_ticket_run_records_failure_and_rollback_state(tmp_path, monke
     assert result.state.validation_results[-1].status == "failed"
     assert result.state.rollback_plan is not None
     assert result.state.rollback_plan.status == "applied"
-    assert result.state.retry_count == 1
+    assert result.state.total_attempts == 1
+    assert result.state.failure_classifications[-1] == "compile_error"
     assert result.state.errors[-1].code == "validation_failed"
-    assert len(result.state.audit_events) == 10
+    assert len(result.state.audit_events) == 12

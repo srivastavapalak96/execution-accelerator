@@ -1,7 +1,9 @@
 """LangGraph node implementations."""
 
 from .bootstrap import bootstrap_state, prepare_planning_stub
+from .classify_failure import classify_failure
 from .delivery import build_publish_remediation_node
+from .escalate import escalate
 from .intake import build_ingest_and_parse_jira_node, build_load_repository_context_node
 from .remediation import (
     build_execute_complex_scaffold_node,
@@ -16,7 +18,9 @@ from .verification import build_verify_advisory_node, build_verify_maven_target_
 __all__ = [
     "bootstrap_state",
     "prepare_planning_stub",
+    "classify_failure",
     "build_publish_remediation_node",
+    "escalate",
     "build_ingest_and_parse_jira_node",
     "build_load_repository_context_node",
     "build_execute_complex_scaffold_node",

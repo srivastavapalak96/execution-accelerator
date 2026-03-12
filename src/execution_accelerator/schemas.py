@@ -85,6 +85,20 @@ class ApprovalDecision(StrEnum):
     REJECTED = "rejected"
 
 
+class FailureClassification(StrEnum):
+    """Normalized failure classes for retry and escalation routing."""
+
+    NETWORK_TRANSIENT = "network_transient"
+    COMPILE_ERROR = "compile_error"
+    TEST_FAILURE = "test_failure"
+    POLICY_BLOCK = "policy_block"
+    RECIPE_NOOP = "recipe_noop"
+    LLM_SCHEMA_INVALID = "llm_schema_invalid"
+    LLM_PATCH_UNCOMPILABLE = "llm_patch_uncompilable"
+    IDEMPOTENT_HIT = "idempotent_hit"
+    UNKNOWN = "unknown"
+
+
 class BaseSchemaModel(BaseModel):
     """Common model configuration for workflow schemas."""
 
@@ -399,6 +413,23 @@ class RemediationPlan(BaseSchemaModel):
     requires_human_approval: bool = False
 
 
+class RetryDecision(BaseSchemaModel):
+    """Decision produced by the retry classifier."""
+
+    classification: FailureClassification = FailureClassification.UNKNOWN
+    next_node: str = Field(min_length=1)
+    max_attempts: int = Field(ge=0)
+    reason: str = Field(min_length=1)
+
+
+class PolicyDecision(BaseSchemaModel):
+    """Policy evaluation result for one remediation target."""
+
+    allowed: bool = True
+    requires_human_approval: bool = False
+    blocked_reason: str | None = None
+
+
 class ValidationCheck(BaseSchemaModel):
     """Single validation step executed against a repository."""
 
@@ -414,6 +445,15 @@ class RepositoryValidationResult(BaseSchemaModel):
     status: ValidationStatus = ValidationStatus.PENDING
     checks: list[ValidationCheck] = Field(default_factory=list)
     summary: str | None = None
+
+
+class LlmCallRecord(BaseSchemaModel):
+    """Minimal audit payload for an LLM call."""
+
+    provider: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+    prompt_name: str = Field(min_length=1)
+    token_count: int = Field(default=0, ge=0)
 
 
 class HumanFeedback(BaseSchemaModel):

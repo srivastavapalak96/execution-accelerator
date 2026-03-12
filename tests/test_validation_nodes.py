@@ -48,6 +48,5 @@ def test_handle_validation_failure_node_records_rollback_plan() -> None:
     update = failure_node(failed_state)
 
     assert update["rollback_plan"].status == "applied"
-    assert update["retry_count"] == 1
     assert update["workflow_status"] == WorkflowStatus.FAILED
     assert update["audit_events"][-1].event_type == "validation.rollback"

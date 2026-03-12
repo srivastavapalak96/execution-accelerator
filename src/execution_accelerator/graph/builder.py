@@ -22,6 +22,7 @@ from execution_accelerator.adapters import (
 from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.nodes import (
     bootstrap_state,
+    classify_failure,
     build_execute_complex_scaffold_node,
     build_ingest_and_parse_jira_node,
     build_load_repository_context_node,
@@ -34,6 +35,7 @@ from execution_accelerator.nodes import (
     build_validate_remediation_node,
     build_verify_advisory_node,
     build_verify_maven_target_node,
+    escalate,
     select_route,
 )
 from execution_accelerator.persistence import build_default_thread_id, build_thread_config, sqlite_checkpointer
@@ -98,6 +100,8 @@ def build_remediation_graph(
         "handle_validation_failure",
         build_handle_validation_failure_node(validation_adapter),
     )
+    builder.add_node("classify_failure", classify_failure)
+    builder.add_node("escalate", escalate)
     builder.add_node("publish_remediation", build_publish_remediation_node(delivery_adapter))
     builder.add_edge(START, "bootstrap_state")
     builder.add_edge("bootstrap_state", "ingest_and_parse_jira")
@@ -129,7 +133,15 @@ def build_remediation_graph(
         },
     )
     builder.add_edge("publish_remediation", END)
-    builder.add_edge("handle_validation_failure", END)
+    builder.add_edge("handle_validation_failure", "classify_failure")
+    builder.add_conditional_edges(
+        "classify_failure",
+        _select_failure_node,
+        {
+            "escalate": "escalate",
+        },
+    )
+    builder.add_edge("escalate", END)
     return builder
 
 
@@ -253,3 +265,7 @@ def _select_post_validation_node(state: RemediationState) -> str:
     if state.validation_results[-1].status == "failed":
         return "handle_validation_failure"
     return "publish_remediation"
+
+
+def _select_failure_node(state: RemediationState) -> str:
+    return "escalate"

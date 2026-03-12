@@ -15,9 +15,12 @@ from execution_accelerator.schemas import (
     CompatibilityDiffResult,
     ComplexRemediationPlan,
     DecompiledArtifactSummary,
+    FailureClassification,
     JiraCompletionResult,
+    LlmCallRecord,
     MavenVerification,
     HumanFeedback,
+    PolicyDecision,
     PomMutationPlan,
     PreflightResolutionResult,
     RemediationPlan,
@@ -99,6 +102,11 @@ class RemediationState(BaseSchemaModel):
     branch_publication: BranchPublicationResult | None = None
     pull_request_summary: PullRequestSummary | None = None
     jira_completion: JiraCompletionResult | None = None
+    total_attempts: int = Field(default=0, ge=0)
+    failure_classifications: list[FailureClassification] = Field(default_factory=list)
+    policy_decisions: list[PolicyDecision] = Field(default_factory=list)
+    llm_calls: list[LlmCallRecord] = Field(default_factory=list)
+    llm_tokens_used: int = Field(default=0, ge=0)
     errors: list[WorkflowError] = Field(default_factory=list)
     retry_count: int = Field(default=0, ge=0)
     requires_human_approval: bool = False

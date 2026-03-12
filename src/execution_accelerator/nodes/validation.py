@@ -79,7 +79,6 @@ def build_handle_validation_failure_node(validation_adapter: ValidationAdapter):
         return {
             "rollback_plan": rollback_plan,
             "errors": errors,
-            "retry_count": state.retry_count + 1,
             "workflow_status": WorkflowStatus.FAILED,
             "audit_events": audit_events,
         }
