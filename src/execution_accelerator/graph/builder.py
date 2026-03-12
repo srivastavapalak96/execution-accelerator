@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel
@@ -62,47 +62,47 @@ def build_remediation_graph(
     preflight_resolution_adapter: PreflightResolutionAdapter,
     validation_adapter: ValidationAdapter,
     delivery_adapter: DeliveryAdapter,
-) -> StateGraph:
+) -> Any:
     """Build the Day 10 stateful remediation graph."""
 
     builder = StateGraph(RemediationState)
     builder.add_node("bootstrap_state", bootstrap_state)
-    builder.add_node("ingest_and_parse_jira", build_ingest_and_parse_jira_node(jira_adapter))
+    builder.add_node("ingest_and_parse_jira", cast(Any, build_ingest_and_parse_jira_node(jira_adapter)))
     builder.add_node(
         "load_repository_context",
-        build_load_repository_context_node(repository_inventory_adapter),
+        cast(Any, build_load_repository_context_node(repository_inventory_adapter)),
     )
     builder.add_node(
         "verify_advisory",
-        build_verify_advisory_node(advisory_verification_adapter),
+        cast(Any, build_verify_advisory_node(advisory_verification_adapter)),
     )
     builder.add_node(
         "verify_maven_target",
-        build_verify_maven_target_node(maven_verification_adapter),
+        cast(Any, build_verify_maven_target_node(maven_verification_adapter)),
     )
     builder.add_node("select_route", select_route)
     builder.add_node(
         "prepare_complex_remediation",
-        build_prepare_complex_remediation_node(complex_remediation_adapter),
+        cast(Any, build_prepare_complex_remediation_node(complex_remediation_adapter)),
     )
     builder.add_node(
         "execute_complex_scaffold",
-        build_execute_complex_scaffold_node(complex_remediation_adapter),
+        cast(Any, build_execute_complex_scaffold_node(complex_remediation_adapter)),
     )
-    builder.add_node("remediate_simple", build_remediate_simple_node(pom_mutation_adapter))
-    builder.add_node("remediate_transitive", build_remediate_transitive_node(pom_mutation_adapter))
+    builder.add_node("remediate_simple", cast(Any, build_remediate_simple_node(pom_mutation_adapter)))
+    builder.add_node("remediate_transitive", cast(Any, build_remediate_transitive_node(pom_mutation_adapter)))
     builder.add_node(
         "preflight_validate",
-        build_preflight_validation_node(preflight_resolution_adapter),
+        cast(Any, build_preflight_validation_node(preflight_resolution_adapter)),
     )
-    builder.add_node("validate_remediation", build_validate_remediation_node(validation_adapter))
+    builder.add_node("validate_remediation", cast(Any, build_validate_remediation_node(validation_adapter)))
     builder.add_node(
         "handle_validation_failure",
-        build_handle_validation_failure_node(validation_adapter),
+        cast(Any, build_handle_validation_failure_node(validation_adapter)),
     )
-    builder.add_node("classify_failure", classify_failure)
-    builder.add_node("escalate", escalate)
-    builder.add_node("publish_remediation", build_publish_remediation_node(delivery_adapter))
+    builder.add_node("classify_failure", cast(Any, classify_failure))
+    builder.add_node("escalate", cast(Any, escalate))
+    builder.add_node("publish_remediation", cast(Any, build_publish_remediation_node(delivery_adapter)))
     builder.add_edge(START, "bootstrap_state")
     builder.add_edge("bootstrap_state", "ingest_and_parse_jira")
     builder.add_edge("ingest_and_parse_jira", "load_repository_context")
@@ -157,7 +157,7 @@ def compile_remediation_graph(
     validation_adapter: ValidationAdapter,
     delivery_adapter: DeliveryAdapter,
     checkpointer: Any | None = None,
-):
+) -> Any:
     """Compile the remediation graph, optionally with persistence."""
 
     return build_remediation_graph(

@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from execution_accelerator.adapters import ValidationAdapter
 from execution_accelerator.schemas import AuditEvent, ValidationStatus, WorkflowStatus
 from execution_accelerator.state import RemediationState, WorkflowError
 
 
-def build_validate_remediation_node(validation_adapter: ValidationAdapter):
+def build_validate_remediation_node(
+    validation_adapter: ValidationAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that records placeholder validation results for one repository."""
 
     def validate_remediation(state: RemediationState) -> dict[str, object]:
@@ -44,7 +48,9 @@ def build_validate_remediation_node(validation_adapter: ValidationAdapter):
     return validate_remediation
 
 
-def build_handle_validation_failure_node(validation_adapter: ValidationAdapter):
+def build_handle_validation_failure_node(
+    validation_adapter: ValidationAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that records rollback metadata after validation failure."""
 
     def handle_validation_failure(state: RemediationState) -> dict[str, object]:

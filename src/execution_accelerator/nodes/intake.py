@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from execution_accelerator.adapters import JiraAdapter, RepositoryInventoryAdapter
 from execution_accelerator.schemas import AuditEvent, WorkflowStatus
 from execution_accelerator.state import RemediationState
 
 
-def build_ingest_and_parse_jira_node(jira_adapter: JiraAdapter):
+def build_ingest_and_parse_jira_node(
+    jira_adapter: JiraAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that loads Jira ticket details into workflow state."""
 
     def ingest_and_parse_jira(state: RemediationState) -> dict[str, object]:
@@ -34,7 +38,9 @@ def build_ingest_and_parse_jira_node(jira_adapter: JiraAdapter):
     return ingest_and_parse_jira
 
 
-def build_load_repository_context_node(repository_inventory_adapter: RepositoryInventoryAdapter):
+def build_load_repository_context_node(
+    repository_inventory_adapter: RepositoryInventoryAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that resolves affected repositories and materializes workspaces."""
 
     def load_repository_context(state: RemediationState) -> dict[str, object]:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from execution_accelerator.adapters import AdvisoryVerificationAdapter, MavenVerificationAdapter
 from execution_accelerator.schemas import (
     AuditEvent,
@@ -16,7 +18,9 @@ from execution_accelerator.schemas import (
 from execution_accelerator.state import RemediationState
 
 
-def build_verify_advisory_node(advisory_adapter: AdvisoryVerificationAdapter):
+def build_verify_advisory_node(
+    advisory_adapter: AdvisoryVerificationAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that verifies the recommended remediation target from advisory data."""
 
     def verify_advisory(state: RemediationState) -> dict[str, object]:
@@ -45,7 +49,9 @@ def build_verify_advisory_node(advisory_adapter: AdvisoryVerificationAdapter):
     return verify_advisory
 
 
-def build_verify_maven_target_node(maven_adapter: MavenVerificationAdapter):
+def build_verify_maven_target_node(
+    maven_adapter: MavenVerificationAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that verifies the selected target version against Maven metadata."""
 
     def verify_maven_target(state: RemediationState) -> dict[str, object]:

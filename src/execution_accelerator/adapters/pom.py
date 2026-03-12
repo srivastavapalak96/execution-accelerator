@@ -8,7 +8,12 @@ import xml.etree.ElementTree as ET
 
 from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig
-from execution_accelerator.schemas import ExecutionMode, PomMutationPlan, PreflightResolutionResult
+from execution_accelerator.schemas import (
+    ExecutionMode,
+    PomMutationChange,
+    PomMutationPlan,
+    PreflightResolutionResult,
+)
 
 
 MAVEN_NAMESPACE = {"m": "http://maven.apache.org/POM/4.0.0"}
@@ -78,7 +83,7 @@ class PomMutationAdapter:
 
         return ET.tostring(root, encoding="unicode")
 
-    def _apply_direct_dependency_update(self, root: ET.Element, change) -> None:
+    def _apply_direct_dependency_update(self, root: ET.Element, change: PomMutationChange) -> None:
         dependencies = root.findall(".//m:dependencies/m:dependency", MAVEN_NAMESPACE)
         for dependency in dependencies:
             group_id = dependency.find("m:groupId", MAVEN_NAMESPACE)
@@ -97,7 +102,7 @@ class PomMutationAdapter:
             f"Dependency {change.dependency.group_id}:{change.dependency.artifact_id} was not found in pom.xml."
         )
 
-    def _apply_dependency_management_override(self, root: ET.Element, change) -> None:
+    def _apply_dependency_management_override(self, root: ET.Element, change: PomMutationChange) -> None:
         dependency_management = root.find("m:dependencyManagement", MAVEN_NAMESPACE)
         if dependency_management is None:
             dependency_management = ET.SubElement(root, _namespaced("dependencyManagement"))

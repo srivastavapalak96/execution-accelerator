@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from execution_accelerator.adapters import DeliveryAdapter
 from execution_accelerator.schemas import AuditEvent, WorkflowStatus
 from execution_accelerator.state import RemediationState
 
 
-def build_publish_remediation_node(delivery_adapter: DeliveryAdapter):
+def build_publish_remediation_node(
+    delivery_adapter: DeliveryAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that records publication and Jira completion metadata."""
 
     def publish_remediation(state: RemediationState) -> dict[str, object]:

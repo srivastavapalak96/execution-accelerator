@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from execution_accelerator.adapters import (
@@ -26,7 +27,9 @@ class WorkspaceError(RuntimeError):
     """Raised when the expected workspace manifest is missing."""
 
 
-def build_remediate_simple_node(pom_adapter: PomMutationAdapter):
+def build_remediate_simple_node(
+    pom_adapter: PomMutationAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that applies the Day 5 simple remediation plan."""
 
     def remediate_simple(state: RemediationState) -> dict[str, object]:
@@ -68,7 +71,9 @@ def build_remediate_simple_node(pom_adapter: PomMutationAdapter):
     return remediate_simple
 
 
-def build_remediate_transitive_node(pom_adapter: PomMutationAdapter):
+def build_remediate_transitive_node(
+    pom_adapter: PomMutationAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that applies the Day 6 transitive override remediation plan."""
 
     def remediate_transitive(state: RemediationState) -> dict[str, object]:
@@ -111,7 +116,9 @@ def build_remediate_transitive_node(pom_adapter: PomMutationAdapter):
     return remediate_transitive
 
 
-def build_preflight_validation_node(preflight_adapter: PreflightResolutionAdapter):
+def build_preflight_validation_node(
+    preflight_adapter: PreflightResolutionAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that loads the fixture-backed preflight validation result."""
 
     def preflight_validate(state: RemediationState) -> dict[str, object]:
@@ -139,7 +146,9 @@ def build_preflight_validation_node(preflight_adapter: PreflightResolutionAdapte
     return preflight_validate
 
 
-def build_prepare_complex_remediation_node(complex_adapter: ComplexRemediationAdapter):
+def build_prepare_complex_remediation_node(
+    complex_adapter: ComplexRemediationAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that records the Day 7 complex-lane analysis placeholders."""
 
     def prepare_complex_remediation(state: RemediationState) -> dict[str, object]:
@@ -186,7 +195,9 @@ def build_prepare_complex_remediation_node(complex_adapter: ComplexRemediationAd
     return prepare_complex_remediation
 
 
-def build_execute_complex_scaffold_node(complex_adapter: ComplexRemediationAdapter):
+def build_execute_complex_scaffold_node(
+    complex_adapter: ComplexRemediationAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
     """Create a node that expands the Day 8 complex analysis into an execution scaffold."""
 
     def execute_complex_scaffold(state: RemediationState) -> dict[str, object]:
