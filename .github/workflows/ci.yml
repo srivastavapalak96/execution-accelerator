@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      EA_MODE: fixture
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -e .[dev]
+
+      - name: Run ruff
+        run: python -m ruff check src tests
+
+      - name: Run mypy
+        run: python -m mypy --strict src/execution_accelerator
+
+      - name: Run fixture tests
+        run: python -m pytest -q tests
