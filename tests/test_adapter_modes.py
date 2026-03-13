@@ -6,10 +6,8 @@ from pathlib import Path
 import pytest
 
 from execution_accelerator.adapters import (
-    AdvisoryVerificationAdapter,
     ComplexRemediationAdapter,
     DeliveryAdapter,
-    MavenVerificationAdapter,
     PomMutationAdapter,
     PreflightResolutionAdapter,
     ValidationAdapter,
@@ -28,19 +26,10 @@ def build_vulnerability_details() -> VulnerabilityDetails:
     )
 
 
-def test_live_mode_remaining_adapters_fail_fast_until_implemented(tmp_path: Path) -> None:
+def test_live_mode_remaining_adapters_fail_fast_until_implemented() -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
-    details = build_vulnerability_details()
 
     live_calls: list[Callable[[], object]] = [
-        lambda: AdvisoryVerificationAdapter(
-            fixture_path=fixture_dir / "advisory_verification.json",
-            mode=ExecutionMode.LIVE,
-        ).load_verification(details),
-        lambda: MavenVerificationAdapter(
-            fixture_path=fixture_dir / "maven_verification.json",
-            mode=ExecutionMode.LIVE,
-        ).load_verification(details, target_version="1.2.4"),
         lambda: PomMutationAdapter(
             fixture_before_path=fixture_dir / "pom_before.xml",
             mode=ExecutionMode.LIVE,

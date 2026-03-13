@@ -3,10 +3,24 @@ from __future__ import annotations
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+import json
+from execution_accelerator.adapters import (
+    AdvisoryVerificationAdapter,
+    ComplexRemediationAdapter,
+    DeliveryAdapter,
+    JiraAdapter,
+    MavenVerificationAdapter,
+    PomMutationAdapter,
+    PreflightResolutionAdapter,
+    RepositoryInventoryAdapter,
+    ValidationAdapter,
+)
 from execution_accelerator.config import load_runtime_config
-from execution_accelerator.graph import bootstrap_ticket_run, load_remediation_state
+from execution_accelerator.graph import bootstrap_ticket_run, compile_remediation_graph, load_remediation_state
+from execution_accelerator.persistence import build_thread_config
 from execution_accelerator.schemas import WorkflowStatus
 from tests.conftest import seed_bootstrap_workspace_pom
+from tests.live_support import ResponseSpec, create_live_repo, serve_routes
 
 
 def _configure_runtime(monkeypatch, tmp_path, *, transitive: bool = False, complex_refactor: bool = False) -> None:
@@ -114,7 +128,7 @@ def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch)
     assert loaded_state.workflow_status == WorkflowStatus.COMPLETED
     assert len(result.state.targets) == 1
     assert result.state.current_target_index == 0
-    assert len(loaded_state.audit_events) == 11
+    assert len(loaded_state.audit_events) == 12
     assert Path(loaded_state.repo_map["payments-service"].local_path).is_dir()
     assert (
         Path(loaded_state.repo_map["payments-service"].local_path) / ".execution-accelerator-repo.json"
@@ -156,7 +170,7 @@ def test_bootstrap_ticket_run_persists_transitive_override_state(tmp_path, monke
     assert result.state.preflight_resolution is not None
     assert result.state.preflight_resolution.dependency_kind == "transitive"
     assert len(result.state.targets) == 1
-    assert len(result.state.audit_events) == 11
+    assert len(result.state.audit_events) == 12
     mutated_root = ET.fromstring(Path(result.state.modified_files[0]).read_text())
     version = mutated_root.find(
         ".//{http://maven.apache.org/POM/4.0.0}dependencyManagement/"
@@ -205,7 +219,7 @@ def test_bootstrap_ticket_run_persists_complex_refactor_state(tmp_path, monkeypa
     assert result.state.completed_repos == ["payments-service"]
     assert result.state.pending_repos == []
     assert len(result.state.targets) == 1
-    assert len(result.state.audit_events) == 11
+    assert len(result.state.audit_events) == 12
     assert loaded_state.complex_remediation_plan is not None
     assert loaded_state.complex_remediation_plan.compatibility_diff.target_version == "2.0.0"
     assert loaded_state.code_change_plan is not None
@@ -243,4 +257,165 @@ def test_bootstrap_ticket_run_records_failure_and_rollback_state(tmp_path, monke
     assert result.state.failure_classifications[-1] == "compile_error"
     assert result.state.errors[-1].code == "validation_failed"
     assert len(result.state.targets) == 1
-    assert len(result.state.audit_events) == 13
+    assert len(result.state.audit_events) == 14
+
+
+def test_live_intake_and_verification_flow_runs_end_to_end_with_fixture_downstream(tmp_path, monkeypatch) -> None:
+    fixtures_dir = Path(__file__).parent / "fixtures"
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    repo_path = create_live_repo(
+        tmp_path / "origin-repo",
+        pom_text=(
+            "<project xmlns=\"http://maven.apache.org/POM/4.0.0\">"
+            "<modelVersion>4.0.0</modelVersion>"
+            "<groupId>org.example</groupId><artifactId>payments-service</artifactId><version>1.0.0</version>"
+            "<dependencies><dependency><groupId>org.example</groupId><artifactId>legacy-json</artifactId>"
+            "<version>1.2.3</version></dependency></dependencies>"
+            "</project>"
+        ),
+        dependency_tree_output=(
+            "[INFO] org.example:payments-service:jar:1.0.0\n"
+            "[INFO] +- org.example:legacy-json:jar:1.2.3:compile\n"
+        ),
+    )
+    (config_dir / "jira.yaml").write_text("project_key: SEC\n")
+    (config_dir / "repositories.yaml").write_text(
+        json.dumps(
+            {
+                "repositories": [
+                    {
+                        "name": "payments-service",
+                        "clone_url": str(repo_path),
+                        "default_branch": "main",
+                        "build_system": "maven",
+                        "manifest_path": "pom.xml",
+                        "owner": "payments-platform",
+                    }
+                ]
+            }
+        )
+    )
+    monkeypatch.setenv("EA_MODE", "live")
+    monkeypatch.setenv("EA_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
+    monkeypatch.setenv("EA_LOGS_DIR", str(tmp_path / "logs"))
+    monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "state" / "checkpoints.sqlite"))
+    monkeypatch.setenv("EA_DRY_RUN", "1")
+    monkeypatch.setenv("EA_KEEP_WORKSPACE", "1")
+    monkeypatch.setenv("EA_JIRA_EMAIL", "bot@example.com")
+    monkeypatch.setenv("EA_JIRA_TOKEN", "jira-token")
+    monkeypatch.setenv("GITHUB_TOKEN", "gh-token")
+    monkeypatch.setenv("GITHUB_OWNER", "payments-platform")
+    monkeypatch.setenv("EA_GIT_USER_NAME", "Execution Bot")
+    monkeypatch.setenv("EA_GIT_USER_EMAIL", "bot@example.com")
+    monkeypatch.setenv("EA_POM_FIXTURE_BEFORE_PATH", str(fixtures_dir / "pom_before.xml"))
+    monkeypatch.setenv("EA_POM_FIXTURE_AFTER_PATH", str(fixtures_dir / "pom_after.xml"))
+    monkeypatch.setenv("EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH", str(fixtures_dir / "preflight_resolution.json"))
+    monkeypatch.setenv("EA_VALIDATION_RESULT_FIXTURE_PATH", str(fixtures_dir / "validation_result.json"))
+    monkeypatch.setenv("EA_BRANCH_PUBLICATION_FIXTURE_PATH", str(fixtures_dir / "branch_publication.json"))
+    monkeypatch.setenv("EA_PULL_REQUEST_FIXTURE_PATH", str(fixtures_dir / "pull_request.json"))
+    monkeypatch.setenv("EA_JIRA_COMPLETION_FIXTURE_PATH", str(fixtures_dir / "jira_completion.json"))
+    monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixtures_dir / "complex_artifacts.json"))
+    monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixtures_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixtures_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixtures_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixtures_dir / "code_change_plan.json"))
+    monkeypatch.setenv("EA_ROLLBACK_FIXTURE_PATH", str(fixtures_dir / "rollback_plan.json"))
+
+    issue_response = {
+        "key": "SEC-900",
+        "fields": {
+            "summary": "Upgrade legacy-json",
+            "description": (
+                "Package: org.example:legacy-json\n"
+                "Installed Version: 1.2.3\n"
+                "Fixed Version: 1.2.4\n"
+                "Severity: high\n"
+                "Repository: payments-service\n"
+                "CVE: CVE-2026-12345\n"
+            ),
+        },
+    }
+    osv_response = {
+        "vulns": [
+            {
+                "id": "OSV-2026-1",
+                "summary": "legacy-json vulnerable before 1.2.4",
+                "aliases": ["CVE-2026-12345"],
+                "database_specific": {"severity": "high"},
+                "affected": [
+                    {
+                        "package": {"name": "org.example:legacy-json", "ecosystem": "Maven"},
+                        "ranges": [{"type": "ECOSYSTEM", "events": [{"introduced": "0"}, {"fixed": "1.2.4"}]}],
+                    }
+                ],
+            }
+        ]
+    }
+    with serve_routes(
+        {
+            ("GET", "/rest/api/3/myself"): ResponseSpec(status=200, body=b"{}"),
+            ("GET", "/user"): ResponseSpec(status=200, body=b"{}"),
+            ("GET", "/rest/api/3/issue/SEC-900"): ResponseSpec(status=200, body=json.dumps(issue_response).encode()),
+            ("GET", "/search/issues"): ResponseSpec(
+                status=200,
+                body=b'{\"items\": []}',
+            ),
+            ("POST", "/v1/query"): ResponseSpec(status=200, body=json.dumps(osv_response).encode()),
+            (
+                "GET",
+                "/org/example/legacy-json/maven-metadata.xml",
+            ): ResponseSpec(
+                status=200,
+                body=(
+                    "<metadata><groupId>org.example</groupId><artifactId>legacy-json</artifactId>"
+                    "<versioning><latest>1.2.4</latest><release>1.2.4</release>"
+                    "<versions><version>1.2.3</version><version>1.2.4</version></versions>"
+                    "</versioning></metadata>"
+                ).encode(),
+                content_type="application/xml",
+            ),
+        }
+    ) as base_url:
+        monkeypatch.setenv("EA_JIRA_BASE_URL", base_url)
+        monkeypatch.setenv("EA_GITHUB_API_BASE", base_url)
+        monkeypatch.setenv("EA_OSV_API_BASE", base_url)
+        monkeypatch.setenv("EA_MAVEN_METADATA_BASE", base_url)
+        config = load_runtime_config(repo_root=tmp_path)
+        graph = compile_remediation_graph(
+            runtime_config=config,
+            jira_adapter=JiraAdapter.from_runtime_config(config),
+            repository_inventory_adapter=RepositoryInventoryAdapter.from_runtime_config(config),
+            advisory_verification_adapter=AdvisoryVerificationAdapter.from_runtime_config(config),
+            maven_verification_adapter=MavenVerificationAdapter.from_runtime_config(config),
+            complex_remediation_adapter=ComplexRemediationAdapter.from_runtime_config(config),
+            pom_mutation_adapter=PomMutationAdapter(
+                fixture_before_path=fixtures_dir / "pom_before.xml",
+                fixture_after_path=fixtures_dir / "pom_after.xml",
+            ),
+            preflight_resolution_adapter=PreflightResolutionAdapter(
+                fixture_path=fixtures_dir / "preflight_resolution.json"
+            ),
+            validation_adapter=ValidationAdapter(
+                validation_result_fixture_path=fixtures_dir / "validation_result.json",
+                rollback_fixture_path=fixtures_dir / "rollback_plan.json",
+            ),
+            delivery_adapter=DeliveryAdapter(
+                branch_publication_fixture_path=fixtures_dir / "branch_publication.json",
+                pull_request_fixture_path=fixtures_dir / "pull_request.json",
+                jira_completion_fixture_path=fixtures_dir / "jira_completion.json",
+            ),
+            checkpointer=None,
+        )
+
+        result = graph.invoke(
+            {"initial_ticket_id": "SEC-900"},
+            config=build_thread_config("live-sec-900"),
+        )
+
+    assert result["workflow_status"] == WorkflowStatus.COMPLETED
+    assert result["advisory_verification"].source == "osv"
+    assert result["maven_verification"].dependency_kind == "direct"
+    assert result["maven_plan"].uses_wrapper is True
+    assert result["validation_results"][-1].status == "passed"

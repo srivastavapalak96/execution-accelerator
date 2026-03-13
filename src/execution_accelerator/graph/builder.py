@@ -24,6 +24,7 @@ from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.nodes import (
     bootstrap_state,
     classify_failure,
+    build_detect_maven_profile_node,
     build_execute_complex_scaffold_node,
     build_ingest_and_parse_jira_node,
     build_load_repository_context_node,
@@ -78,6 +79,7 @@ def build_remediation_graph(
         "load_repository_context",
         cast(Any, build_load_repository_context_node(repository_inventory_adapter)),
     )
+    builder.add_node("detect_maven_profile", cast(Any, build_detect_maven_profile_node(runtime_config)))
     builder.add_node(
         "verify_advisory",
         cast(Any, build_verify_advisory_node(advisory_verification_adapter)),
@@ -114,7 +116,8 @@ def build_remediation_graph(
     builder.add_edge("bootstrap_state", "probe_credentials")
     builder.add_edge("probe_credentials", "ingest_and_parse_jira")
     builder.add_edge("ingest_and_parse_jira", "load_repository_context")
-    builder.add_edge("load_repository_context", "verify_advisory")
+    builder.add_edge("load_repository_context", "detect_maven_profile")
+    builder.add_edge("detect_maven_profile", "verify_advisory")
     builder.add_edge("verify_advisory", "verify_maven_target")
     builder.add_edge("verify_maven_target", "select_route")
     builder.add_conditional_edges(

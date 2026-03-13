@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from execution_accelerator.config import RuntimeConfig, load_credentials
 from execution_accelerator.adapters import AdvisoryVerificationAdapter, MavenVerificationAdapter
+from execution_accelerator.profiles import detect_maven_execution_plan
 from execution_accelerator.schemas import (
     AuditEvent,
     CompatibilityRisk,
@@ -16,6 +18,43 @@ from execution_accelerator.schemas import (
     WorkflowStatus,
 )
 from execution_accelerator.state import RemediationState
+
+
+def build_detect_maven_profile_node(
+    runtime_config: RuntimeConfig,
+) -> Callable[[RemediationState], dict[str, object]]:
+    """Create a node that detects Maven execution settings for the current repository."""
+
+    def detect_maven_profile(state: RemediationState) -> dict[str, object]:
+        repository = state.current_working_repo or state.pending_repos[0]
+        workspace = state.repo_map[repository]
+        credentials = load_credentials(repo_root=runtime_config.repo_root)
+        maven_plan = detect_maven_execution_plan(
+            workspace,
+            settings_xml=credentials.maven_settings,
+            java_home=runtime_config.java_home,
+        )
+        audit_events = list(state.audit_events)
+        audit_events.append(
+            AuditEvent(
+                event_type="verification.maven_profile",
+                message=f"Detected Maven execution settings for {repository}.",
+                details={
+                    "repository": repository,
+                    "command": maven_plan.command,
+                    "uses_wrapper": maven_plan.uses_wrapper,
+                    "module_count": len(maven_plan.modules),
+                    "profile_count": len(maven_plan.profiles),
+                },
+            )
+        )
+        return {
+            "current_working_repo": repository,
+            "maven_plan": maven_plan,
+            "audit_events": audit_events,
+        }
+
+    return detect_maven_profile
 
 
 def build_verify_advisory_node(
@@ -57,10 +96,13 @@ def build_verify_maven_target_node(
     def verify_maven_target(state: RemediationState) -> dict[str, object]:
         assert state.vulnerability_details is not None
         assert state.advisory_verification is not None
+        assert state.current_working_repo is not None
 
         maven_verification = maven_adapter.load_verification(
             state.vulnerability_details,
             target_version=state.advisory_verification.recommended_fix_version,
+            repository_workspace=state.repo_map[state.current_working_repo],
+            maven_plan=state.maven_plan,
         )
         audit_events = list(state.audit_events)
         audit_events.append(

@@ -13,7 +13,12 @@ from .remediation import (
     build_remediate_transitive_node,
 )
 from .validation import build_handle_validation_failure_node, build_validate_remediation_node
-from .verification import build_verify_advisory_node, build_verify_maven_target_node, select_route
+from .verification import (
+    build_detect_maven_profile_node,
+    build_verify_advisory_node,
+    build_verify_maven_target_node,
+    select_route,
+)
 
 __all__ = [
     "bootstrap_state",
@@ -32,6 +37,7 @@ __all__ = [
     "build_remediate_transitive_node",
     "build_validate_remediation_node",
     "build_handle_validation_failure_node",
+    "build_detect_maven_profile_node",
     "build_verify_advisory_node",
     "build_verify_maven_target_node",
     "select_route",

@@ -193,6 +193,19 @@ class RemediationTarget(BaseSchemaModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class MavenExecutionPlan(BaseSchemaModel):
+    """Detected Maven execution settings for a cloned repository workspace."""
+
+    repository: str = Field(min_length=1)
+    command: list[str] = Field(default_factory=list)
+    root_pom_path: str = Field(min_length=1)
+    uses_wrapper: bool = False
+    modules: list[str] = Field(default_factory=list)
+    profiles: list[str] = Field(default_factory=list)
+    settings_xml: str | None = None
+    java_home: str | None = None
+
+
 class MavenDependencyKind(StrEnum):
     """Whether the vulnerable dependency is direct or transitive."""
 

@@ -26,10 +26,14 @@ class RuntimeConfig:
     data_dir: Path
     workspace_dir: Path
     logs_dir: Path
+    cache_dir: Path
     checkpoints_path: Path
     execution_mode: ExecutionMode
     dry_run: bool
     keep_workspace: bool
+    advisory_api_base_url: str
+    maven_metadata_base_url: str
+    java_home: Path | None
     jira_base_url: str | None
     jira_project_key: str | None
     jira_fixture_path: Path | None
@@ -68,6 +72,10 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         os.getenv("EA_LOGS_DIR", resolved_root / ".local" / "logs"),
         repo_root=resolved_root,
     )
+    cache_dir = _resolve_path_setting(
+        os.getenv("EA_CACHE_DIR", resolved_root / ".local" / "cache"),
+        repo_root=resolved_root,
+    )
     checkpoints_path = _resolve_path_setting(
         os.getenv("EA_CHECKPOINTS_PATH", data_dir / "checkpoints.sqlite"),
         repo_root=resolved_root,
@@ -75,6 +83,7 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
     execution_mode = ExecutionMode(os.getenv("EA_MODE", ExecutionMode.FIXTURE))
     dry_run = os.getenv("EA_DRY_RUN", "0") == "1"
     keep_workspace = os.getenv("EA_KEEP_WORKSPACE", "0") == "1"
+    java_home_value = os.getenv("EA_JAVA_HOME")
     jira_fixture_path_value = os.getenv(
         "EA_JIRA_FIXTURE_PATH",
         str(resolved_root / "tests" / "fixtures" / "jira_issue.json"),
@@ -149,10 +158,18 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         data_dir=data_dir,
         workspace_dir=workspace_dir,
         logs_dir=logs_dir,
+        cache_dir=cache_dir,
         checkpoints_path=checkpoints_path,
         execution_mode=execution_mode,
         dry_run=dry_run,
         keep_workspace=keep_workspace,
+        advisory_api_base_url=os.getenv("EA_OSV_API_BASE", "https://api.osv.dev"),
+        maven_metadata_base_url=os.getenv("EA_MAVEN_METADATA_BASE", "https://repo1.maven.org/maven2"),
+        java_home=(
+            _resolve_path_setting(java_home_value, repo_root=resolved_root)
+            if java_home_value
+            else None
+        ),
         jira_base_url=os.getenv("EA_JIRA_BASE_URL"),
         jira_project_key=os.getenv("EA_JIRA_PROJECT_KEY"),
         jira_fixture_path=(

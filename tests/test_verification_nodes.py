@@ -3,13 +3,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from execution_accelerator.adapters import AdvisoryVerificationAdapter, MavenVerificationAdapter
+from execution_accelerator.profiles import detect_maven_execution_plan
 from execution_accelerator.nodes import (
+    build_detect_maven_profile_node,
     build_verify_advisory_node,
     build_verify_maven_target_node,
     select_route,
 )
+from execution_accelerator.config import load_runtime_config
 from execution_accelerator.schemas import RemediationStrategy, WorkflowStatus
-from execution_accelerator.state import RemediationState
+from execution_accelerator.state import RemediationState, RepositoryWorkspace
+from tests.conftest import seed_workspace_pom
 
 
 def build_state() -> RemediationState:
@@ -38,13 +42,36 @@ def test_verify_advisory_node_loads_fixture_data() -> None:
     assert update["audit_events"][-1].event_type == "verification.advisory"
 
 
-def test_verify_maven_target_node_loads_fixture_data() -> None:
+def test_verify_maven_target_node_loads_fixture_data(tmp_path) -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
+    workspace = tmp_path / "workspace"
+    seed_workspace_pom(workspace, fixture_dir / "pom_before.xml")
     state = build_state().model_copy(
         update={
+            "repo_map": {
+                "payments-service": RepositoryWorkspace(
+                    name="payments-service",
+                    local_path=str(workspace),
+                    clone_url="https://example.test/payments-service.git",
+                    default_branch="main",
+                    build_system="maven",
+                    manifest_path="pom.xml",
+                )
+            },
+            "current_working_repo": "payments-service",
             "advisory_verification": AdvisoryVerificationAdapter(
                 fixture_path=fixture_dir / "advisory_verification.json"
             ).load_verification(build_state().vulnerability_details),
+            "maven_plan": detect_maven_execution_plan(
+                RepositoryWorkspace(
+                    name="payments-service",
+                    local_path=str(workspace),
+                    clone_url="https://example.test/payments-service.git",
+                    default_branch="main",
+                    build_system="maven",
+                    manifest_path="pom.xml",
+                )
+            ),
         }
     )
     node = build_verify_maven_target_node(
@@ -55,6 +82,39 @@ def test_verify_maven_target_node_loads_fixture_data() -> None:
 
     assert update["maven_verification"].target_version == "1.2.4"
     assert update["audit_events"][-1].event_type == "verification.maven"
+
+
+def test_detect_maven_profile_node_sets_current_repo_and_plan(tmp_path, monkeypatch) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    workspace = tmp_path / "workspace" / "payments-service"
+    seed_workspace_pom(workspace, fixture_dir / "pom_before.xml")
+    (workspace / "mvnw").write_text("#!/bin/sh\n")
+    (workspace / "mvnw").chmod(0o755)
+    monkeypatch.setenv("EA_MAVEN_SETTINGS", str(tmp_path / "settings.xml"))
+    (tmp_path / "settings.xml").write_text("<settings/>")
+    config = load_runtime_config(repo_root=tmp_path)
+    node = build_detect_maven_profile_node(config)
+
+    update = node(
+        RemediationState(
+            initial_ticket_id="SEC-123",
+            pending_repos=["payments-service"],
+            repo_map={
+                "payments-service": RepositoryWorkspace(
+                    name="payments-service",
+                    local_path=str(workspace),
+                    clone_url="https://example.test/payments-service.git",
+                    default_branch="main",
+                    build_system="maven",
+                    manifest_path="pom.xml",
+                )
+            },
+        )
+    )
+
+    assert update["current_working_repo"] == "payments-service"
+    assert update["maven_plan"].uses_wrapper is True
+    assert update["audit_events"][-1].event_type == "verification.maven_profile"
 
 
 def test_select_route_prefers_simple_update_for_low_risk_direct_dependencies() -> None:

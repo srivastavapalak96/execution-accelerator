@@ -2,13 +2,13 @@
 
 Execution Accelerator is a **local, checkpointed remediation workflow prototype** for Maven vulnerability tickets.
 
-Today, this repository is best understood as a **mostly fixture-backed implementation scaffold**:
+Today, this repository is best understood as a **partially live remediation prototype with fixture-backed downstream delivery**:
 
 - LangGraph orchestration is real
 - SQLite checkpoint persistence is real
 - workflow schemas/state are real
+- live Jira intake, repository preparation, OSV advisory lookup, Maven profile detection, and Maven verification are real
 - remediation, validation, delivery, and tough-path behavior are still mostly **fixture-backed placeholders**
-- live Jira reads now have a real adapter path; the rest of the workflow is still largely fixture-backed
 
 If you want the long-term target, read **`docs/vision.md`**.  
 If you want the truth about what works right now, read **`docs/status.md`**.
@@ -17,16 +17,17 @@ If you want the truth about what works right now, read **`docs/status.md`**.
 
 The current repo can run a persisted local flow for:
 
-1. Jira intake from fixtures, plus partial live Jira reads
+1. Jira intake from fixtures, plus live Jira reads
 2. repository workspace preparation from fixtures, plus live inventory/clone primitives
-3. advisory + Maven verification from fixtures
-4. route selection across:
+3. advisory verification from fixtures or live OSV
+4. Maven profile detection plus Maven metadata/dependency-tree verification in live mode
+5. route selection across:
    - simple update
    - transitive override
    - complex refactor scaffold
-5. fixture-backed validation
-6. fixture-backed rollback-on-failure
-7. fixture-backed delivery metadata on success
+6. fixture-backed validation
+7. fixture-backed rollback-on-failure
+8. fixture-backed delivery metadata on success
 
 The default mode is:
 
@@ -34,7 +35,7 @@ The default mode is:
 EA_MODE=fixture
 ```
 
-`EA_MODE=live` is now explicit. Jira issue reads are partially implemented; the remaining live adapters are still mostly unimplemented.
+`EA_MODE=live` is now explicit. Intake and verification are real enough to exercise a live dry-run through route selection, but remediation, validation, and delivery remain fixture-backed.
 
 ## Current limitations
 
@@ -43,7 +44,6 @@ This repository does **not** yet perform:
 - live Jira writes
 - fully wired live repository remediation end to end
 - live PR creation
-- live OSV + Maven verification
 - live compile/test/security validation
 - real retry matrix behavior
 - real policy enforcement
@@ -107,8 +107,10 @@ Important source areas:
 - `src/execution_accelerator/state.py` — persisted remediation state
 - `src/execution_accelerator/graph/builder.py` — main graph composition
 - `src/execution_accelerator/nodes/` — graph nodes
-- `src/execution_accelerator/adapters/` — fixture adapters and live-mode stubs
-- `tests/` — fixture-backed test suite
+- `src/execution_accelerator/adapters/` — fixture adapters plus live intake/verification implementations
+- `src/execution_accelerator/services/` — OSV and version-range services
+- `src/execution_accelerator/profiles/` — Maven profile detection helpers
+- `tests/` — fixture suite plus live verification integration coverage
 
 ## Validation
 
