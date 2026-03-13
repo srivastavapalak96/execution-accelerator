@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -8,7 +9,6 @@ from execution_accelerator.adapters import (
     AdvisoryVerificationAdapter,
     ComplexRemediationAdapter,
     DeliveryAdapter,
-    JiraAdapter,
     MavenVerificationAdapter,
     PomMutationAdapter,
     PreflightResolutionAdapter,
@@ -29,14 +29,11 @@ def build_vulnerability_details() -> VulnerabilityDetails:
     )
 
 
-def test_live_mode_adapters_fail_fast_until_implemented(tmp_path) -> None:
+def test_live_mode_remaining_adapters_fail_fast_until_implemented(tmp_path: Path) -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
     details = build_vulnerability_details()
 
-    live_calls = [
-        lambda: JiraAdapter(fixture_path=fixture_dir / "jira_issue.json", mode=ExecutionMode.LIVE).load_issue(
-            "SEC-123"
-        ),
+    live_calls: list[Callable[[], object]] = [
         lambda: RepositoryInventoryAdapter(
             fixture_path=fixture_dir / "repository_inventory.json",
             workspace_root=tmp_path / "workspace",

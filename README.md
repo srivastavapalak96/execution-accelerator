@@ -2,12 +2,13 @@
 
 Execution Accelerator is a **local, checkpointed remediation workflow prototype** for Maven vulnerability tickets.
 
-Today, this repository is best understood as a **fixture-backed implementation scaffold**:
+Today, this repository is best understood as a **mostly fixture-backed implementation scaffold**:
 
 - LangGraph orchestration is real
 - SQLite checkpoint persistence is real
 - workflow schemas/state are real
 - remediation, validation, delivery, and tough-path behavior are still mostly **fixture-backed placeholders**
+- live Jira reads now have a real adapter path; the rest of the workflow is still largely fixture-backed
 
 If you want the long-term target, read **`docs/vision.md`**.  
 If you want the truth about what works right now, read **`docs/status.md`**.
@@ -33,13 +34,13 @@ The default mode is:
 EA_MODE=fixture
 ```
 
-`EA_MODE=live` is now explicit, but live adapters are still intentionally unimplemented.
+`EA_MODE=live` is now explicit. Jira issue reads are partially implemented; the remaining live adapters are still mostly unimplemented.
 
 ## Current limitations
 
 This repository does **not** yet perform:
 
-- live Jira reads/writes
+- live Jira writes
 - live repository clone / branch / push
 - live PR creation
 - live OSV + Maven verification

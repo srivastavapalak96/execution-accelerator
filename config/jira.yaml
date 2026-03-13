@@ -1,0 +1,14 @@
+project_key: SEC
+fields:
+  # Replace these placeholders with your Jira custom field ids.
+  package_name: customfield_10010
+  installed_version: customfield_10011
+  fixed_version: customfield_10012
+  severity: customfield_10013
+  affected_repositories: customfield_10014
+  cve_id: customfield_10015
+  references: customfield_10016
+
+# If one of the fields above is unavailable, the live Jira adapter falls back to
+# simple regex extraction from the issue description for package/version/severity/CVE
+# and repository names.

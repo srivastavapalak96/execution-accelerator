@@ -7,8 +7,8 @@ This file tracks the repository **as implemented today**, not the aspirational e
 | LangGraph + SQLite checkpoints | SHIPPED | Persisted runs and checkpoint reload are implemented. |
 | Typed schemas and remediation state | SHIPPED | Core workflow models and state exist. |
 | Fixture execution mode | SHIPPED | `EA_MODE=fixture` is the default and covered by tests. |
-| Live execution mode | PLANNED | `EA_MODE=live` is explicit but currently raises `NotImplementedError` in adapters. |
-| Jira intake | PARTIAL | Fixture-backed only. |
+| Live execution mode | PARTIAL | `EA_MODE=live` is explicit; Jira intake now has a real read path, most other adapters remain fixture-only or stubbed. |
+| Jira intake | PARTIAL | Fixture-backed by default; live issue reads now work with `config/jira.yaml` plus Jira credentials. |
 | Repository inventory + workspace prep | PARTIAL | Fixture-backed only; no live clone yet. |
 | Advisory verification | PARTIAL | Fixture-backed only. |
 | Maven verification | PARTIAL | Fixture-backed only. |
@@ -24,4 +24,4 @@ This file tracks the repository **as implemented today**, not the aspirational e
 | Live PR creation and Jira updates | PLANNED | Delivery is still fixture-backed. |
 | Tough-path EOL migrations | PLANNED | No real recipe/decompile/diff/mapping ladder yet. |
 | Observability and escalation bundles | PLANNED | Not implemented yet. |
-| CI workflow | PLANNED | Baseline CI not yet added. |
+| CI workflow | SHIPPED | GitHub Actions runs ruff, strict mypy, and fixture-mode pytest. |
