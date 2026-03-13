@@ -17,8 +17,8 @@ If you want the truth about what works right now, read **`docs/status.md`**.
 
 The current repo can run a persisted local flow for:
 
-1. Jira intake from fixtures
-2. repository workspace preparation from fixtures
+1. Jira intake from fixtures, plus partial live Jira reads
+2. repository workspace preparation from fixtures, plus live inventory/clone primitives
 3. advisory + Maven verification from fixtures
 4. route selection across:
    - simple update
@@ -41,7 +41,7 @@ EA_MODE=fixture
 This repository does **not** yet perform:
 
 - live Jira writes
-- live repository clone / branch / push
+- fully wired live repository remediation end to end
 - live PR creation
 - live OSV + Maven verification
 - live compile/test/security validation
@@ -72,10 +72,22 @@ Bootstrap a fixture-backed ticket run:
 python -m execution_accelerator --bootstrap-ticket SEC-123 --thread-id sec-123-dev
 ```
 
+Bootstrap a dry-run that stops before delivery side effects:
+
+```bash
+python -m execution_accelerator --bootstrap-ticket SEC-123 --dry-run --keep-workspace
+```
+
 Inspect persisted state:
 
 ```bash
 python -m execution_accelerator --show-thread-state sec-123-dev
+```
+
+Rehydrate a persisted thread with the resume flow:
+
+```bash
+python -m execution_accelerator --resume sec-123-dev
 ```
 
 ## Development notes

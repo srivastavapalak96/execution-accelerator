@@ -6,6 +6,7 @@ from .builder import (
     build_remediation_graph,
     compile_remediation_graph,
     load_remediation_state,
+    resume_ticket_run,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "build_remediation_graph",
     "compile_remediation_graph",
     "load_remediation_state",
+    "resume_ticket_run",
 ]

@@ -28,6 +28,8 @@ class RuntimeConfig:
     logs_dir: Path
     checkpoints_path: Path
     execution_mode: ExecutionMode
+    dry_run: bool
+    keep_workspace: bool
     jira_base_url: str | None
     jira_project_key: str | None
     jira_fixture_path: Path | None
@@ -71,6 +73,8 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         repo_root=resolved_root,
     )
     execution_mode = ExecutionMode(os.getenv("EA_MODE", ExecutionMode.FIXTURE))
+    dry_run = os.getenv("EA_DRY_RUN", "0") == "1"
+    keep_workspace = os.getenv("EA_KEEP_WORKSPACE", "0") == "1"
     jira_fixture_path_value = os.getenv(
         "EA_JIRA_FIXTURE_PATH",
         str(resolved_root / "tests" / "fixtures" / "jira_issue.json"),
@@ -147,6 +151,8 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         logs_dir=logs_dir,
         checkpoints_path=checkpoints_path,
         execution_mode=execution_mode,
+        dry_run=dry_run,
+        keep_workspace=keep_workspace,
         jira_base_url=os.getenv("EA_JIRA_BASE_URL"),
         jira_project_key=os.getenv("EA_JIRA_PROJECT_KEY"),
         jira_fixture_path=(

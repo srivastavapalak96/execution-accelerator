@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import os
 
+import httpx
+
 from execution_accelerator.schemas import ExecutionMode
 
 
@@ -81,11 +83,28 @@ def probe_credentials(
 
 
 def _default_jira_probe(credentials: Credentials) -> None:
-    raise NotImplementedError(f"live Jira probe not implemented for {credentials.jira_base_url}")
+    if not credentials.jira_base_url or not credentials.jira_email or not credentials.jira_token:
+        raise MissingCredentialError("missing live credentials: EA_JIRA_BASE_URL, EA_JIRA_EMAIL, EA_JIRA_TOKEN")
+    response = httpx.get(
+        f"{credentials.jira_base_url.rstrip('/')}/rest/api/3/myself",
+        auth=(credentials.jira_email, credentials.jira_token),
+        timeout=15.0,
+    )
+    response.raise_for_status()
 
 
 def _default_github_probe(credentials: Credentials) -> None:
-    raise NotImplementedError(f"live GitHub probe not implemented for owner {credentials.github_owner}")
+    if not credentials.github_token:
+        raise MissingCredentialError("missing live credentials: GITHUB_TOKEN")
+    response = httpx.get(
+        f"{credentials.github_api_base.rstrip('/')}/user",
+        headers={
+            "Authorization": f"Bearer {credentials.github_token}",
+            "Accept": "application/vnd.github+json",
+        },
+        timeout=15.0,
+    )
+    response.raise_for_status()
 
 
 def _require_live_credentials(credentials: Credentials) -> None:

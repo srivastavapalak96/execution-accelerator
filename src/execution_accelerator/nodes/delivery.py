@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.adapters import DeliveryAdapter
 from execution_accelerator.schemas import AuditEvent, WorkflowStatus
 from execution_accelerator.state import RemediationState
@@ -53,3 +54,38 @@ def build_publish_remediation_node(
         }
 
     return publish_remediation
+
+
+def build_skip_publish_for_dry_run_node(
+    runtime_config: RuntimeConfig,
+) -> Callable[[RemediationState], dict[str, object]]:
+    """Create a node that completes successfully without delivery side effects."""
+
+    def skip_publish_for_dry_run(state: RemediationState) -> dict[str, object]:
+        assert state.current_working_repo is not None
+
+        completed_repos = list(state.completed_repos)
+        if state.current_working_repo not in completed_repos:
+            completed_repos.append(state.current_working_repo)
+        pending_repos = [repo for repo in state.pending_repos if repo != state.current_working_repo]
+
+        audit_events = list(state.audit_events)
+        audit_events.append(
+            AuditEvent(
+                event_type="delivery.skipped_dry_run",
+                message=f"Skipped publication side effects for {state.current_working_repo} in dry-run mode.",
+                details={
+                    "repository": state.current_working_repo,
+                    "dry_run": runtime_config.dry_run,
+                },
+            )
+        )
+
+        return {
+            "completed_repos": completed_repos,
+            "pending_repos": pending_repos,
+            "workflow_status": WorkflowStatus.COMPLETED,
+            "audit_events": audit_events,
+        }
+
+    return skip_publish_for_dry_run

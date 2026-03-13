@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import os
 
 from execution_accelerator.config import load_runtime_config
-from execution_accelerator.graph import bootstrap_ticket_run, load_remediation_state
+from execution_accelerator.graph import bootstrap_ticket_run, load_remediation_state, resume_ticket_run
+from execution_accelerator.state import RemediationState
 from execution_accelerator.observability import configure_logging
 from execution_accelerator.version import __version__
 
@@ -30,6 +32,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override the LangGraph thread id used for checkpointed runs.",
     )
     parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Stop before publication side effects and leave the ticket in dry-run mode.",
+    )
+    parser.add_argument(
+        "--keep-workspace",
+        action="store_true",
+        help="Keep live-mode workspaces on disk after execution.",
+    )
+    parser.add_argument(
+        "--workspace-dir",
+        metavar="PATH",
+        help="Override the workspace directory for this invocation.",
+    )
+    parser.add_argument(
+        "--resume",
+        metavar="THREAD_ID",
+        help="Resume or rehydrate a persisted remediation thread.",
+    )
+    parser.add_argument(
         "--show-thread-state",
         metavar="THREAD_ID",
         help="Load and print the current persisted state summary for a LangGraph thread.",
@@ -42,157 +64,163 @@ def main() -> int:
 
     parser = build_parser()
     args = parser.parse_args()
-    configure_logging()
+    previous_env = _apply_runtime_overrides(args)
+    try:
+        configure_logging()
 
-    if args.version:
-        print(__version__)
+        if args.version:
+            print(__version__)
+            return 0
+
+        if args.show_config:
+            config = load_runtime_config()
+            print(f"repo_root={config.repo_root}")
+            print(f"execution_mode={config.execution_mode}")
+            print(f"dry_run={config.dry_run}")
+            print(f"keep_workspace={config.keep_workspace}")
+            print(f"data_dir={config.data_dir}")
+            print(f"workspace_dir={config.workspace_dir}")
+            print(f"logs_dir={config.logs_dir}")
+            print(f"checkpoints_path={config.checkpoints_path}")
+            print(f"jira_fixture_path={config.jira_fixture_path}")
+            print(f"repository_inventory_fixture_path={config.repository_inventory_fixture_path}")
+            print(f"advisory_fixture_path={config.advisory_fixture_path}")
+            print(f"maven_verification_fixture_path={config.maven_verification_fixture_path}")
+            print(f"pom_fixture_before_path={config.pom_fixture_before_path}")
+            print(f"pom_fixture_after_path={config.pom_fixture_after_path}")
+            print(f"preflight_resolution_fixture_path={config.preflight_resolution_fixture_path}")
+            print(f"complex_artifact_fixture_path={config.complex_artifact_fixture_path}")
+            print(f"compatibility_diff_fixture_path={config.compatibility_diff_fixture_path}")
+            print(f"decompiled_artifact_fixture_path={config.decompiled_artifact_fixture_path}")
+            print(f"symbol_mapping_fixture_path={config.symbol_mapping_fixture_path}")
+            print(f"code_change_plan_fixture_path={config.code_change_plan_fixture_path}")
+            print(f"validation_result_fixture_path={config.validation_result_fixture_path}")
+            print(f"rollback_fixture_path={config.rollback_fixture_path}")
+            print(f"branch_publication_fixture_path={config.branch_publication_fixture_path}")
+            print(f"pull_request_fixture_path={config.pull_request_fixture_path}")
+            print(f"jira_completion_fixture_path={config.jira_completion_fixture_path}")
+            return 0
+
+        if args.bootstrap_ticket:
+            config = load_runtime_config()
+            result = bootstrap_ticket_run(
+                args.bootstrap_ticket,
+                runtime_config=config,
+                thread_id=args.thread_id,
+            )
+            _print_run_summary(
+                thread_id=result.thread_id,
+                checkpoint_path=str(result.checkpoint_path),
+                state=result.state,
+            )
+            return 0
+
+        if args.resume:
+            config = load_runtime_config()
+            result = resume_ticket_run(runtime_config=config, thread_id=args.resume)
+            _print_run_summary(
+                thread_id=result.thread_id,
+                checkpoint_path=str(result.checkpoint_path),
+                state=result.state,
+            )
+            return 0
+
+        if args.show_thread_state:
+            config = load_runtime_config()
+            state = load_remediation_state(runtime_config=config, thread_id=args.show_thread_state)
+            _print_run_summary(
+                thread_id=args.show_thread_state,
+                checkpoint_path=None,
+                state=state,
+            )
+            return 0
+
+        parser.print_help()
         return 0
+    finally:
+        _restore_runtime_overrides(previous_env)
 
-    if args.show_config:
-        config = load_runtime_config()
-        print(f"repo_root={config.repo_root}")
-        print(f"execution_mode={config.execution_mode}")
-        print(f"data_dir={config.data_dir}")
-        print(f"workspace_dir={config.workspace_dir}")
-        print(f"logs_dir={config.logs_dir}")
-        print(f"checkpoints_path={config.checkpoints_path}")
-        print(f"jira_fixture_path={config.jira_fixture_path}")
-        print(f"repository_inventory_fixture_path={config.repository_inventory_fixture_path}")
-        print(f"advisory_fixture_path={config.advisory_fixture_path}")
-        print(f"maven_verification_fixture_path={config.maven_verification_fixture_path}")
-        print(f"pom_fixture_before_path={config.pom_fixture_before_path}")
-        print(f"pom_fixture_after_path={config.pom_fixture_after_path}")
-        print(f"preflight_resolution_fixture_path={config.preflight_resolution_fixture_path}")
-        print(f"complex_artifact_fixture_path={config.complex_artifact_fixture_path}")
-        print(f"compatibility_diff_fixture_path={config.compatibility_diff_fixture_path}")
-        print(f"decompiled_artifact_fixture_path={config.decompiled_artifact_fixture_path}")
-        print(f"symbol_mapping_fixture_path={config.symbol_mapping_fixture_path}")
-        print(f"code_change_plan_fixture_path={config.code_change_plan_fixture_path}")
-        print(f"validation_result_fixture_path={config.validation_result_fixture_path}")
-        print(f"rollback_fixture_path={config.rollback_fixture_path}")
-        print(f"branch_publication_fixture_path={config.branch_publication_fixture_path}")
-        print(f"pull_request_fixture_path={config.pull_request_fixture_path}")
-        print(f"jira_completion_fixture_path={config.jira_completion_fixture_path}")
-        return 0
 
-    if args.bootstrap_ticket:
-        config = load_runtime_config()
-        result = bootstrap_ticket_run(
-            args.bootstrap_ticket,
-            runtime_config=config,
-            thread_id=args.thread_id,
+def _apply_runtime_overrides(args: argparse.Namespace) -> dict[str, str | None]:
+    previous_env = {
+        "EA_WORKSPACE_DIR": os.environ.get("EA_WORKSPACE_DIR"),
+        "EA_KEEP_WORKSPACE": os.environ.get("EA_KEEP_WORKSPACE"),
+        "EA_DRY_RUN": os.environ.get("EA_DRY_RUN"),
+    }
+    if args.workspace_dir:
+        os.environ["EA_WORKSPACE_DIR"] = args.workspace_dir
+    if args.keep_workspace:
+        os.environ["EA_KEEP_WORKSPACE"] = "1"
+    if args.dry_run:
+        os.environ["EA_DRY_RUN"] = "1"
+    return previous_env
+
+
+def _restore_runtime_overrides(previous_env: dict[str, str | None]) -> None:
+    for key, value in previous_env.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
+
+def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: RemediationState) -> None:
+    print(f"thread_id={thread_id}")
+    if checkpoint_path is not None:
+        print(f"checkpoint_path={checkpoint_path}")
+    print(f"workflow_status={state.workflow_status}")
+    print(f"target_count={len(state.targets)}")
+    print(f"current_target_index={state.current_target_index}")
+    print(f"audit_event_count={len(state.audit_events)}")
+    if state.vulnerability_details is not None:
+        print(f"package_name={state.vulnerability_details.package_name}")
+        print(f"severity={state.vulnerability_details.severity}")
+    if state.advisory_verification is not None:
+        print(f"recommended_fix_version={state.advisory_verification.recommended_fix_version}")
+    if state.maven_verification is not None:
+        print(f"dependency_kind={state.maven_verification.dependency_kind}")
+    print(f"pending_repos={','.join(state.pending_repos)}")
+    print(f"completed_repos={','.join(state.completed_repos)}")
+    if state.route_decision is not None:
+        print(f"route_strategy={state.route_decision.strategy}")
+        print(f"route_confidence={state.route_decision.confidence:.2f}")
+    if state.remediation_plan is not None:
+        print(f"plan_strategy={state.remediation_plan.strategy}")
+    if state.pom_mutation_plan is not None and state.pom_mutation_plan.changes:
+        change = state.pom_mutation_plan.changes[0]
+        print(f"pom_change_kind={change.mutation_kind}")
+        print(f"pom_change_target_section={change.target_section}")
+    if state.complex_remediation_plan is not None:
+        print(f"complex_candidate_count={len(state.complex_remediation_plan.artifact_candidates)}")
+        print(
+            "complex_breaking_change_count="
+            f"{len(state.complex_remediation_plan.compatibility_diff.breaking_changes)}"
         )
-        print(f"thread_id={result.thread_id}")
-        print(f"checkpoint_path={result.checkpoint_path}")
-        print(f"workflow_status={result.state.workflow_status}")
-        print(f"audit_event_count={len(result.state.audit_events)}")
-        if result.state.vulnerability_details is not None:
-            print(f"package_name={result.state.vulnerability_details.package_name}")
-            print(f"severity={result.state.vulnerability_details.severity}")
-        if result.state.advisory_verification is not None:
-            print(f"recommended_fix_version={result.state.advisory_verification.recommended_fix_version}")
-        if result.state.maven_verification is not None:
-            print(f"dependency_kind={result.state.maven_verification.dependency_kind}")
-        print(f"pending_repos={','.join(result.state.pending_repos)}")
-        print(f"completed_repos={','.join(result.state.completed_repos)}")
-        if result.state.route_decision is not None:
-            print(f"route_strategy={result.state.route_decision.strategy}")
-            print(f"route_confidence={result.state.route_decision.confidence:.2f}")
-        if result.state.remediation_plan is not None:
-            print(f"plan_strategy={result.state.remediation_plan.strategy}")
-        if result.state.pom_mutation_plan is not None and result.state.pom_mutation_plan.changes:
-            change = result.state.pom_mutation_plan.changes[0]
-            print(f"pom_change_kind={change.mutation_kind}")
-            print(f"pom_change_target_section={change.target_section}")
-        if result.state.complex_remediation_plan is not None:
-            print(f"complex_candidate_count={len(result.state.complex_remediation_plan.artifact_candidates)}")
-            print(
-                "complex_breaking_change_count="
-                f"{len(result.state.complex_remediation_plan.compatibility_diff.breaking_changes)}"
-            )
-        if result.state.code_change_plan is not None:
-            print(f"complex_decompiled_artifact_count={len(result.state.decompiled_artifacts)}")
-            print(f"complex_symbol_mapping_count={len(result.state.symbol_mappings)}")
-            print(f"complex_planned_file_count={len(result.state.code_change_plan.target_files)}")
-        if result.state.current_working_repo is not None:
-            print(f"current_working_repo={result.state.current_working_repo}")
-        print(f"modified_file_count={len(result.state.modified_files)}")
-        if result.state.modified_files:
-            print(f"modified_file={result.state.modified_files[0]}")
-        if result.state.preflight_resolution is not None:
-            print(f"preflight_status={result.state.preflight_resolution.status}")
-            print(f"preflight_dependency_kind={result.state.preflight_resolution.dependency_kind}")
-            print(f"preflight_resolved_version={result.state.preflight_resolution.resolved_version}")
-        if result.state.validation_results:
-            validation = result.state.validation_results[-1]
-            print(f"validation_status={validation.status}")
-            print(f"validation_check_count={len(validation.checks)}")
-        if result.state.rollback_plan is not None:
-            print(f"rollback_status={result.state.rollback_plan.status}")
-            print(f"rollback_reason={result.state.rollback_plan.reason}")
-        if result.state.branch_publication is not None:
-            print(f"branch_name={result.state.branch_publication.branch_name}")
-            print(f"branch_commit_sha={result.state.branch_publication.commit_sha}")
-        if result.state.pull_request_summary is not None:
-            print(f"pull_request_number={result.state.pull_request_summary.number}")
-            print(f"pull_request_url={result.state.pull_request_summary.url}")
-        if result.state.jira_completion is not None:
-            print(f"jira_ticket_status={result.state.jira_completion.status}")
-        return 0
-
-    if args.show_thread_state:
-        config = load_runtime_config()
-        state = load_remediation_state(runtime_config=config, thread_id=args.show_thread_state)
-        print(f"thread_id={args.show_thread_state}")
-        print(f"workflow_status={state.workflow_status}")
-        print(f"pending_repos={','.join(state.pending_repos)}")
-        print(f"completed_repos={','.join(state.completed_repos)}")
-        print(f"audit_event_count={len(state.audit_events)}")
-        if state.vulnerability_details is not None:
-            print(f"package_name={state.vulnerability_details.package_name}")
-        if state.advisory_verification is not None:
-            print(f"recommended_fix_version={state.advisory_verification.recommended_fix_version}")
-        if state.route_decision is not None:
-            print(f"route_strategy={state.route_decision.strategy}")
-        if state.pom_mutation_plan is not None and state.pom_mutation_plan.changes:
-            change = state.pom_mutation_plan.changes[0]
-            print(f"pom_change_kind={change.mutation_kind}")
-            print(f"pom_change_target_section={change.target_section}")
-        if state.complex_remediation_plan is not None:
-            print(f"complex_candidate_count={len(state.complex_remediation_plan.artifact_candidates)}")
-            print(
-                "complex_breaking_change_count="
-                f"{len(state.complex_remediation_plan.compatibility_diff.breaking_changes)}"
-            )
-        if state.code_change_plan is not None:
-            print(f"complex_decompiled_artifact_count={len(state.decompiled_artifacts)}")
-            print(f"complex_symbol_mapping_count={len(state.symbol_mappings)}")
-            print(f"complex_planned_file_count={len(state.code_change_plan.target_files)}")
-        if state.current_working_repo is not None:
-            print(f"current_working_repo={state.current_working_repo}")
-        print(f"modified_file_count={len(state.modified_files)}")
-        if state.modified_files:
-            print(f"modified_file={state.modified_files[0]}")
-        if state.preflight_resolution is not None:
-            print(f"preflight_status={state.preflight_resolution.status}")
-            print(f"preflight_dependency_kind={state.preflight_resolution.dependency_kind}")
-            print(f"preflight_resolved_version={state.preflight_resolution.resolved_version}")
-        if state.validation_results:
-            validation = state.validation_results[-1]
-            print(f"validation_status={validation.status}")
-            print(f"validation_check_count={len(validation.checks)}")
-        if state.rollback_plan is not None:
-            print(f"rollback_status={state.rollback_plan.status}")
-            print(f"rollback_reason={state.rollback_plan.reason}")
-        if state.branch_publication is not None:
-            print(f"branch_name={state.branch_publication.branch_name}")
-            print(f"branch_commit_sha={state.branch_publication.commit_sha}")
-        if state.pull_request_summary is not None:
-            print(f"pull_request_number={state.pull_request_summary.number}")
-            print(f"pull_request_url={state.pull_request_summary.url}")
-        if state.jira_completion is not None:
-            print(f"jira_ticket_status={state.jira_completion.status}")
-        return 0
-
-    parser.print_help()
-    return 0
+    if state.code_change_plan is not None:
+        print(f"complex_decompiled_artifact_count={len(state.decompiled_artifacts)}")
+        print(f"complex_symbol_mapping_count={len(state.symbol_mappings)}")
+        print(f"complex_planned_file_count={len(state.code_change_plan.target_files)}")
+    if state.current_working_repo is not None:
+        print(f"current_working_repo={state.current_working_repo}")
+    print(f"modified_file_count={len(state.modified_files)}")
+    if state.modified_files:
+        print(f"modified_file={state.modified_files[0]}")
+    if state.preflight_resolution is not None:
+        print(f"preflight_status={state.preflight_resolution.status}")
+        print(f"preflight_dependency_kind={state.preflight_resolution.dependency_kind}")
+        print(f"preflight_resolved_version={state.preflight_resolution.resolved_version}")
+    if state.validation_results:
+        validation = state.validation_results[-1]
+        print(f"validation_status={validation.status}")
+        print(f"validation_check_count={len(validation.checks)}")
+    if state.rollback_plan is not None:
+        print(f"rollback_status={state.rollback_plan.status}")
+        print(f"rollback_reason={state.rollback_plan.reason}")
+    if state.branch_publication is not None:
+        print(f"branch_name={state.branch_publication.branch_name}")
+        print(f"branch_commit_sha={state.branch_publication.commit_sha}")
+    if state.pull_request_summary is not None:
+        print(f"pull_request_number={state.pull_request_summary.number}")
+        print(f"pull_request_url={state.pull_request_summary.url}")
+    if state.jira_completion is not None:
+        print(f"jira_ticket_status={state.jira_completion.status}")

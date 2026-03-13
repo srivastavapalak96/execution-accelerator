@@ -11,11 +11,15 @@ def test_load_runtime_config_uses_repo_relative_defaults(tmp_path, monkeypatch) 
     monkeypatch.delenv("EA_WORKSPACE_DIR", raising=False)
     monkeypatch.delenv("EA_LOGS_DIR", raising=False)
     monkeypatch.delenv("EA_CHECKPOINTS_PATH", raising=False)
+    monkeypatch.delenv("EA_DRY_RUN", raising=False)
+    monkeypatch.delenv("EA_KEEP_WORKSPACE", raising=False)
 
     config = load_runtime_config(repo_root=tmp_path)
 
     assert config.repo_root == tmp_path
     assert config.execution_mode == ExecutionMode.FIXTURE
+    assert config.dry_run is False
+    assert config.keep_workspace is False
     assert config.data_dir == Path(tmp_path / ".local" / "data")
     assert config.workspace_dir == Path(tmp_path / ".local" / "workspace")
     assert config.logs_dir == Path(tmp_path / ".local" / "logs")
@@ -42,6 +46,16 @@ def test_load_runtime_config_reads_execution_mode(tmp_path, monkeypatch) -> None
     config = load_runtime_config(repo_root=tmp_path)
 
     assert config.execution_mode == ExecutionMode.LIVE
+
+
+def test_load_runtime_config_reads_dry_run_and_keep_workspace_flags(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("EA_DRY_RUN", "1")
+    monkeypatch.setenv("EA_KEEP_WORKSPACE", "1")
+
+    config = load_runtime_config(repo_root=tmp_path)
+
+    assert config.dry_run is True
+    assert config.keep_workspace is True
 
 
 def test_load_runtime_config_resolves_relative_environment_paths(tmp_path, monkeypatch) -> None:

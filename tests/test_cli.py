@@ -86,6 +86,8 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     assert exit_code == 0
     assert "repo_root=" in captured.out
     assert "execution_mode=fixture" in captured.out
+    assert "dry_run=False" in captured.out
+    assert "keep_workspace=False" in captured.out
     assert f"data_dir={tmp_path / 'data'}" in captured.out
     assert f"workspace_dir={tmp_path / 'workspace'}" in captured.out
     assert f"logs_dir={tmp_path / 'logs'}" in captured.out
@@ -215,7 +217,9 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "thread_id=sec-401-dev" in captured.out
     assert f"checkpoint_path={tmp_path / 'state' / 'checkpoints.sqlite'}" in captured.out
     assert "workflow_status=completed" in captured.out
-    assert "audit_event_count=10" in captured.out
+    assert "target_count=1" in captured.out
+    assert "current_target_index=0" in captured.out
+    assert "audit_event_count=11" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
     assert "severity=high" in captured.out
     assert "recommended_fix_version=1.2.4" in captured.out
@@ -309,9 +313,10 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     assert exit_code == 0
     assert "thread_id=sec-402-dev" in captured.out
     assert "workflow_status=completed" in captured.out
+    assert "target_count=1" in captured.out
     assert "pending_repos=" in captured.out
     assert "completed_repos=payments-service" in captured.out
-    assert "audit_event_count=10" in captured.out
+    assert "audit_event_count=11" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
     assert "recommended_fix_version=1.2.4" in captured.out
     assert "route_strategy=simple_update" in captured.out
@@ -448,3 +453,123 @@ def test_main_bootstraps_complex_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "branch_name=sec-123-remediate-legacy-json" in captured.out
     assert "pull_request_number=42" in captured.out
     assert "jira_ticket_status=done" in captured.out
+
+
+def test_main_bootstraps_ticket_in_dry_run_mode(monkeypatch, capsys, tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    custom_workspace = tmp_path / "custom-workspace"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--bootstrap-ticket",
+            "SEC-450",
+            "--thread-id",
+            "sec-450-dry-run",
+            "--dry-run",
+            "--keep-workspace",
+            "--workspace-dir",
+            str(custom_workspace),
+        ],
+    )
+    monkeypatch.setenv("EA_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("EA_LOGS_DIR", str(tmp_path / "logs"))
+    monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "state" / "checkpoints.sqlite"))
+    monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(fixture_dir / "jira_issue.json"))
+    monkeypatch.setenv("EA_REPOSITORY_INVENTORY_FIXTURE_PATH", str(fixture_dir / "repository_inventory.json"))
+    monkeypatch.setenv("EA_ADVISORY_FIXTURE_PATH", str(fixture_dir / "advisory_verification.json"))
+    monkeypatch.setenv("EA_MAVEN_VERIFICATION_FIXTURE_PATH", str(fixture_dir / "maven_verification.json"))
+    monkeypatch.setenv("EA_POM_FIXTURE_BEFORE_PATH", str(fixture_dir / "pom_before.xml"))
+    monkeypatch.setenv("EA_POM_FIXTURE_AFTER_PATH", str(fixture_dir / "pom_after.xml"))
+    monkeypatch.setenv("EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH", str(fixture_dir / "preflight_resolution.json"))
+    monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "complex_artifacts.json"))
+    monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixture_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
+    monkeypatch.setenv("EA_VALIDATION_RESULT_FIXTURE_PATH", str(fixture_dir / "validation_result.json"))
+    monkeypatch.setenv("EA_ROLLBACK_FIXTURE_PATH", str(fixture_dir / "rollback_plan.json"))
+    monkeypatch.setenv("EA_BRANCH_PUBLICATION_FIXTURE_PATH", str(fixture_dir / "branch_publication.json"))
+    monkeypatch.setenv("EA_PULL_REQUEST_FIXTURE_PATH", str(fixture_dir / "pull_request.json"))
+    monkeypatch.setenv("EA_JIRA_COMPLETION_FIXTURE_PATH", str(fixture_dir / "jira_completion.json"))
+    seed_bootstrap_workspace_pom(
+        custom_workspace,
+        ticket_id="SEC-450",
+        repository_name="payments-service",
+        fixture_path=fixture_dir / "pom_before.xml",
+    )
+
+    exit_code = main()
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "thread_id=sec-450-dry-run" in captured.out
+    assert "workflow_status=completed" in captured.out
+    assert "target_count=1" in captured.out
+    assert "completed_repos=payments-service" in captured.out
+    assert f"modified_file={custom_workspace / 'sec-450' / 'payments-service' / 'pom.xml'}" in captured.out
+    assert "branch_name=" not in captured.out
+    assert "pull_request_number=" not in captured.out
+    assert "jira_ticket_status=" not in captured.out
+
+
+def test_main_resumes_persisted_thread(monkeypatch, capsys, tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    monkeypatch.setenv("EA_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
+    monkeypatch.setenv("EA_LOGS_DIR", str(tmp_path / "logs"))
+    monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "state" / "checkpoints.sqlite"))
+    monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(fixture_dir / "jira_issue.json"))
+    monkeypatch.setenv("EA_REPOSITORY_INVENTORY_FIXTURE_PATH", str(fixture_dir / "repository_inventory.json"))
+    monkeypatch.setenv("EA_ADVISORY_FIXTURE_PATH", str(fixture_dir / "advisory_verification.json"))
+    monkeypatch.setenv("EA_MAVEN_VERIFICATION_FIXTURE_PATH", str(fixture_dir / "maven_verification.json"))
+    monkeypatch.setenv("EA_POM_FIXTURE_BEFORE_PATH", str(fixture_dir / "pom_before.xml"))
+    monkeypatch.setenv("EA_POM_FIXTURE_AFTER_PATH", str(fixture_dir / "pom_after.xml"))
+    monkeypatch.setenv("EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH", str(fixture_dir / "preflight_resolution.json"))
+    monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "complex_artifacts.json"))
+    monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixture_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
+    monkeypatch.setenv("EA_VALIDATION_RESULT_FIXTURE_PATH", str(fixture_dir / "validation_result.json"))
+    monkeypatch.setenv("EA_ROLLBACK_FIXTURE_PATH", str(fixture_dir / "rollback_plan.json"))
+    monkeypatch.setenv("EA_BRANCH_PUBLICATION_FIXTURE_PATH", str(fixture_dir / "branch_publication.json"))
+    monkeypatch.setenv("EA_PULL_REQUEST_FIXTURE_PATH", str(fixture_dir / "pull_request.json"))
+    monkeypatch.setenv("EA_JIRA_COMPLETION_FIXTURE_PATH", str(fixture_dir / "jira_completion.json"))
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-460",
+        repository_name="payments-service",
+        fixture_path=fixture_dir / "pom_before.xml",
+    )
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--bootstrap-ticket",
+            "SEC-460",
+            "--thread-id",
+            "sec-460-resume",
+        ],
+    )
+    assert main() == 0
+    capsys.readouterr()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--resume",
+            "sec-460-resume",
+        ],
+    )
+    exit_code = main()
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "thread_id=sec-460-resume" in captured.out
+    assert f"checkpoint_path={tmp_path / 'state' / 'checkpoints.sqlite'}" in captured.out
+    assert "workflow_status=completed" in captured.out
+    assert "target_count=1" in captured.out
+    assert "completed_repos=payments-service" in captured.out

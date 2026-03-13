@@ -15,6 +15,8 @@ def _configure_runtime(monkeypatch, tmp_path, *, transitive: bool = False, compl
     monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
     monkeypatch.setenv("EA_LOGS_DIR", str(tmp_path / "logs"))
     monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "state" / "checkpoints.sqlite"))
+    monkeypatch.setenv("EA_DRY_RUN", "0")
+    monkeypatch.setenv("EA_KEEP_WORKSPACE", "0")
     monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(fixtures_dir / "jira_issue.json"))
     monkeypatch.setenv(
         "EA_REPOSITORY_INVENTORY_FIXTURE_PATH",
@@ -110,7 +112,9 @@ def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch)
     assert config.checkpoints_path.exists()
     assert loaded_state.initial_ticket_id == "SEC-42"
     assert loaded_state.workflow_status == WorkflowStatus.COMPLETED
-    assert len(loaded_state.audit_events) == 10
+    assert len(result.state.targets) == 1
+    assert result.state.current_target_index == 0
+    assert len(loaded_state.audit_events) == 11
     assert Path(loaded_state.repo_map["payments-service"].local_path).is_dir()
     assert (
         Path(loaded_state.repo_map["payments-service"].local_path) / ".execution-accelerator-repo.json"
@@ -151,7 +155,8 @@ def test_bootstrap_ticket_run_persists_transitive_override_state(tmp_path, monke
     assert result.state.pom_mutation_plan.changes[0].target_section == "dependency_management"
     assert result.state.preflight_resolution is not None
     assert result.state.preflight_resolution.dependency_kind == "transitive"
-    assert len(result.state.audit_events) == 10
+    assert len(result.state.targets) == 1
+    assert len(result.state.audit_events) == 11
     mutated_root = ET.fromstring(Path(result.state.modified_files[0]).read_text())
     version = mutated_root.find(
         ".//{http://maven.apache.org/POM/4.0.0}dependencyManagement/"
@@ -199,7 +204,8 @@ def test_bootstrap_ticket_run_persists_complex_refactor_state(tmp_path, monkeypa
     assert result.state.workflow_status == WorkflowStatus.COMPLETED
     assert result.state.completed_repos == ["payments-service"]
     assert result.state.pending_repos == []
-    assert len(result.state.audit_events) == 10
+    assert len(result.state.targets) == 1
+    assert len(result.state.audit_events) == 11
     assert loaded_state.complex_remediation_plan is not None
     assert loaded_state.complex_remediation_plan.compatibility_diff.target_version == "2.0.0"
     assert loaded_state.code_change_plan is not None
@@ -236,4 +242,5 @@ def test_bootstrap_ticket_run_records_failure_and_rollback_state(tmp_path, monke
     assert result.state.total_attempts == 1
     assert result.state.failure_classifications[-1] == "compile_error"
     assert result.state.errors[-1].code == "validation_failed"
-    assert len(result.state.audit_events) == 12
+    assert len(result.state.targets) == 1
+    assert len(result.state.audit_events) == 13

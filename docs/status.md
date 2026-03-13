@@ -7,9 +7,9 @@ This file tracks the repository **as implemented today**, not the aspirational e
 | LangGraph + SQLite checkpoints | SHIPPED | Persisted runs and checkpoint reload are implemented. |
 | Typed schemas and remediation state | SHIPPED | Core workflow models and state exist. |
 | Fixture execution mode | SHIPPED | `EA_MODE=fixture` is the default and covered by tests. |
-| Live execution mode | PARTIAL | `EA_MODE=live` is explicit; Jira intake now has a real read path, most other adapters remain fixture-only or stubbed. |
+| Live execution mode | PARTIAL | `EA_MODE=live` is explicit; Jira intake plus repository inventory/clone now have real paths, most other adapters remain fixture-only or stubbed. |
 | Jira intake | PARTIAL | Fixture-backed by default; live issue reads now work with `config/jira.yaml` plus Jira credentials. |
-| Repository inventory + workspace prep | PARTIAL | Fixture-backed only; no live clone yet. |
+| Repository inventory + workspace prep | PARTIAL | Fixture-backed by default; live inventory from `config/repositories.yaml`, PR idempotency lookup, and git clone prep now exist. |
 | Advisory verification | PARTIAL | Fixture-backed only. |
 | Maven verification | PARTIAL | Fixture-backed only. |
 | Simple remediation lane | PARTIAL | Fixture-backed mutation flow exists. |

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,8 +30,10 @@ from execution_accelerator.nodes import (
     build_preflight_validation_node,
     build_prepare_complex_remediation_node,
     build_publish_remediation_node,
+    build_probe_credentials_node,
     build_remediate_simple_node,
     build_remediate_transitive_node,
+    build_skip_publish_for_dry_run_node,
     build_handle_validation_failure_node,
     build_validate_remediation_node,
     build_verify_advisory_node,
@@ -53,6 +56,7 @@ class BootstrapRunResult(BaseModel):
 
 def build_remediation_graph(
     *,
+    runtime_config: RuntimeConfig,
     jira_adapter: JiraAdapter,
     repository_inventory_adapter: RepositoryInventoryAdapter,
     advisory_verification_adapter: AdvisoryVerificationAdapter,
@@ -66,7 +70,9 @@ def build_remediation_graph(
     """Build the Day 10 stateful remediation graph."""
 
     builder = StateGraph(RemediationState)
+    post_validation_selector = _build_post_validation_selector(dry_run=runtime_config.dry_run)
     builder.add_node("bootstrap_state", bootstrap_state)
+    builder.add_node("probe_credentials", cast(Any, build_probe_credentials_node(runtime_config)))
     builder.add_node("ingest_and_parse_jira", cast(Any, build_ingest_and_parse_jira_node(jira_adapter)))
     builder.add_node(
         "load_repository_context",
@@ -102,9 +108,11 @@ def build_remediation_graph(
     )
     builder.add_node("classify_failure", cast(Any, classify_failure))
     builder.add_node("escalate", cast(Any, escalate))
+    builder.add_node("skip_publish_for_dry_run", cast(Any, build_skip_publish_for_dry_run_node(runtime_config)))
     builder.add_node("publish_remediation", cast(Any, build_publish_remediation_node(delivery_adapter)))
     builder.add_edge(START, "bootstrap_state")
-    builder.add_edge("bootstrap_state", "ingest_and_parse_jira")
+    builder.add_edge("bootstrap_state", "probe_credentials")
+    builder.add_edge("probe_credentials", "ingest_and_parse_jira")
     builder.add_edge("ingest_and_parse_jira", "load_repository_context")
     builder.add_edge("load_repository_context", "verify_advisory")
     builder.add_edge("verify_advisory", "verify_maven_target")
@@ -126,13 +134,15 @@ def build_remediation_graph(
     builder.add_edge("preflight_validate", "validate_remediation")
     builder.add_conditional_edges(
         "validate_remediation",
-        _select_post_validation_node,
+        post_validation_selector,
         {
             "handle_validation_failure": "handle_validation_failure",
+            "skip_publish_for_dry_run": "skip_publish_for_dry_run",
             "publish_remediation": "publish_remediation",
         },
     )
     builder.add_edge("publish_remediation", END)
+    builder.add_edge("skip_publish_for_dry_run", END)
     builder.add_edge("handle_validation_failure", "classify_failure")
     builder.add_conditional_edges(
         "classify_failure",
@@ -147,6 +157,7 @@ def build_remediation_graph(
 
 def compile_remediation_graph(
     *,
+    runtime_config: RuntimeConfig,
     jira_adapter: JiraAdapter,
     repository_inventory_adapter: RepositoryInventoryAdapter,
     advisory_verification_adapter: AdvisoryVerificationAdapter,
@@ -161,6 +172,7 @@ def compile_remediation_graph(
     """Compile the remediation graph, optionally with persistence."""
 
     return build_remediation_graph(
+        runtime_config=runtime_config,
         jira_adapter=jira_adapter,
         repository_inventory_adapter=repository_inventory_adapter,
         advisory_verification_adapter=advisory_verification_adapter,
@@ -195,6 +207,7 @@ def bootstrap_ticket_run(
 
     with sqlite_checkpointer(runtime_config) as checkpointer:
         graph = compile_remediation_graph(
+            runtime_config=runtime_config,
             jira_adapter=jira_adapter,
             repository_inventory_adapter=repository_inventory_adapter,
             advisory_verification_adapter=advisory_verification_adapter,
@@ -232,6 +245,7 @@ def load_remediation_state(*, runtime_config: RuntimeConfig, thread_id: str) -> 
     delivery_adapter = DeliveryAdapter.from_runtime_config(runtime_config)
     with sqlite_checkpointer(runtime_config) as checkpointer:
         graph = compile_remediation_graph(
+            runtime_config=runtime_config,
             jira_adapter=jira_adapter,
             repository_inventory_adapter=repository_inventory_adapter,
             advisory_verification_adapter=advisory_verification_adapter,
@@ -247,6 +261,17 @@ def load_remediation_state(*, runtime_config: RuntimeConfig, thread_id: str) -> 
     return RemediationState.model_validate(snapshot.values)
 
 
+def resume_ticket_run(*, runtime_config: RuntimeConfig, thread_id: str) -> BootstrapRunResult:
+    """Resume a persisted thread when possible, or rehydrate its latest state."""
+
+    state = load_remediation_state(runtime_config=runtime_config, thread_id=thread_id)
+    return BootstrapRunResult(
+        thread_id=thread_id,
+        checkpoint_path=runtime_config.checkpoints_path,
+        state=state,
+    )
+
+
 def _select_remediation_node(state: RemediationState) -> str:
     assert state.route_decision is not None
 
@@ -259,12 +284,17 @@ def _select_remediation_node(state: RemediationState) -> str:
     return END
 
 
-def _select_post_validation_node(state: RemediationState) -> str:
-    assert state.validation_results
+def _build_post_validation_selector(*, dry_run: bool) -> Callable[[RemediationState], str]:
+    def select_post_validation_node(state: RemediationState) -> str:
+        assert state.validation_results
 
-    if state.validation_results[-1].status == "failed":
-        return "handle_validation_failure"
-    return "publish_remediation"
+        if state.validation_results[-1].status == "failed":
+            return "handle_validation_failure"
+        if dry_run:
+            return "skip_publish_for_dry_run"
+        return "publish_remediation"
+
+    return select_post_validation_node
 
 
 def _select_failure_node(state: RemediationState) -> str:
