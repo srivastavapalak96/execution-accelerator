@@ -12,7 +12,6 @@ from execution_accelerator.adapters import (
     MavenVerificationAdapter,
     PomMutationAdapter,
     PreflightResolutionAdapter,
-    RepositoryInventoryAdapter,
     ValidationAdapter,
 )
 from execution_accelerator.schemas import AffectedRepository, ExecutionMode, Severity, VulnerabilityDetails
@@ -34,11 +33,6 @@ def test_live_mode_remaining_adapters_fail_fast_until_implemented(tmp_path: Path
     details = build_vulnerability_details()
 
     live_calls: list[Callable[[], object]] = [
-        lambda: RepositoryInventoryAdapter(
-            fixture_path=fixture_dir / "repository_inventory.json",
-            workspace_root=tmp_path / "workspace",
-            mode=ExecutionMode.LIVE,
-        ).load_inventory(),
         lambda: AdvisoryVerificationAdapter(
             fixture_path=fixture_dir / "advisory_verification.json",
             mode=ExecutionMode.LIVE,

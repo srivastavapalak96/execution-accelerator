@@ -29,6 +29,7 @@ from execution_accelerator.schemas import (
     RollbackPlan,
     PullRequestSummary,
     SymbolMappingEntry,
+    RemediationTarget,
     VulnerabilityDetails,
     WorkflowStatus,
 )
@@ -89,6 +90,8 @@ class RemediationState(BaseSchemaModel):
     decompiled_artifacts: list[DecompiledArtifactSummary] = Field(default_factory=list)
     symbol_mappings: list[SymbolMappingEntry] = Field(default_factory=list)
     code_change_plan: ComplexCodeChangePlan | None = None
+    targets: list[RemediationTarget] = Field(default_factory=list)
+    current_target_index: int = Field(default=0, ge=0)
     repo_map: dict[str, RepositoryWorkspace] = Field(default_factory=dict)
     pending_repos: list[str] = Field(default_factory=list)
     current_working_repo: str | None = None

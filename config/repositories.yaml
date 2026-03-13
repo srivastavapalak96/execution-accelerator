@@ -1,0 +1,10 @@
+repositories:
+  - name: payments-service
+    clone_url: https://github.com/example/payments-service.git
+    default_branch: main
+    build_system: maven
+    manifest_path: pom.xml
+    owner: example
+    tags:
+      - payments
+      - java

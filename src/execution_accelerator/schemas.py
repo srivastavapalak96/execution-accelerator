@@ -177,6 +177,22 @@ class RepositoryInventoryPayload(BaseSchemaModel):
     repositories: list[RepositoryInventoryRecord] = Field(default_factory=list)
 
 
+class RemediationTarget(BaseSchemaModel):
+    """One remediation unit for a repository/package/version combination."""
+
+    ticket_id: str = Field(min_length=1)
+    repository_name: str = Field(min_length=1)
+    package_name: str = Field(min_length=1)
+    installed_version: str = Field(min_length=1)
+    target_version: str | None = None
+    clone_url: str = Field(min_length=1)
+    default_branch: str = "main"
+    build_system: str = "maven"
+    manifest_path: str = Field(min_length=1)
+    owner: str | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
 class MavenDependencyKind(StrEnum):
     """Whether the vulnerable dependency is direct or transitive."""
 
