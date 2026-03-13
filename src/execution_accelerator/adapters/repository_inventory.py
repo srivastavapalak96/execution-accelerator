@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import json
-import os
 from pathlib import Path
 import re
 import shutil
@@ -71,7 +70,7 @@ class RepositoryInventoryAdapter:
             mode=config.execution_mode,
             config_path=config.repo_root / "config" / "repositories.yaml",
             git_runner=GitRunner(log_dir=config.logs_dir / "git"),
-            keep_workspace=os.getenv("EA_KEEP_WORKSPACE", "0") == "1",
+            keep_workspace=config.keep_workspace,
         )
 
     def load_inventory(self, *, fixture_path: Path | None = None) -> RepositoryInventoryPayload:
