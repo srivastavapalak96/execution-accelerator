@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import httpx
 import pytest
 
 from execution_accelerator.config import MissingCredentialError, load_credentials, probe_credentials
@@ -74,3 +75,61 @@ def test_probe_credentials_runs_injected_live_probes(monkeypatch: pytest.MonkeyP
     assert report.jira_ok is True
     assert report.github_ok is True
     assert calls == ["jira:https://jira.example.com", "github:octo-org"]
+
+
+def test_probe_credentials_accepts_github_repo_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("EA_JIRA_BASE_URL", "https://jira.example.com")
+    monkeypatch.setenv("EA_JIRA_EMAIL", "bot@example.com")
+    monkeypatch.setenv("EA_JIRA_TOKEN", "jira-token")
+    monkeypatch.setenv("GITHUB_TOKEN", "github-token")
+    monkeypatch.setenv("GITHUB_OWNER", "octo-org")
+    monkeypatch.setenv("EA_GIT_USER_NAME", "Execution Bot")
+    monkeypatch.setenv("EA_GIT_USER_EMAIL", "bot@example.com")
+    credentials = load_credentials(repo_root=tmp_path)
+
+    def fake_get(url: str, **_: object) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"x-oauth-scopes": "repo, workflow"},
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr("execution_accelerator.config.credentials.httpx.get", fake_get)
+
+    report = probe_credentials(
+        credentials,
+        execution_mode=ExecutionMode.LIVE,
+        jira_probe=lambda _: None,
+    )
+
+    assert report.github_ok is True
+
+
+def test_probe_credentials_rejects_github_tokens_without_push_or_pr_scope(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("EA_JIRA_BASE_URL", "https://jira.example.com")
+    monkeypatch.setenv("EA_JIRA_EMAIL", "bot@example.com")
+    monkeypatch.setenv("EA_JIRA_TOKEN", "jira-token")
+    monkeypatch.setenv("GITHUB_TOKEN", "github-token")
+    monkeypatch.setenv("GITHUB_OWNER", "octo-org")
+    monkeypatch.setenv("EA_GIT_USER_NAME", "Execution Bot")
+    monkeypatch.setenv("EA_GIT_USER_EMAIL", "bot@example.com")
+    credentials = load_credentials(repo_root=tmp_path)
+
+    def fake_get(url: str, **_: object) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"x-oauth-scopes": "read:org, gist"},
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr("execution_accelerator.config.credentials.httpx.get", fake_get)
+
+    with pytest.raises(MissingCredentialError, match="push/PR scopes"):
+        probe_credentials(
+            credentials,
+            execution_mode=ExecutionMode.LIVE,
+            jira_probe=lambda _: None,
+        )

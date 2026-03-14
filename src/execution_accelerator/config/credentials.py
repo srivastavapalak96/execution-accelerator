@@ -105,6 +105,7 @@ def _default_github_probe(credentials: Credentials) -> None:
         timeout=15.0,
     )
     response.raise_for_status()
+    _validate_github_scopes(response.headers.get("x-oauth-scopes"))
 
 
 def _require_live_credentials(credentials: Credentials) -> None:
@@ -132,3 +133,17 @@ def _resolve_path(value: str, *, repo_root: Path) -> Path:
     if not path.is_absolute():
         path = repo_root / path
     return path.resolve()
+
+
+def _validate_github_scopes(scopes_header: str | None) -> None:
+    if not scopes_header:
+        return
+    scopes = {scope.strip().lower() for scope in scopes_header.split(",") if scope.strip()}
+    if "repo" in scopes:
+        return
+    if {"contents:write", "pull_requests:write"}.issubset(scopes):
+        return
+    raise MissingCredentialError(
+        "github token is missing required push/PR scopes; need classic 'repo' or "
+        "fine-grained 'contents:write' + 'pull_requests:write'."
+    )
