@@ -45,6 +45,8 @@ class RepositoryWorkspace(BaseSchemaModel):
     default_branch: str = "main"
     build_system: str = "maven"
     manifest_path: str | None = None
+    maven_settings: str | None = None
+    proxy_jump: str | None = None
     owner: str | None = None
     tags: list[str] = Field(default_factory=list)
 

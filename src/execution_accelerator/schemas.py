@@ -167,6 +167,8 @@ class RepositoryInventoryRecord(BaseSchemaModel):
     default_branch: str = "main"
     build_system: str = "maven"
     manifest_path: str = Field(min_length=1)
+    maven_settings: str | None = None
+    proxy_jump: str | None = None
     owner: str | None = None
     tags: list[str] = Field(default_factory=list)
 
@@ -189,6 +191,8 @@ class RemediationTarget(BaseSchemaModel):
     default_branch: str = "main"
     build_system: str = "maven"
     manifest_path: str = Field(min_length=1)
+    maven_settings: str | None = None
+    proxy_jump: str | None = None
     owner: str | None = None
     tags: list[str] = Field(default_factory=list)
 

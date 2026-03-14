@@ -132,6 +132,8 @@ class RepositoryInventoryAdapter:
                 default_branch=repository.default_branch,
                 build_system=repository.build_system,
                 manifest_path=repository.manifest_path,
+                maven_settings=repository.maven_settings,
+                proxy_jump=repository.proxy_jump,
                 owner=repository.owner,
                 tags=repository.tags,
             )
@@ -219,6 +221,7 @@ class RepositoryInventoryAdapter:
                 repository.clone_url,
                 repository_dir,
                 branch=repository.default_branch,
+                proxy_jump=repository.proxy_jump,
             )
             head_sha = self.git_runner.head_sha(cloned_dir)
             metadata = {
@@ -239,6 +242,8 @@ class RepositoryInventoryAdapter:
             default_branch=repository.default_branch,
             build_system=repository.build_system,
             manifest_path=repository.manifest_path,
+            maven_settings=repository.maven_settings,
+            proxy_jump=repository.proxy_jump,
             owner=repository.owner,
             tags=repository.tags,
         )
@@ -278,7 +283,8 @@ class RepositoryInventoryAdapter:
             raise RepositoryInventoryConfigurationError(
                 f"Repository config must be a YAML mapping: {self.config_path}"
             )
-        return RepositoryInventoryPayload.model_validate(loaded)
+        payload = RepositoryInventoryPayload.model_validate(loaded)
+        return _resolve_live_inventory_paths(payload, config_path=self.config_path)
 
 
 def _normalize_path_segment(value: str) -> str:
@@ -286,3 +292,28 @@ def _normalize_path_segment(value: str) -> str:
 
     slug = REPOSITORY_DIR_PATTERN.sub("-", value.strip().lower()).strip("-")
     return slug or "workspace"
+
+
+def _resolve_live_inventory_paths(
+    payload: RepositoryInventoryPayload,
+    *,
+    config_path: Path,
+) -> RepositoryInventoryPayload:
+    resolved_repositories = [
+        repository.model_copy(
+            update={
+                "maven_settings": _resolve_optional_path(repository.maven_settings, base_dir=config_path.parent),
+            }
+        )
+        for repository in payload.repositories
+    ]
+    return payload.model_copy(update={"repositories": resolved_repositories})
+
+
+def _resolve_optional_path(value: str | None, *, base_dir: Path) -> str | None:
+    if value is None:
+        return None
+    path = Path(value)
+    if not path.is_absolute():
+        path = (base_dir / path).resolve()
+    return str(path)

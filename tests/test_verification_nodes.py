@@ -117,6 +117,39 @@ def test_detect_maven_profile_node_sets_current_repo_and_plan(tmp_path, monkeypa
     assert update["audit_events"][-1].event_type == "verification.maven_profile"
 
 
+def test_detect_maven_profile_node_prefers_repo_specific_maven_settings(tmp_path, monkeypatch) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    workspace = tmp_path / "workspace" / "payments-service"
+    seed_workspace_pom(workspace, fixture_dir / "pom_before.xml")
+    repo_settings = tmp_path / "repo-settings.xml"
+    env_settings = tmp_path / "env-settings.xml"
+    repo_settings.write_text("<settings><mirrors /></settings>")
+    env_settings.write_text("<settings><servers /></settings>")
+    monkeypatch.setenv("EA_MAVEN_SETTINGS", str(env_settings))
+    config = load_runtime_config(repo_root=tmp_path)
+    node = build_detect_maven_profile_node(config)
+
+    update = node(
+        RemediationState(
+            initial_ticket_id="SEC-123",
+            pending_repos=["payments-service"],
+            repo_map={
+                "payments-service": RepositoryWorkspace(
+                    name="payments-service",
+                    local_path=str(workspace),
+                    clone_url="https://example.test/payments-service.git",
+                    default_branch="main",
+                    build_system="maven",
+                    manifest_path="pom.xml",
+                    maven_settings=str(repo_settings),
+                )
+            },
+        )
+    )
+
+    assert update["maven_plan"].settings_xml == str(repo_settings)
+
+
 def test_select_route_prefers_simple_update_for_low_risk_direct_dependencies() -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
     state = build_state().model_copy(

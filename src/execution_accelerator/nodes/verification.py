@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 from execution_accelerator.config import RuntimeConfig, load_credentials
 from execution_accelerator.adapters import AdvisoryVerificationAdapter, MavenVerificationAdapter
@@ -29,9 +30,10 @@ def build_detect_maven_profile_node(
         repository = state.current_working_repo or state.pending_repos[0]
         workspace = state.repo_map[repository]
         credentials = load_credentials(repo_root=runtime_config.repo_root)
+        settings_xml = Path(workspace.maven_settings) if workspace.maven_settings else credentials.maven_settings
         maven_plan = detect_maven_execution_plan(
             workspace,
-            settings_xml=credentials.maven_settings,
+            settings_xml=settings_xml,
             java_home=runtime_config.java_home,
         )
         audit_events = list(state.audit_events)
