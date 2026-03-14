@@ -9,6 +9,7 @@ from .maven_runner import (
     parse_dependency_tree,
     parse_maven_metadata,
 )
+from .openrewrite_runner import OpenRewriteRunner
 from .sandbox import CommandResult, CommandTimeoutError, redact, run_command
 
 __all__ = [
@@ -20,6 +21,7 @@ __all__ = [
     "MavenCommandError",
     "MavenMetadata",
     "MavenRunner",
+    "OpenRewriteRunner",
     "parse_dependency_tree",
     "parse_maven_metadata",
     "redact",
