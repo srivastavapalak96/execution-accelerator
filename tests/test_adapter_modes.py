@@ -8,7 +8,6 @@ import pytest
 from execution_accelerator.adapters import (
     ComplexRemediationAdapter,
     DeliveryAdapter,
-    PomMutationAdapter,
     PreflightResolutionAdapter,
     ValidationAdapter,
 )
@@ -30,10 +29,6 @@ def test_live_mode_remaining_adapters_fail_fast_until_implemented() -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
 
     live_calls: list[Callable[[], object]] = [
-        lambda: PomMutationAdapter(
-            fixture_before_path=fixture_dir / "pom_before.xml",
-            mode=ExecutionMode.LIVE,
-        ).load_fixture_before(),
         lambda: PreflightResolutionAdapter(
             fixture_path=fixture_dir / "preflight_resolution.json",
             mode=ExecutionMode.LIVE,

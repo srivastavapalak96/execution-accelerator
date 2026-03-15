@@ -7,9 +7,11 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 from execution_accelerator.adapters._mode import require_fixture_mode
-from execution_accelerator.config import RuntimeConfig
+from execution_accelerator.config import RuntimeConfig, load_credentials
+from execution_accelerator.execution import MavenRunner, OpenRewriteRunner
 from execution_accelerator.schemas import (
     ExecutionMode,
+    MavenExecutionPlan,
     PomMutationChange,
     PomMutationPlan,
     PreflightResolutionResult,
@@ -40,19 +42,29 @@ class PomMutationAdapter:
         fixture_before_path: Path | None = None,
         fixture_after_path: Path | None = None,
         mode: ExecutionMode = ExecutionMode.FIXTURE,
+        openrewrite_runner: OpenRewriteRunner | None = None,
     ) -> None:
         self.fixture_before_path = fixture_before_path
         self.fixture_after_path = fixture_after_path
         self.mode = mode
+        self.openrewrite_runner = openrewrite_runner
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "PomMutationAdapter":
         """Create the pom mutation adapter from runtime configuration."""
 
+        credentials = load_credentials(repo_root=config.repo_root)
         return cls(
             fixture_before_path=config.pom_fixture_before_path,
             fixture_after_path=config.pom_fixture_after_path,
             mode=config.execution_mode,
+            openrewrite_runner=OpenRewriteRunner(
+                MavenRunner(
+                    log_dir=config.logs_dir / "maven",
+                    settings_xml=credentials.maven_settings,
+                    java_home=config.java_home,
+                )
+            ),
         )
 
     def load_fixture_before(self, *, fixture_path: Path | None = None) -> str:
@@ -66,8 +78,18 @@ class PomMutationAdapter:
             )
         return resolved_fixture_path.read_text()
 
-    def apply_plan(self, xml_text: str, plan: PomMutationPlan) -> str:
+    def apply_plan(
+        self,
+        xml_text: str,
+        plan: PomMutationPlan,
+        *,
+        workspace_path: Path | None = None,
+        execution_plan: MavenExecutionPlan | None = None,
+    ) -> str:
         """Apply the simple remediation plan to the provided pom.xml text."""
+
+        if self.mode == ExecutionMode.LIVE:
+            return self._apply_live_plan(plan, workspace_path=workspace_path, execution_plan=execution_plan)
 
         require_fixture_mode(self.mode, capability="Pom live mutation")
         root = ET.fromstring(
@@ -82,6 +104,47 @@ class PomMutationAdapter:
                 self._apply_direct_dependency_update(root, change)
 
         return ET.tostring(root, encoding="unicode")
+
+    def _apply_live_plan(
+        self,
+        plan: PomMutationPlan,
+        *,
+        workspace_path: Path | None,
+        execution_plan: MavenExecutionPlan | None,
+    ) -> str:
+        if self.openrewrite_runner is None:
+            raise PomMutationConfigurationError("Live pom mutation requires an OpenRewrite runner.")
+        if workspace_path is None:
+            raise PomMutationConfigurationError("Live pom mutation requires a workspace path.")
+
+        for change in plan.changes:
+            if change.target_section == "dependency_management":
+                self.openrewrite_runner.apply_recipe(
+                    workspace_path,
+                    recipe_name="org.openrewrite.maven.AddManagedDependency",
+                    execution_plan=execution_plan,
+                    recipe_options={
+                        "groupId": change.dependency.group_id,
+                        "artifactId": change.dependency.artifact_id,
+                        "version": change.target_version,
+                    },
+                )
+                continue
+            self.openrewrite_runner.apply_recipe(
+                workspace_path,
+                recipe_name="org.openrewrite.java.dependencies.UpgradeDependencyVersion",
+                execution_plan=execution_plan,
+                recipe_options={
+                    "groupId": change.dependency.group_id,
+                    "artifactId": change.dependency.artifact_id,
+                    "newVersion": change.target_version,
+                },
+            )
+
+        target_path = Path(workspace_path) / plan.changes[0].file_path
+        if not target_path.exists():
+            raise PomMutationTargetError(f"OpenRewrite did not produce the expected pom file: {target_path}")
+        return target_path.read_text()
 
     def _apply_direct_dependency_update(self, root: ET.Element, change: PomMutationChange) -> None:
         dependencies = root.findall(".//m:dependencies/m:dependency", MAVEN_NAMESPACE)

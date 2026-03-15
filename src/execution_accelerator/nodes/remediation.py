@@ -44,7 +44,12 @@ def build_remediate_simple_node(
         pom_path = Path(workspace.local_path) / plan.changes[0].file_path
         if not pom_path.exists():
             raise WorkspaceError("workspace pom missing; clone failed")
-        mutated_xml = pom_adapter.apply_plan(pom_path.read_text(), plan)
+        mutated_xml = pom_adapter.apply_plan(
+            pom_path.read_text(),
+            plan,
+            workspace_path=Path(workspace.local_path),
+            execution_plan=state.maven_plan,
+        )
         pom_path.write_text(mutated_xml)
 
         audit_events = list(state.audit_events)
@@ -88,7 +93,12 @@ def build_remediate_transitive_node(
         pom_path = Path(workspace.local_path) / plan.changes[0].file_path
         if not pom_path.exists():
             raise WorkspaceError("workspace pom missing; clone failed")
-        mutated_xml = pom_adapter.apply_plan(pom_path.read_text(), plan)
+        mutated_xml = pom_adapter.apply_plan(
+            pom_path.read_text(),
+            plan,
+            workspace_path=Path(workspace.local_path),
+            execution_plan=state.maven_plan,
+        )
         pom_path.write_text(mutated_xml)
 
         audit_events = list(state.audit_events)

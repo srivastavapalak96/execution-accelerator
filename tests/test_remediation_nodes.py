@@ -23,6 +23,7 @@ from execution_accelerator.nodes import (
 )
 from execution_accelerator.nodes.remediation import WorkspaceError
 from execution_accelerator.nodes.verification import select_route
+from execution_accelerator.schemas import ExecutionMode, MavenExecutionPlan
 from execution_accelerator.state import RemediationState
 from tests.conftest import seed_workspace_pom
 
@@ -106,6 +107,113 @@ def test_remediate_transitive_node_applies_dependency_management_override(tmp_pa
     assert Path(update["modified_files"][0]).read_text().count("1.2.4") == 1
     assert update["code_diffs"][0].change_summary.startswith("Added dependencyManagement override")
     assert update["audit_events"][-1].event_type == "remediation.transitive_override"
+
+
+def test_remediate_simple_node_uses_openrewrite_in_live_mode(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    state = build_state(tmp_path)
+    workspace = Path(state.repo_map["payments-service"].local_path)
+    seed_workspace_pom(workspace, fixture_dir / "pom_before.xml")
+    calls: list[tuple[str, dict[str, str] | None]] = []
+
+    class StubOpenRewriteRunner:
+        def apply_recipe(
+            self,
+            cwd: Path,
+            *,
+            recipe_name: str,
+            execution_plan: MavenExecutionPlan | None = None,
+            recipe_options: dict[str, str] | None = None,
+        ) -> None:
+            calls.append((recipe_name, recipe_options))
+            pom_path = cwd / "pom.xml"
+            pom_path.write_text(pom_path.read_text().replace("1.2.3", "1.2.4"))
+
+    node = build_remediate_simple_node(
+        PomMutationAdapter(
+            mode=ExecutionMode.LIVE,
+            openrewrite_runner=StubOpenRewriteRunner(),  # type: ignore[arg-type]
+        )
+    )
+
+    update = node(
+        state.model_copy(
+            update={
+                "maven_plan": MavenExecutionPlan(
+                    repository="payments-service",
+                    command=["./mvnw"],
+                    root_pom_path=str(workspace / "pom.xml"),
+                    uses_wrapper=True,
+                )
+            }
+        )
+    )
+
+    assert calls[0][0] == "org.openrewrite.java.dependencies.UpgradeDependencyVersion"
+    assert calls[0][1] == {
+        "groupId": "org.example",
+        "artifactId": "legacy-json",
+        "newVersion": "1.2.4",
+    }
+    assert Path(update["modified_files"][0]).read_text().count("1.2.4") == 1
+
+
+def test_remediate_transitive_node_uses_openrewrite_in_live_mode(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    state = build_state(tmp_path, transitive=True)
+    workspace = Path(state.repo_map["payments-service"].local_path)
+    seed_workspace_pom(workspace, fixture_dir / "pom_transitive_before.xml")
+    calls: list[tuple[str, dict[str, str] | None]] = []
+
+    class StubOpenRewriteRunner:
+        def apply_recipe(
+            self,
+            cwd: Path,
+            *,
+            recipe_name: str,
+            execution_plan: MavenExecutionPlan | None = None,
+            recipe_options: dict[str, str] | None = None,
+        ) -> None:
+            calls.append((recipe_name, recipe_options))
+            pom_path = cwd / "pom.xml"
+            pom_path.write_text(
+                pom_path.read_text().replace(
+                    "</project>",
+                    (
+                        "<dependencyManagement><dependencies><dependency>"
+                        "<groupId>org.example</groupId><artifactId>legacy-json</artifactId>"
+                        "<version>1.2.4</version></dependency></dependencies></dependencyManagement></project>"
+                    ),
+                )
+            )
+
+    node = build_remediate_transitive_node(
+        PomMutationAdapter(
+            mode=ExecutionMode.LIVE,
+            openrewrite_runner=StubOpenRewriteRunner(),  # type: ignore[arg-type]
+        )
+    )
+
+    update = node(
+        state.model_copy(
+            update={
+                "maven_plan": MavenExecutionPlan(
+                    repository="payments-service",
+                    command=["./mvnw"],
+                    root_pom_path=str(workspace / "pom.xml"),
+                    uses_wrapper=True,
+                )
+            }
+        )
+    )
+
+    assert calls[0][0] == "org.openrewrite.maven.AddManagedDependency"
+    assert calls[0][1] == {
+        "groupId": "org.example",
+        "artifactId": "legacy-json",
+        "version": "1.2.4",
+    }
+    assert Path(update["modified_files"][0]).read_text().count("1.2.4") == 1
 
 
 def test_remediation_nodes_require_workspace_pom(tmp_path) -> None:
