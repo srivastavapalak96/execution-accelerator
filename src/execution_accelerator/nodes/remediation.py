@@ -134,7 +134,14 @@ def build_preflight_validation_node(
     def preflight_validate(state: RemediationState) -> dict[str, object]:
         assert state.current_working_repo is not None
 
-        preflight_resolution = preflight_adapter.load_result(repository=state.current_working_repo)
+        workspace = state.repo_map.get(state.current_working_repo)
+        preflight_resolution = preflight_adapter.load_result(
+            repository=state.current_working_repo,
+            workspace_path=Path(workspace.local_path) if workspace is not None else None,
+            vulnerability_details=state.vulnerability_details,
+            maven_verification=state.maven_verification,
+            execution_plan=state.maven_plan,
+        )
         audit_events = list(state.audit_events)
         audit_events.append(
             AuditEvent(

@@ -8,7 +8,6 @@ import pytest
 from execution_accelerator.adapters import (
     ComplexRemediationAdapter,
     DeliveryAdapter,
-    PreflightResolutionAdapter,
     ValidationAdapter,
 )
 from execution_accelerator.schemas import AffectedRepository, ExecutionMode, Severity, VulnerabilityDetails
@@ -29,10 +28,6 @@ def test_live_mode_remaining_adapters_fail_fast_until_implemented() -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
 
     live_calls: list[Callable[[], object]] = [
-        lambda: PreflightResolutionAdapter(
-            fixture_path=fixture_dir / "preflight_resolution.json",
-            mode=ExecutionMode.LIVE,
-        ).load_result(repository="payments-service"),
         lambda: ComplexRemediationAdapter(
             artifact_fixture_path=fixture_dir / "complex_artifacts.json",
             mode=ExecutionMode.LIVE,

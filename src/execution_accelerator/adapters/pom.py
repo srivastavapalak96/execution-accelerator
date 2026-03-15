@@ -8,13 +8,17 @@ import xml.etree.ElementTree as ET
 
 from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig, load_credentials
-from execution_accelerator.execution import MavenRunner, OpenRewriteRunner
+from execution_accelerator.execution import DependencyTreeEntry, MavenRunner, OpenRewriteRunner
 from execution_accelerator.schemas import (
+    DependencyCoordinate,
     ExecutionMode,
     MavenExecutionPlan,
+    MavenVerification,
     PomMutationChange,
     PomMutationPlan,
     PreflightResolutionResult,
+    ValidationStatus,
+    VulnerabilityDetails,
 )
 
 
@@ -214,23 +218,47 @@ class PreflightResolutionAdapter:
         *,
         fixture_path: Path | None = None,
         mode: ExecutionMode = ExecutionMode.FIXTURE,
+        maven_runner: MavenRunner | None = None,
     ) -> None:
         self.fixture_path = fixture_path
         self.mode = mode
+        self.maven_runner = maven_runner
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "PreflightResolutionAdapter":
         """Create the preflight adapter from runtime configuration."""
 
-        return cls(fixture_path=config.preflight_resolution_fixture_path, mode=config.execution_mode)
+        credentials = load_credentials(repo_root=config.repo_root)
+        return cls(
+            fixture_path=config.preflight_resolution_fixture_path,
+            mode=config.execution_mode,
+            maven_runner=MavenRunner(
+                log_dir=config.logs_dir / "maven",
+                settings_xml=credentials.maven_settings,
+                java_home=config.java_home,
+            ),
+        )
 
     def load_result(
         self,
         *,
         repository: str,
+        workspace_path: Path | None = None,
+        vulnerability_details: VulnerabilityDetails | None = None,
+        maven_verification: MavenVerification | None = None,
+        execution_plan: MavenExecutionPlan | None = None,
         fixture_path: Path | None = None,
     ) -> PreflightResolutionResult:
         """Load the fixture-backed preflight resolution result."""
+
+        if self.mode == ExecutionMode.LIVE:
+            return self._load_live_result(
+                repository=repository,
+                workspace_path=workspace_path,
+                vulnerability_details=vulnerability_details,
+                maven_verification=maven_verification,
+                execution_plan=execution_plan,
+            )
 
         require_fixture_mode(self.mode, capability="Preflight live validation")
         resolved_fixture_path = fixture_path or self.fixture_path
@@ -247,6 +275,81 @@ class PreflightResolutionAdapter:
             )
         return result
 
+    def _load_live_result(
+        self,
+        *,
+        repository: str,
+        workspace_path: Path | None,
+        vulnerability_details: VulnerabilityDetails | None,
+        maven_verification: MavenVerification | None,
+        execution_plan: MavenExecutionPlan | None,
+    ) -> PreflightResolutionResult:
+        if self.maven_runner is None:
+            raise PomMutationConfigurationError("Live preflight validation requires a Maven runner.")
+        if workspace_path is None:
+            raise PomMutationConfigurationError("Live preflight validation requires a workspace path.")
+        if vulnerability_details is None or maven_verification is None:
+            raise PomMutationConfigurationError("Live preflight validation requires verified vulnerability details.")
+
+        coordinate = _dependency_coordinate(vulnerability_details, target_version=maven_verification.target_version)
+        dependency_tree = self.maven_runner.dependency_tree(
+            workspace_path,
+            settings_xml=Path(execution_plan.settings_xml) if execution_plan and execution_plan.settings_xml else None,
+            jdk_home=Path(execution_plan.java_home) if execution_plan and execution_plan.java_home else None,
+        )
+        matching_entries = _matching_dependency_entries(dependency_tree, coordinate=coordinate)
+        if not matching_entries:
+            return PreflightResolutionResult(
+                repository=repository,
+                status=ValidationStatus.FAILED,
+                resolved_version=vulnerability_details.installed_version,
+                dependency_kind=maven_verification.dependency_kind,
+                message="Dependency did not resolve after the requested pom mutation.",
+            )
+
+        resolved_entry = next(
+            (entry for entry in matching_entries if entry.coordinate.version == maven_verification.target_version),
+            matching_entries[0],
+        )
+        status = (
+            ValidationStatus.PASSED
+            if resolved_entry.coordinate.version == maven_verification.target_version
+            else ValidationStatus.FAILED
+        )
+        message = (
+            f"Dependency resolves cleanly after the {'direct version bump' if resolved_entry.direct else 'managed override'}."
+            if status == ValidationStatus.PASSED
+            else "Dependency resolved, but not to the requested target version."
+        )
+        return PreflightResolutionResult(
+            repository=repository,
+            status=status,
+            resolved_version=resolved_entry.coordinate.version,
+            dependency_kind=maven_verification.dependency_kind,
+            message=message,
+        )
+
 
 def _namespaced(tag: str) -> str:
     return f"{{{MAVEN_NAMESPACE['m']}}}{tag}"
+
+
+def _dependency_coordinate(
+    vulnerability_details: VulnerabilityDetails,
+    *,
+    target_version: str,
+) -> DependencyCoordinate:
+    group_id, artifact_id = vulnerability_details.package_name.split(":", maxsplit=1)
+    return DependencyCoordinate(group_id=group_id, artifact_id=artifact_id, version=target_version)
+
+
+def _matching_dependency_entries(
+    entries: list[DependencyTreeEntry],
+    *,
+    coordinate: DependencyCoordinate,
+) -> list[DependencyTreeEntry]:
+    return [
+        entry
+        for entry in entries
+        if entry.coordinate.group_id == coordinate.group_id and entry.coordinate.artifact_id == coordinate.artifact_id
+    ]

@@ -23,7 +23,13 @@ from execution_accelerator.nodes import (
 )
 from execution_accelerator.nodes.remediation import WorkspaceError
 from execution_accelerator.nodes.verification import select_route
-from execution_accelerator.schemas import ExecutionMode, MavenExecutionPlan
+from execution_accelerator.schemas import (
+    DependencyCoordinate,
+    ExecutionMode,
+    MavenDependencyKind,
+    MavenExecutionPlan,
+    ValidationStatus,
+)
 from execution_accelerator.state import RemediationState
 from tests.conftest import seed_workspace_pom
 
@@ -244,6 +250,56 @@ def test_preflight_validation_node_loads_fixture_result() -> None:
 
     assert update["preflight_resolution"].resolved_version == "1.2.4"
     assert update["audit_events"][-1].event_type == "remediation.preflight"
+
+
+def test_preflight_validation_node_uses_live_dependency_tree(tmp_path) -> None:
+    state = build_state(tmp_path)
+
+    class StubMavenRunner:
+        def dependency_tree(
+            self,
+            cwd: Path,
+            *,
+            settings_xml: Path | None = None,
+            jdk_home: Path | None = None,
+        ) -> list[object]:
+            return [
+                __import__("execution_accelerator.execution", fromlist=["DependencyTreeEntry"]).DependencyTreeEntry(
+                    coordinate=DependencyCoordinate(
+                        group_id="org.example",
+                        artifact_id="legacy-json",
+                        version="1.2.4",
+                    ),
+                    packaging="jar",
+                    scope="compile",
+                    direct=True,
+                )
+            ]
+
+    node = build_preflight_validation_node(
+        PreflightResolutionAdapter(
+            mode=ExecutionMode.LIVE,
+            maven_runner=StubMavenRunner(),  # type: ignore[arg-type]
+        )
+    )
+
+    update = node(
+        state.model_copy(
+            update={
+                "current_working_repo": "payments-service",
+                "maven_plan": MavenExecutionPlan(
+                    repository="payments-service",
+                    command=["./mvnw"],
+                    root_pom_path=str(Path(state.repo_map["payments-service"].local_path) / "pom.xml"),
+                    uses_wrapper=True,
+                ),
+            }
+        )
+    )
+
+    assert update["preflight_resolution"].status == ValidationStatus.PASSED
+    assert update["preflight_resolution"].resolved_version == "1.2.4"
+    assert update["preflight_resolution"].dependency_kind == MavenDependencyKind.DIRECT
 
 
 def test_prepare_complex_remediation_node_records_analysis_placeholders(tmp_path) -> None:
