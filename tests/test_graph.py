@@ -128,7 +128,7 @@ def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch)
     assert loaded_state.workflow_status == WorkflowStatus.COMPLETED
     assert len(result.state.targets) == 1
     assert result.state.current_target_index == 0
-    assert len(loaded_state.audit_events) == 12
+    assert len(loaded_state.audit_events) == 13
     assert Path(loaded_state.repo_map["payments-service"].local_path).is_dir()
     assert (
         Path(loaded_state.repo_map["payments-service"].local_path) / ".execution-accelerator-repo.json"
@@ -170,7 +170,7 @@ def test_bootstrap_ticket_run_persists_transitive_override_state(tmp_path, monke
     assert result.state.preflight_resolution is not None
     assert result.state.preflight_resolution.dependency_kind == "transitive"
     assert len(result.state.targets) == 1
-    assert len(result.state.audit_events) == 12
+    assert len(result.state.audit_events) == 13
     mutated_root = ET.fromstring(Path(result.state.modified_files[0]).read_text())
     version = mutated_root.find(
         ".//{http://maven.apache.org/POM/4.0.0}dependencyManagement/"
@@ -219,7 +219,7 @@ def test_bootstrap_ticket_run_persists_complex_refactor_state(tmp_path, monkeypa
     assert result.state.completed_repos == ["payments-service"]
     assert result.state.pending_repos == []
     assert len(result.state.targets) == 1
-    assert len(result.state.audit_events) == 12
+    assert len(result.state.audit_events) == 13
     assert loaded_state.complex_remediation_plan is not None
     assert loaded_state.complex_remediation_plan.compatibility_diff.target_version == "2.0.0"
     assert loaded_state.code_change_plan is not None
@@ -257,7 +257,7 @@ def test_bootstrap_ticket_run_records_failure_and_rollback_state(tmp_path, monke
     assert result.state.failure_classifications[-1] == "compile_error"
     assert result.state.errors[-1].code == "validation_failed"
     assert len(result.state.targets) == 1
-    assert len(result.state.audit_events) == 14
+    assert len(result.state.audit_events) == 15
 
 
 def test_live_intake_and_verification_flow_runs_end_to_end_with_fixture_downstream(tmp_path, monkeypatch) -> None:

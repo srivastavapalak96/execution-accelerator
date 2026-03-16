@@ -5,6 +5,7 @@ from .classify_failure import classify_failure
 from .delivery import build_publish_remediation_node, build_skip_publish_for_dry_run_node
 from .escalate import escalate
 from .intake import build_ingest_and_parse_jira_node, build_load_repository_context_node, build_probe_credentials_node
+from .policy import build_apply_policy_node
 from .remediation import (
     build_execute_complex_scaffold_node,
     build_preflight_validation_node,
@@ -30,6 +31,7 @@ __all__ = [
     "build_ingest_and_parse_jira_node",
     "build_load_repository_context_node",
     "build_probe_credentials_node",
+    "build_apply_policy_node",
     "build_execute_complex_scaffold_node",
     "build_preflight_validation_node",
     "build_prepare_complex_remediation_node",

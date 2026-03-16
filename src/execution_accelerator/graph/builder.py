@@ -23,6 +23,7 @@ from execution_accelerator.adapters import (
 from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.nodes import (
     bootstrap_state,
+    build_apply_policy_node,
     classify_failure,
     build_detect_maven_profile_node,
     build_execute_complex_scaffold_node,
@@ -42,6 +43,7 @@ from execution_accelerator.nodes import (
     escalate,
     select_route,
 )
+from execution_accelerator.policy import PolicyEngine
 from execution_accelerator.persistence import build_default_thread_id, build_thread_config, sqlite_checkpointer
 from execution_accelerator.schemas import RemediationStrategy
 from execution_accelerator.state import RemediationState
@@ -90,6 +92,10 @@ def build_remediation_graph(
     )
     builder.add_node("select_route", select_route)
     builder.add_node(
+        "apply_policy",
+        cast(Any, build_apply_policy_node(PolicyEngine(config_path=runtime_config.repo_root / "config" / "policy.yaml"))),
+    )
+    builder.add_node(
         "prepare_complex_remediation",
         cast(Any, build_prepare_complex_remediation_node(complex_remediation_adapter)),
     )
@@ -120,9 +126,10 @@ def build_remediation_graph(
     builder.add_edge("detect_maven_profile", "verify_advisory")
     builder.add_edge("verify_advisory", "verify_maven_target")
     builder.add_edge("verify_maven_target", "select_route")
+    builder.add_edge("select_route", "apply_policy")
     builder.add_conditional_edges(
-        "select_route",
-        _select_remediation_node,
+        "apply_policy",
+        _select_post_policy_node,
         {
             "prepare_complex_remediation": "prepare_complex_remediation",
             "remediate_simple": "remediate_simple",
@@ -285,6 +292,12 @@ def _select_remediation_node(state: RemediationState) -> str:
     if state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR:
         return "prepare_complex_remediation"
     return END
+
+
+def _select_post_policy_node(state: RemediationState) -> str:
+    if state.policy_decisions and not state.policy_decisions[-1].allowed:
+        return END
+    return _select_remediation_node(state)
 
 
 def _build_post_validation_selector(*, dry_run: bool) -> Callable[[RemediationState], str]:
