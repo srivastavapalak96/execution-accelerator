@@ -11,6 +11,7 @@ from .maven_runner import (
 )
 from .openrewrite_runner import OpenRewriteRunner
 from .sandbox import CommandResult, CommandTimeoutError, redact, run_command
+from .surefire_parser import SurefireReportSummary, SurefireSuiteResult, parse_surefire_report, parse_surefire_reports
 
 __all__ = [
     "CommandResult",
@@ -24,6 +25,10 @@ __all__ = [
     "OpenRewriteRunner",
     "parse_dependency_tree",
     "parse_maven_metadata",
+    "parse_surefire_report",
+    "parse_surefire_reports",
     "redact",
     "run_command",
+    "SurefireReportSummary",
+    "SurefireSuiteResult",
 ]
