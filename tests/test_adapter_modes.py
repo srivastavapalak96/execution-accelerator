@@ -8,7 +8,6 @@ import pytest
 from execution_accelerator.adapters import (
     ComplexRemediationAdapter,
     DeliveryAdapter,
-    ValidationAdapter,
 )
 from execution_accelerator.schemas import AffectedRepository, ExecutionMode, Severity, VulnerabilityDetails
 
@@ -32,11 +31,6 @@ def test_live_mode_remaining_adapters_fail_fast_until_implemented() -> None:
             artifact_fixture_path=fixture_dir / "complex_artifacts.json",
             mode=ExecutionMode.LIVE,
         ).load_artifact_candidates(),
-        lambda: ValidationAdapter(
-            validation_result_fixture_path=fixture_dir / "validation_result.json",
-            rollback_fixture_path=fixture_dir / "rollback_plan.json",
-            mode=ExecutionMode.LIVE,
-        ).load_validation_result(repository="payments-service"),
         lambda: DeliveryAdapter(
             branch_publication_fixture_path=fixture_dir / "branch_publication.json",
             pull_request_fixture_path=fixture_dir / "pull_request.json",

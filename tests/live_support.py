@@ -60,14 +60,39 @@ def create_live_repo(
     *,
     pom_text: str,
     dependency_tree_output: str,
+    dynamic_legacy_json_version: bool = False,
+    surefire_report_xml: str | None = None,
 ) -> Path:
     repo_path.mkdir(parents=True, exist_ok=True)
     (repo_path / "pom.xml").write_text(pom_text)
     mvnw = repo_path / "mvnw"
+    dependency_tree_body = (
+        "  version=$(python3 - <<'PY'\n"
+        "from pathlib import Path\n"
+        "import re\n"
+        "pom = Path('pom.xml').read_text()\n"
+        "match = re.search(r'<artifactId>legacy-json</artifactId>\\s*<version>([^<]+)</version>', pom)\n"
+        "print(match.group(1) if match else '1.2.3')\n"
+        "PY\n"
+        ")\n"
+        "  printf '[INFO] org.example:payments-service:jar:1.0.0\\n'\n"
+        "  printf '[INFO] +- org.example:legacy-json:jar:%s:compile\\n' \"$version\"\n"
+        if dynamic_legacy_json_version
+        else f"  cat <<'EOF'\n{dependency_tree_output}\nEOF\n"
+    )
+    verify_body = (
+        "  mkdir -p target/surefire-reports\n"
+        "  cat <<'EOF' > target/surefire-reports/TEST-demo.xml\n"
+        f"{surefire_report_xml}\n"
+        "EOF\n"
+        "  echo \"[INFO] BUILD SUCCESS\"\n"
+        if surefire_report_xml is not None
+        else "  echo \"[INFO] BUILD SUCCESS\"\n"
+    )
     mvnw.write_text(
         "#!/bin/sh\n"
         "if [ \"$1\" = \"dependency:tree\" ]; then\n"
-        f"  cat <<'EOF'\n{dependency_tree_output}\nEOF\n"
+        f"{dependency_tree_body}"
         "  exit 0\n"
         "fi\n"
         "if [ \"$1\" = \"help:effective-pom\" ]; then\n"
@@ -75,7 +100,7 @@ def create_live_repo(
         "  exit 0\n"
         "fi\n"
         "if [ \"$1\" = \"verify\" ]; then\n"
-        "  echo \"[INFO] BUILD SUCCESS\"\n"
+        f"{verify_body}"
         "  exit 0\n"
         "fi\n"
         "echo \"[INFO] OK\"\n"

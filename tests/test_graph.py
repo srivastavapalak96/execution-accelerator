@@ -278,6 +278,8 @@ def test_live_intake_and_verification_flow_runs_end_to_end_with_fixture_downstre
             "[INFO] org.example:payments-service:jar:1.0.0\n"
             "[INFO] +- org.example:legacy-json:jar:1.2.3:compile\n"
         ),
+        dynamic_legacy_json_version=True,
+        surefire_report_xml='<testsuite name="demo" tests="2" failures="0" errors="0" skipped="0" />',
     )
     (config_dir / "jira.yaml").write_text("project_key: SEC\n")
     (config_dir / "repositories.yaml").write_text(
@@ -394,13 +396,8 @@ def test_live_intake_and_verification_flow_runs_end_to_end_with_fixture_downstre
                 fixture_before_path=fixtures_dir / "pom_before.xml",
                 fixture_after_path=fixtures_dir / "pom_after.xml",
             ),
-            preflight_resolution_adapter=PreflightResolutionAdapter(
-                fixture_path=fixtures_dir / "preflight_resolution.json"
-            ),
-            validation_adapter=ValidationAdapter(
-                validation_result_fixture_path=fixtures_dir / "validation_result.json",
-                rollback_fixture_path=fixtures_dir / "rollback_plan.json",
-            ),
+            preflight_resolution_adapter=PreflightResolutionAdapter.from_runtime_config(config),
+            validation_adapter=ValidationAdapter.from_runtime_config(config),
             delivery_adapter=DeliveryAdapter(
                 branch_publication_fixture_path=fixtures_dir / "branch_publication.json",
                 pull_request_fixture_path=fixtures_dir / "pull_request.json",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 from execution_accelerator.adapters import ValidationAdapter
 from execution_accelerator.schemas import AuditEvent, ValidationStatus, WorkflowStatus
@@ -17,7 +18,12 @@ def build_validate_remediation_node(
     def validate_remediation(state: RemediationState) -> dict[str, object]:
         assert state.current_working_repo is not None
 
-        validation_result = validation_adapter.load_validation_result(repository=state.current_working_repo)
+        workspace = state.repo_map.get(state.current_working_repo)
+        validation_result = validation_adapter.load_validation_result(
+            repository=state.current_working_repo,
+            workspace_path=Path(workspace.local_path) if workspace is not None else None,
+            execution_plan=state.maven_plan,
+        )
         validation_results = list(state.validation_results)
         validation_results.append(validation_result)
 

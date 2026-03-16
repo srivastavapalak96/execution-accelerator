@@ -7,8 +7,9 @@ from execution_accelerator.nodes import (
     build_handle_validation_failure_node,
     build_validate_remediation_node,
 )
-from execution_accelerator.schemas import ValidationStatus, WorkflowStatus
-from execution_accelerator.state import RemediationState
+from execution_accelerator.execution import MavenRunner
+from execution_accelerator.schemas import ExecutionMode, MavenExecutionPlan, ValidationStatus, WorkflowStatus
+from execution_accelerator.state import RemediationState, RepositoryWorkspace
 
 
 def test_validate_remediation_node_records_passed_result() -> None:
@@ -50,3 +51,54 @@ def test_handle_validation_failure_node_records_rollback_plan() -> None:
     assert update["rollback_plan"].status == "applied"
     assert update["workflow_status"] == WorkflowStatus.FAILED
     assert update["audit_events"][-1].event_type == "validation.rollback"
+
+
+def test_validate_remediation_node_runs_live_validation(tmp_path) -> None:
+    workspace = tmp_path / "live-validation-workspace"
+    workspace.mkdir(exist_ok=True)
+    wrapper = workspace / "mvnw"
+    wrapper.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                "mkdir -p target/surefire-reports",
+                "cat <<'EOF' > target/surefire-reports/TEST-demo.xml",
+                '<testsuite name="demo" tests="2" failures="0" errors="0" skipped="0" />',
+                "EOF",
+                "echo '[INFO] BUILD SUCCESS'",
+            ]
+        )
+        + "\n"
+    )
+    wrapper.chmod(0o755)
+    node = build_validate_remediation_node(
+        ValidationAdapter(
+            mode=ExecutionMode.LIVE,
+            maven_runner=MavenRunner(log_dir=workspace / "logs"),
+        )
+    )
+    state = RemediationState(
+        initial_ticket_id="SEC-123",
+        current_working_repo="payments-service",
+        repo_map={
+            "payments-service": RepositoryWorkspace(
+                name="payments-service",
+                local_path=str(workspace),
+                clone_url="https://example.test/payments-service.git",
+                default_branch="main",
+                build_system="maven",
+                manifest_path="pom.xml",
+            )
+        },
+        maven_plan=MavenExecutionPlan(
+            repository="payments-service",
+            command=["./mvnw"],
+            root_pom_path=str(workspace / "pom.xml"),
+            uses_wrapper=True,
+        ),
+    )
+
+    update = node(state)
+
+    assert update["validation_results"][-1].status == ValidationStatus.PASSED
+    assert update["workflow_status"] == WorkflowStatus.IN_PROGRESS
