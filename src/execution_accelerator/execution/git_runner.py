@@ -66,6 +66,18 @@ class GitRunner:
         result = self._run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_dir, action="current-branch")
         return result.stdout.strip()
 
+    def create_branch(self, repo_dir: Path, branch_name: str) -> None:
+        self._run_git(["checkout", "-B", branch_name], cwd=repo_dir, action="checkout-branch")
+
+    def add_all(self, repo_dir: Path) -> None:
+        self._run_git(["add", "--all"], cwd=repo_dir, action="add-all")
+
+    def commit(self, repo_dir: Path, *, message: str) -> None:
+        self._run_git(["commit", "-m", message], cwd=repo_dir, action="commit")
+
+    def push(self, repo_dir: Path, *, remote: str = "origin", branch_name: str) -> None:
+        self._run_git(["push", "--set-upstream", remote, branch_name], cwd=repo_dir, action="push")
+
     def status_clean(self, repo_dir: Path) -> bool:
         result = self._run_git(["status", "--porcelain"], cwd=repo_dir, action="status")
         return result.stdout.strip() == ""

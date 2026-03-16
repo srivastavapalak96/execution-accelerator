@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 from execution_accelerator.adapters import DeliveryAdapter
+from execution_accelerator.schemas import AuditEvent, JiraCompletionResult, PullRequestSummary
 from execution_accelerator.nodes import build_publish_remediation_node
 from execution_accelerator.schemas import WorkflowStatus
 from execution_accelerator.state import RemediationState
@@ -28,6 +30,6 @@ def test_publish_remediation_node_records_delivery_metadata() -> None:
     assert update["workflow_status"] == WorkflowStatus.COMPLETED
     assert update["completed_repos"] == ["payments-service"]
     assert update["pending_repos"] == []
-    assert update["pull_request_summary"].number == 42
-    assert update["jira_completion"].status == "done"
-    assert update["audit_events"][-1].event_type == "delivery.publish"
+    assert cast(PullRequestSummary, update["pull_request_summary"]).number == 42
+    assert cast(JiraCompletionResult, update["jira_completion"]).status == "done"
+    assert cast(list[AuditEvent], update["audit_events"])[-1].event_type == "delivery.publish"

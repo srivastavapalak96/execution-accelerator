@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.adapters import DeliveryAdapter
@@ -17,9 +18,13 @@ def build_publish_remediation_node(
 
     def publish_remediation(state: RemediationState) -> dict[str, object]:
         assert state.current_working_repo is not None
+        workspace = state.repo_map.get(state.current_working_repo)
 
         branch_publication = delivery_adapter.load_branch_publication(
-            repository=state.current_working_repo
+            repository=state.current_working_repo,
+            workspace_path=Path(workspace.local_path) if workspace is not None else None,
+            ticket_id=state.initial_ticket_id,
+            package_name=state.vulnerability_details.package_name if state.vulnerability_details is not None else None,
         )
         pull_request_summary = delivery_adapter.load_pull_request(repository=state.current_working_repo)
         jira_completion = delivery_adapter.load_jira_completion(ticket_id=state.initial_ticket_id)
