@@ -78,6 +78,15 @@ class GitRunner:
     def push(self, repo_dir: Path, *, remote: str = "origin", branch_name: str) -> None:
         self._run_git(["push", "--set-upstream", remote, branch_name], cwd=repo_dir, action="push")
 
+    def restore_paths(self, repo_dir: Path, *, paths: list[str]) -> None:
+        if not paths:
+            return
+        self._run_git(
+            ["restore", "--source=HEAD", "--staged", "--worktree", "--", *paths],
+            cwd=repo_dir,
+            action="restore",
+        )
+
     def status_clean(self, repo_dir: Path) -> bool:
         result = self._run_git(["status", "--porcelain"], cwd=repo_dir, action="status")
         return result.stdout.strip() == ""

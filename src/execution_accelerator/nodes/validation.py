@@ -64,7 +64,12 @@ def build_handle_validation_failure_node(
         assert state.validation_results
 
         validation_result = state.validation_results[-1]
-        rollback_plan = validation_adapter.load_rollback_plan(repository=state.current_working_repo)
+        workspace = state.repo_map.get(state.current_working_repo)
+        rollback_plan = validation_adapter.load_rollback_plan(
+            repository=state.current_working_repo,
+            workspace_path=Path(workspace.local_path) if workspace is not None else None,
+            modified_files=state.modified_files,
+        )
         errors = list(state.errors)
         errors.append(
             WorkflowError(

@@ -9,7 +9,7 @@ Today, this repository is best understood as a **partially live remediation prot
 - workflow schemas/state are real
 - live Jira intake, repository preparation, OSV advisory lookup, Maven profile detection, and Maven verification are real
 - live remediation, live validation, and basic live delivery now exist
-- rollback, approval/retry flows, and tough-path behavior are still incomplete
+- approval/retry flows and tough-path behavior are still incomplete
 
 If you want the long-term target, read **`docs/vision.md`**.  
 If you want the truth about what works right now, read **`docs/status.md`**.
@@ -27,7 +27,7 @@ The current repo can run a persisted local flow for:
    - transitive override
    - complex refactor scaffold
 6. live or fixture-backed validation
-7. fixture-backed rollback-on-failure
+7. fixture-backed or live git-backed rollback-on-failure
 8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira comment writes
 
 The default mode is:
@@ -36,14 +36,13 @@ The default mode is:
 EA_MODE=fixture
 ```
 
-`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, and a basic delivery path are real enough to exercise a live run, but rollback, Jira transition workflows, and tougher remediation lanes are still incomplete.
+`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, and a basic delivery path are real enough to exercise a live run, but Jira transition workflows and tougher remediation lanes are still incomplete.
 
 ## Current limitations
 
 This repository does **not** yet perform:
 
 - full Jira completion transitions
-- live rollback after failed delivery/validation
 - full compile/test/security/license validation coverage
 - real retry matrix behavior
 - richer policy enforcement and approval routing

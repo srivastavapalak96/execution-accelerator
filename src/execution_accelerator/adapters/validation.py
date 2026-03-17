@@ -8,6 +8,7 @@ from pathlib import Path
 from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig, load_credentials
 from execution_accelerator.execution import (
+    GitRunner,
     MavenCommandError,
     MavenRunner,
     SurefireReportSummary,
@@ -18,6 +19,7 @@ from execution_accelerator.schemas import (
     MavenExecutionPlan,
     RepositoryValidationResult,
     RollbackPlan,
+    RollbackStatus,
     ValidationCheck,
     ValidationStatus,
 )
@@ -41,11 +43,13 @@ class ValidationAdapter:
         rollback_fixture_path: Path | None = None,
         mode: ExecutionMode = ExecutionMode.FIXTURE,
         maven_runner: MavenRunner | None = None,
+        git_runner: GitRunner | None = None,
     ) -> None:
         self.validation_result_fixture_path = validation_result_fixture_path
         self.rollback_fixture_path = rollback_fixture_path
         self.mode = mode
         self.maven_runner = maven_runner
+        self.git_runner = git_runner
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "ValidationAdapter":
@@ -60,6 +64,10 @@ class ValidationAdapter:
                 log_dir=config.logs_dir / "maven",
                 settings_xml=credentials.maven_settings,
                 java_home=config.java_home,
+            ),
+            git_runner=GitRunner(
+                log_dir=config.logs_dir / "git",
+                secrets=tuple(secret for secret in (credentials.github_token,) if secret),
             ),
         )
 
@@ -168,10 +176,18 @@ class ValidationAdapter:
         self,
         *,
         repository: str,
+        workspace_path: Path | None = None,
+        modified_files: list[str] | None = None,
         fixture_path: Path | None = None,
     ) -> RollbackPlan:
         """Load the placeholder rollback plan for one repository."""
 
+        if self.mode == ExecutionMode.LIVE:
+            return self._load_live_rollback_plan(
+                repository=repository,
+                workspace_path=workspace_path,
+                modified_files=modified_files or [],
+            )
         require_fixture_mode(self.mode, capability="Rollback live execution")
         resolved_fixture_path = fixture_path or self.rollback_fixture_path
         if resolved_fixture_path is None:
@@ -182,6 +198,33 @@ class ValidationAdapter:
 
         plan = RollbackPlan.model_validate(json.loads(resolved_fixture_path.read_text()))
         return plan.model_copy(update={"repository": repository})
+
+    def _load_live_rollback_plan(
+        self,
+        *,
+        repository: str,
+        workspace_path: Path | None,
+        modified_files: list[str],
+    ) -> RollbackPlan:
+        if self.git_runner is None:
+            raise ValidationConfigurationError("Live rollback requires a configured Git runner.")
+        if workspace_path is None:
+            raise ValidationConfigurationError("Live rollback requires a workspace path.")
+
+        files_to_restore = _relative_restore_paths(workspace_path, modified_files)
+        if files_to_restore:
+            self.git_runner.restore_paths(workspace_path, paths=files_to_restore)
+            status = RollbackStatus.APPLIED
+            reason = "Restored modified files from HEAD after validation failure."
+        else:
+            status = RollbackStatus.SKIPPED
+            reason = "No tracked file changes were available for rollback."
+        return RollbackPlan(
+            repository=repository,
+            status=status,
+            reason=reason,
+            files_to_restore=files_to_restore,
+        )
 
 
 def _collect_test_reports(workspace_path: Path) -> SurefireReportSummary | None:
@@ -208,3 +251,16 @@ def _collect_test_reports(workspace_path: Path) -> SurefireReportSummary | None:
         total_errors=total_errors,
         total_skipped=total_skipped,
     )
+
+
+def _relative_restore_paths(workspace_path: Path, modified_files: list[str]) -> list[str]:
+    relative_paths: list[str] = []
+    for file_path in modified_files:
+        candidate = Path(file_path)
+        if candidate.is_absolute():
+            try:
+                candidate = candidate.relative_to(workspace_path)
+            except ValueError:
+                continue
+        relative_paths.append(candidate.as_posix())
+    return relative_paths

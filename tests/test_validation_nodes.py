@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
+from typing import cast
 
 from execution_accelerator.adapters import ValidationAdapter
-from execution_accelerator.nodes import (
-    build_handle_validation_failure_node,
-    build_validate_remediation_node,
+from execution_accelerator.execution import GitRunner, MavenRunner
+from execution_accelerator.nodes import build_handle_validation_failure_node, build_validate_remediation_node
+from execution_accelerator.schemas import (
+    AuditEvent,
+    ExecutionMode,
+    MavenExecutionPlan,
+    RepositoryValidationResult,
+    RollbackPlan,
+    ValidationStatus,
+    WorkflowStatus,
 )
-from execution_accelerator.execution import MavenRunner
-from execution_accelerator.schemas import ExecutionMode, MavenExecutionPlan, ValidationStatus, WorkflowStatus
 from execution_accelerator.state import RemediationState, RepositoryWorkspace
 
 
@@ -27,9 +34,9 @@ def test_validate_remediation_node_records_passed_result() -> None:
 
     update = node(state)
 
-    assert update["validation_results"][-1].status == ValidationStatus.PASSED
+    assert cast(list[RepositoryValidationResult], update["validation_results"])[-1].status == ValidationStatus.PASSED
     assert update["workflow_status"] == WorkflowStatus.IN_PROGRESS
-    assert update["audit_events"][-1].event_type == "validation.run"
+    assert cast(list[AuditEvent], update["audit_events"])[-1].event_type == "validation.run"
 
 
 def test_handle_validation_failure_node_records_rollback_plan() -> None:
@@ -48,12 +55,12 @@ def test_handle_validation_failure_node_records_rollback_plan() -> None:
 
     update = failure_node(failed_state)
 
-    assert update["rollback_plan"].status == "applied"
+    assert cast(RollbackPlan, update["rollback_plan"]).status == "applied"
     assert update["workflow_status"] == WorkflowStatus.FAILED
-    assert update["audit_events"][-1].event_type == "validation.rollback"
+    assert cast(list[AuditEvent], update["audit_events"])[-1].event_type == "validation.rollback"
 
 
-def test_validate_remediation_node_runs_live_validation(tmp_path) -> None:
+def test_validate_remediation_node_runs_live_validation(tmp_path: Path) -> None:
     workspace = tmp_path / "live-validation-workspace"
     workspace.mkdir(exist_ok=True)
     wrapper = workspace / "mvnw"
@@ -100,5 +107,57 @@ def test_validate_remediation_node_runs_live_validation(tmp_path) -> None:
 
     update = node(state)
 
-    assert update["validation_results"][-1].status == ValidationStatus.PASSED
+    assert cast(list[RepositoryValidationResult], update["validation_results"])[-1].status == ValidationStatus.PASSED
     assert update["workflow_status"] == WorkflowStatus.IN_PROGRESS
+
+
+def test_handle_validation_failure_node_runs_live_rollback(tmp_path: Path) -> None:
+    workspace = tmp_path / "live-rollback-workspace"
+    workspace.mkdir(exist_ok=True)
+    pom_path = workspace / "pom.xml"
+    pom_path.write_text("<project><version>1</version></project>\n")
+    wrapper = workspace / "mvnw"
+    wrapper.write_text("#!/bin/sh\necho '[ERROR] verify failed' >&2\nexit 1\n")
+    wrapper.chmod(0o755)
+    subprocess.run(["git", "init", "-b", "main"], cwd=workspace, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=workspace, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=workspace, check=True, capture_output=True)
+    subprocess.run(["git", "add", "pom.xml", "mvnw"], cwd=workspace, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=workspace, check=True, capture_output=True)
+    pom_path.write_text("<project><version>2</version></project>\n")
+    adapter = ValidationAdapter(
+        mode=ExecutionMode.LIVE,
+        maven_runner=MavenRunner(log_dir=workspace / "logs"),
+        git_runner=GitRunner(log_dir=workspace / "logs"),
+    )
+    validate_node = build_validate_remediation_node(adapter)
+    failure_node = build_handle_validation_failure_node(adapter)
+    base_state = RemediationState(
+        initial_ticket_id="SEC-123",
+        current_working_repo="payments-service",
+        repo_map={
+            "payments-service": RepositoryWorkspace(
+                name="payments-service",
+                local_path=str(workspace),
+                clone_url="https://example.test/payments-service.git",
+                default_branch="main",
+                build_system="maven",
+                manifest_path="pom.xml",
+            )
+        },
+        maven_plan=MavenExecutionPlan(
+            repository="payments-service",
+            command=["./mvnw"],
+            root_pom_path=str(workspace / "pom.xml"),
+            uses_wrapper=True,
+        ),
+        modified_files=[str(pom_path)],
+    )
+    failed_state = base_state.model_copy(update=validate_node(base_state))
+
+    update = failure_node(failed_state)
+
+    assert cast(RollbackPlan, update["rollback_plan"]).status == "applied"
+    assert pom_path.read_text() == "<project><version>1</version></project>\n"
+    assert update["workflow_status"] == WorkflowStatus.FAILED
+    assert cast(list[AuditEvent], update["audit_events"])[-1].event_type == "validation.rollback"

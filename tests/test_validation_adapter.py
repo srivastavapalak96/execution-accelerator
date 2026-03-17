@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 
-from execution_accelerator.execution import MavenRunner
+from execution_accelerator.execution import GitRunner, MavenRunner
 import pytest
 
 from execution_accelerator.adapters import (
@@ -13,7 +14,9 @@ from execution_accelerator.config import load_runtime_config
 from execution_accelerator.schemas import ExecutionMode, MavenExecutionPlan
 
 
-def test_validation_adapter_loads_validation_result(tmp_path, monkeypatch) -> None:
+def test_validation_adapter_loads_validation_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
     monkeypatch.setenv("EA_VALIDATION_RESULT_FIXTURE_PATH", str(fixture_dir / "validation_result.json"))
     monkeypatch.setenv("EA_ROLLBACK_FIXTURE_PATH", str(fixture_dir / "rollback_plan.json"))
@@ -26,7 +29,9 @@ def test_validation_adapter_loads_validation_result(tmp_path, monkeypatch) -> No
     assert len(result.checks) == 3
 
 
-def test_validation_adapter_loads_rollback_plan(tmp_path, monkeypatch) -> None:
+def test_validation_adapter_loads_rollback_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
     monkeypatch.setenv("EA_VALIDATION_RESULT_FIXTURE_PATH", str(fixture_dir / "validation_result.json"))
     monkeypatch.setenv("EA_ROLLBACK_FIXTURE_PATH", str(fixture_dir / "rollback_plan.json"))
@@ -110,3 +115,30 @@ def test_validation_adapter_reports_live_verify_failure(tmp_path: Path) -> None:
 
     assert result.status == "failed"
     assert result.checks[0].status == "failed"
+
+
+def test_validation_adapter_applies_live_rollback(tmp_path: Path) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    pom_path = repo_dir / "pom.xml"
+    pom_path.write_text("<project><version>1</version></project>\n")
+    subprocess.run(["git", "init", "-b", "main"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "add", "pom.xml"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=repo_dir, check=True, capture_output=True)
+    pom_path.write_text("<project><version>2</version></project>\n")
+    adapter = ValidationAdapter(
+        mode=ExecutionMode.LIVE,
+        git_runner=GitRunner(log_dir=tmp_path / "logs"),
+    )
+
+    plan = adapter.load_rollback_plan(
+        repository="payments-service",
+        workspace_path=repo_dir,
+        modified_files=[str(pom_path)],
+    )
+
+    assert plan.status == "applied"
+    assert plan.files_to_restore == ["pom.xml"]
+    assert pom_path.read_text() == "<project><version>1</version></project>\n"

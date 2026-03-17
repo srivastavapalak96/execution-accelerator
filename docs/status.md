@@ -15,7 +15,7 @@ This file tracks the repository **as implemented today**, not the aspirational e
 | Simple remediation lane | PARTIAL | Fixture-backed default path remains, and live mode now delegates direct upgrades through OpenRewrite-backed mutation. |
 | Transitive remediation lane | PARTIAL | Fixture-backed default path remains, and live mode now delegates managed dependency overrides through OpenRewrite-backed mutation. |
 | Complex remediation lane | PARTIAL | Analysis/execution scaffold exists, not real migration logic. |
-| Validation | PARTIAL | Live preflight resolution now checks the workspace dependency tree and live validation runs `mvn verify` plus Surefire/Failsafe parsing, but security diffing and live rollback remain fixture-backed. |
+| Validation | PARTIAL | Live preflight resolution now checks the workspace dependency tree, live validation runs `mvn verify` plus Surefire/Failsafe parsing, and validation failures can now trigger git-backed rollback of modified files. |
 | Delivery | PARTIAL | Live branch publication and PR creation now exist; Jira completion is currently a comment write, not a full transition workflow. |
 | Failure classification | PARTIAL | Phase 0 stub routes failures through classify -> escalate. |
 | Retry matrix | PLANNED | Full retry routing is not implemented yet. |
