@@ -26,8 +26,19 @@ def build_publish_remediation_node(
             ticket_id=state.initial_ticket_id,
             package_name=state.vulnerability_details.package_name if state.vulnerability_details is not None else None,
         )
-        pull_request_summary = delivery_adapter.load_pull_request(repository=state.current_working_repo)
-        jira_completion = delivery_adapter.load_jira_completion(ticket_id=state.initial_ticket_id)
+        pull_request_summary = delivery_adapter.load_pull_request(
+            repository=state.current_working_repo,
+            owner=workspace.owner if workspace is not None else None,
+            base_branch=workspace.default_branch if workspace is not None else None,
+            head_branch=branch_publication.branch_name,
+            ticket_id=state.initial_ticket_id,
+            package_name=state.vulnerability_details.package_name if state.vulnerability_details is not None else None,
+        )
+        jira_completion = delivery_adapter.load_jira_completion(
+            ticket_id=state.initial_ticket_id,
+            repository=state.current_working_repo,
+            pull_request_url=pull_request_summary.url,
+        )
 
         completed_repos = list(state.completed_repos)
         if state.current_working_repo not in completed_repos:

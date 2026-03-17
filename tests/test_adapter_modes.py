@@ -5,10 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from execution_accelerator.adapters import (
-    ComplexRemediationAdapter,
-    DeliveryAdapter,
-)
+from execution_accelerator.adapters import ComplexRemediationAdapter
 from execution_accelerator.schemas import AffectedRepository, ExecutionMode, Severity, VulnerabilityDetails
 
 
@@ -31,12 +28,6 @@ def test_live_mode_remaining_adapters_fail_fast_until_implemented() -> None:
             artifact_fixture_path=fixture_dir / "complex_artifacts.json",
             mode=ExecutionMode.LIVE,
         ).load_artifact_candidates(),
-        lambda: DeliveryAdapter(
-            branch_publication_fixture_path=fixture_dir / "branch_publication.json",
-            pull_request_fixture_path=fixture_dir / "pull_request.json",
-            jira_completion_fixture_path=fixture_dir / "jira_completion.json",
-            mode=ExecutionMode.LIVE,
-        ).load_branch_publication(repository="payments-service"),
     ]
 
     for live_call in live_calls:

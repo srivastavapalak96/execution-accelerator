@@ -12,6 +12,7 @@ from execution_accelerator.adapters import (
 from execution_accelerator.config import load_runtime_config
 from execution_accelerator.execution import GitRunner
 from execution_accelerator.schemas import ExecutionMode
+from tests.live_support import ResponseSpec, serve_routes
 
 
 def test_delivery_adapter_loads_branch_and_pull_request_metadata(
@@ -81,3 +82,49 @@ def test_delivery_adapter_requires_configuration() -> None:
 
     with pytest.raises(DeliveryConfigurationError):
         adapter.load_branch_publication(repository="payments-service")
+
+
+def test_delivery_adapter_creates_live_pull_request_and_jira_comment(tmp_path: Path) -> None:
+    with serve_routes(
+        {
+            (
+                "POST",
+                "/repos/payments-platform/payments-service/pulls",
+            ): ResponseSpec(
+                status=201,
+                body=(
+                    b'{"number": 42, "html_url": "https://example.test/pr/42", '
+                    b'"title": "SEC-123: remediate legacy-json", "state": "open"}'
+                ),
+            ),
+            ("POST", "/rest/api/3/issue/SEC-123/comment"): ResponseSpec(status=201, body=b'{"id":"10001"}'),
+        }
+    ) as base_url:
+        adapter = DeliveryAdapter(
+            mode=ExecutionMode.LIVE,
+            github_api_base=base_url,
+            github_token="ghp_testtoken",
+            github_owner="payments-platform",
+            jira_base_url=base_url,
+            jira_email="jira@example.com",
+            jira_token="jira-token",
+        )
+
+        pull_request = adapter.load_pull_request(
+            repository="payments-service",
+            owner="payments-platform",
+            base_branch="main",
+            head_branch="sec-123-remediate-legacy-json",
+            ticket_id="SEC-123",
+            package_name="legacy-json",
+        )
+        jira_completion = adapter.load_jira_completion(
+            ticket_id="SEC-123",
+            repository="payments-service",
+            pull_request_url=pull_request.url,
+        )
+
+    assert pull_request.number == 42
+    assert pull_request.url == "https://example.test/pr/42"
+    assert jira_completion.status == "commented"
+    assert "https://example.test/pr/42" in jira_completion.comment

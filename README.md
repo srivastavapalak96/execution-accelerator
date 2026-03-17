@@ -2,13 +2,14 @@
 
 Execution Accelerator is a **local, checkpointed remediation workflow prototype** for Maven vulnerability tickets.
 
-Today, this repository is best understood as a **partially live remediation prototype with fixture-backed downstream delivery**:
+Today, this repository is best understood as a **partially live remediation prototype with a still-incomplete live delivery path**:
 
 - LangGraph orchestration is real
 - SQLite checkpoint persistence is real
 - workflow schemas/state are real
 - live Jira intake, repository preparation, OSV advisory lookup, Maven profile detection, and Maven verification are real
-- remediation, validation, delivery, and tough-path behavior are still mostly **fixture-backed placeholders**
+- live remediation, live validation, and basic live delivery now exist
+- rollback, approval/retry flows, and tough-path behavior are still incomplete
 
 If you want the long-term target, read **`docs/vision.md`**.  
 If you want the truth about what works right now, read **`docs/status.md`**.
@@ -25,9 +26,9 @@ The current repo can run a persisted local flow for:
    - simple update
    - transitive override
    - complex refactor scaffold
-6. fixture-backed validation
+6. live or fixture-backed validation
 7. fixture-backed rollback-on-failure
-8. fixture-backed delivery metadata on success
+8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira comment writes
 
 The default mode is:
 
@@ -35,18 +36,17 @@ The default mode is:
 EA_MODE=fixture
 ```
 
-`EA_MODE=live` is now explicit. Intake and verification are real enough to exercise a live dry-run through route selection, but remediation, validation, and delivery remain fixture-backed.
+`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, and a basic delivery path are real enough to exercise a live run, but rollback, Jira transition workflows, and tougher remediation lanes are still incomplete.
 
 ## Current limitations
 
 This repository does **not** yet perform:
 
-- live Jira writes
-- fully wired live repository remediation end to end
-- live PR creation
-- live compile/test/security validation
+- full Jira completion transitions
+- live rollback after failed delivery/validation
+- full compile/test/security/license validation coverage
 - real retry matrix behavior
-- real policy enforcement
+- richer policy enforcement and approval routing
 - real tough-path/EOL migrations
 
 ## Quickstart
