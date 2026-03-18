@@ -16,12 +16,12 @@ This file tracks the repository **as implemented today**, not the aspirational e
 | Transitive remediation lane | PARTIAL | Fixture-backed default path remains, and live mode now delegates managed dependency overrides through OpenRewrite-backed mutation. |
 | Complex remediation lane | PARTIAL | Analysis/execution scaffold exists, not real migration logic. |
 | Validation | PARTIAL | Live preflight resolution now checks the workspace dependency tree, live validation runs `mvn verify` plus Surefire/Failsafe parsing, and validation failures can now trigger git-backed rollback of modified files. |
-| Delivery | PARTIAL | Live branch publication and PR creation now exist; Jira completion is currently a comment write, not a full transition workflow. |
+| Delivery | PARTIAL | Live branch publication and PR creation now exist; Jira completion can post a comment and optionally fire a configured done transition, but richer workflow handling is still missing. |
 | Failure classification | PARTIAL | Phase 0 stub routes failures through classify -> escalate. |
 | Retry matrix | PLANNED | Full retry routing is not implemented yet. |
 | Policy engine | PARTIAL | A basic policy engine runs after route selection and can block tagged repositories or require approval for complex refactors. |
 | Human approval interrupt | PARTIAL | Approval-required runs now pause before remediation, persist approval state, and can resume after explicit approve/reject input. |
-| Live PR creation and Jira updates | PARTIAL | PR creation is live; Jira updates currently post completion comments only. |
+| Live PR creation and Jira updates | PARTIAL | PR creation is live; Jira updates can post completion comments and optionally apply a configured done transition. |
 | Tough-path EOL migrations | PLANNED | No real recipe/decompile/diff/mapping ladder yet. |
 | Observability and escalation bundles | PLANNED | Not implemented yet. |
 | CI workflow | SHIPPED | GitHub Actions runs ruff, strict mypy, and fixture-mode pytest. |

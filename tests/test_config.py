@@ -29,6 +29,8 @@ def test_load_runtime_config_uses_repo_relative_defaults(tmp_path, monkeypatch) 
 def test_load_runtime_config_reads_optional_environment(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("EA_JIRA_BASE_URL", "https://example.atlassian.net")
     monkeypatch.setenv("EA_JIRA_PROJECT_KEY", "SEC")
+    monkeypatch.setenv("EA_JIRA_DONE_TRANSITION_ID", "31")
+    monkeypatch.setenv("EA_JIRA_DONE_STATUS_NAME", "Done")
     monkeypatch.setenv("EA_GITHUB_OWNER", "srivastavapalak96")
     monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "checkpoints.sqlite"))
 
@@ -36,6 +38,8 @@ def test_load_runtime_config_reads_optional_environment(tmp_path, monkeypatch) -
 
     assert config.jira_base_url == "https://example.atlassian.net"
     assert config.jira_project_key == "SEC"
+    assert config.jira_done_transition_id == "31"
+    assert config.jira_done_status_name == "Done"
     assert config.github_owner == "srivastavapalak96"
     assert config.checkpoints_path == Path(tmp_path / "checkpoints.sqlite")
 

@@ -23,6 +23,8 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
     monkeypatch.setenv("EA_LOGS_DIR", str(tmp_path / "logs"))
     monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "state" / "checkpoints.sqlite"))
+    monkeypatch.setenv("EA_JIRA_DONE_TRANSITION_ID", "31")
+    monkeypatch.setenv("EA_JIRA_DONE_STATUS_NAME", "Done")
     monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(tmp_path / "fixtures" / "jira_issue.json"))
     monkeypatch.setenv(
         "EA_REPOSITORY_INVENTORY_FIXTURE_PATH",
@@ -92,6 +94,8 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     assert f"workspace_dir={tmp_path / 'workspace'}" in captured.out
     assert f"logs_dir={tmp_path / 'logs'}" in captured.out
     assert f"checkpoints_path={tmp_path / 'state' / 'checkpoints.sqlite'}" in captured.out
+    assert "jira_done_transition_id=31" in captured.out
+    assert "jira_done_status_name=Done" in captured.out
     assert f"jira_fixture_path={tmp_path / 'fixtures' / 'jira_issue.json'}" in captured.out
     assert (
         f"repository_inventory_fixture_path={tmp_path / 'fixtures' / 'repository_inventory.json'}"

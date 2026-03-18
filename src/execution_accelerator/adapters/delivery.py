@@ -46,6 +46,8 @@ class DeliveryAdapter:
         jira_base_url: str | None = None,
         jira_email: str | None = None,
         jira_token: str | None = None,
+        jira_done_transition_id: str | None = None,
+        jira_done_status_name: str | None = None,
     ) -> None:
         self.branch_publication_fixture_path = branch_publication_fixture_path
         self.pull_request_fixture_path = pull_request_fixture_path
@@ -60,6 +62,8 @@ class DeliveryAdapter:
         self.jira_base_url = jira_base_url
         self.jira_email = jira_email
         self.jira_token = jira_token
+        self.jira_done_transition_id = jira_done_transition_id
+        self.jira_done_status_name = jira_done_status_name
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "DeliveryAdapter":
@@ -83,6 +87,8 @@ class DeliveryAdapter:
             jira_base_url=credentials.jira_base_url,
             jira_email=credentials.jira_email,
             jira_token=credentials.jira_token,
+            jira_done_transition_id=config.jira_done_transition_id,
+            jira_done_status_name=config.jira_done_status_name,
         )
 
     def load_branch_publication(
@@ -281,9 +287,19 @@ class DeliveryAdapter:
             timeout=30.0,
         )
         response.raise_for_status()
+        status = "commented"
+        if self.jira_done_transition_id:
+            transition_response = httpx.post(
+                f"{self.jira_base_url.rstrip('/')}/rest/api/3/issue/{ticket_id}/transitions",
+                auth=(self.jira_email, self.jira_token),
+                json={"transition": {"id": self.jira_done_transition_id}},
+                timeout=30.0,
+            )
+            transition_response.raise_for_status()
+            status = self.jira_done_status_name or "done"
         return JiraCompletionResult(
             ticket_id=ticket_id,
-            status="commented",
+            status=status,
             comment=comment,
         )
 

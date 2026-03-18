@@ -128,3 +128,34 @@ def test_delivery_adapter_creates_live_pull_request_and_jira_comment(tmp_path: P
     assert pull_request.url == "https://example.test/pr/42"
     assert jira_completion.status == "commented"
     assert "https://example.test/pr/42" in jira_completion.comment
+
+
+def test_delivery_adapter_transitions_jira_ticket_when_configured() -> None:
+    requests_log: list[tuple[str, str, bytes]] = []
+    with serve_routes(
+        {
+            ("POST", "/rest/api/3/issue/SEC-123/comment"): ResponseSpec(status=201, body=b'{"id":"10001"}'),
+            ("POST", "/rest/api/3/issue/SEC-123/transitions"): ResponseSpec(status=204, body=b""),
+        },
+        requests_log=requests_log,
+    ) as base_url:
+        adapter = DeliveryAdapter(
+            mode=ExecutionMode.LIVE,
+            jira_base_url=base_url,
+            jira_email="jira@example.com",
+            jira_token="jira-token",
+            jira_done_transition_id="31",
+            jira_done_status_name="Done",
+        )
+
+        jira_completion = adapter.load_jira_completion(
+            ticket_id="SEC-123",
+            repository="payments-service",
+            pull_request_url="https://example.test/pr/42",
+        )
+
+    assert jira_completion.status == "Done"
+    assert [path for _, path, _ in requests_log] == [
+        "/rest/api/3/issue/SEC-123/comment",
+        "/rest/api/3/issue/SEC-123/transitions",
+    ]

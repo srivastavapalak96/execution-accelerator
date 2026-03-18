@@ -36,6 +36,8 @@ class RuntimeConfig:
     java_home: Path | None
     jira_base_url: str | None
     jira_project_key: str | None
+    jira_done_transition_id: str | None
+    jira_done_status_name: str | None
     jira_fixture_path: Path | None
     repository_inventory_fixture_path: Path | None
     advisory_fixture_path: Path | None
@@ -172,6 +174,8 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         ),
         jira_base_url=os.getenv("EA_JIRA_BASE_URL"),
         jira_project_key=os.getenv("EA_JIRA_PROJECT_KEY"),
+        jira_done_transition_id=os.getenv("EA_JIRA_DONE_TRANSITION_ID"),
+        jira_done_status_name=os.getenv("EA_JIRA_DONE_STATUS_NAME"),
         jira_fixture_path=(
             _resolve_path_setting(jira_fixture_path_value, repo_root=resolved_root)
             if jira_fixture_path_value

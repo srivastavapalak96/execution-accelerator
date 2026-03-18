@@ -17,8 +17,12 @@ class ResponseSpec:
 
 
 @contextmanager
-def serve_routes(routes: dict[tuple[str, str], ResponseSpec]) -> Iterator[str]:
-    requests: list[tuple[str, str, bytes]] = []
+def serve_routes(
+    routes: dict[tuple[str, str], ResponseSpec],
+    *,
+    requests_log: list[tuple[str, str, bytes]] | None = None,
+) -> Iterator[str]:
+    requests = requests_log if requests_log is not None else []
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
