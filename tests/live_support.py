@@ -62,6 +62,7 @@ def create_live_repo(
     dependency_tree_output: str,
     dynamic_legacy_json_version: bool = False,
     surefire_report_xml: str | None = None,
+    verify_exit_code: int = 0,
 ) -> Path:
     repo_path.mkdir(parents=True, exist_ok=True)
     (repo_path / "pom.xml").write_text(pom_text)
@@ -80,14 +81,20 @@ def create_live_repo(
         if dynamic_legacy_json_version
         else f"  cat <<'EOF'\n{dependency_tree_output}\nEOF\n"
     )
-    verify_body = (
-        "  mkdir -p target/surefire-reports\n"
-        "  cat <<'EOF' > target/surefire-reports/TEST-demo.xml\n"
-        f"{surefire_report_xml}\n"
-        "EOF\n"
-        "  echo \"[INFO] BUILD SUCCESS\"\n"
-        if surefire_report_xml is not None
-        else "  echo \"[INFO] BUILD SUCCESS\"\n"
+    if surefire_report_xml is not None:
+        verify_body = (
+            "  mkdir -p target/surefire-reports\n"
+            "  cat <<'EOF' > target/surefire-reports/TEST-demo.xml\n"
+            f"{surefire_report_xml}\n"
+            "EOF\n"
+        )
+    else:
+        verify_body = ""
+    verify_body += (
+        "  echo \"[ERROR] BUILD FAILURE\" >&2\n"
+        f"  exit {verify_exit_code}\n"
+        if verify_exit_code
+        else "  echo \"[INFO] BUILD SUCCESS\"\n  exit 0\n"
     )
     mvnw.write_text(
         "#!/bin/sh\n"
@@ -112,3 +119,27 @@ def create_live_repo(
     subprocess.run(["git", "add", "pom.xml", "mvnw"], cwd=repo_path, check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Initial"], cwd=repo_path, check=True, capture_output=True)
     return repo_path
+
+
+def create_live_remote_repo(
+    root_dir: Path,
+    *,
+    pom_text: str,
+    dependency_tree_output: str,
+    dynamic_legacy_json_version: bool = False,
+    surefire_report_xml: str | None = None,
+    verify_exit_code: int = 0,
+) -> Path:
+    working_repo = create_live_repo(
+        root_dir / "source-repo",
+        pom_text=pom_text,
+        dependency_tree_output=dependency_tree_output,
+        dynamic_legacy_json_version=dynamic_legacy_json_version,
+        surefire_report_xml=surefire_report_xml,
+        verify_exit_code=verify_exit_code,
+    )
+    remote_repo = root_dir / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(remote_repo)], check=True, capture_output=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remote_repo)], cwd=working_repo, check=True, capture_output=True)
+    subprocess.run(["git", "push", "-u", "origin", "main"], cwd=working_repo, check=True, capture_output=True)
+    return remote_repo
