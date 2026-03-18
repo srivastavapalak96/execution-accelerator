@@ -85,6 +85,7 @@ def test_delivery_adapter_requires_configuration() -> None:
 
 
 def test_delivery_adapter_creates_live_pull_request_and_jira_comment(tmp_path: Path) -> None:
+    requests_log: list[tuple[str, str, bytes]] = []
     with serve_routes(
         {
             (
@@ -94,11 +95,12 @@ def test_delivery_adapter_creates_live_pull_request_and_jira_comment(tmp_path: P
                 status=201,
                 body=(
                     b'{"number": 42, "html_url": "https://example.test/pr/42", '
-                    b'"title": "SEC-123: remediate legacy-json", "state": "open"}'
+                    b'"title": "SEC-123: remediate legacy-json", "state": "open", "draft": false}'
                 ),
             ),
             ("POST", "/rest/api/3/issue/SEC-123/comment"): ResponseSpec(status=201, body=b'{"id":"10001"}'),
-        }
+        },
+        requests_log=requests_log,
     ) as base_url:
         adapter = DeliveryAdapter(
             mode=ExecutionMode.LIVE,
@@ -108,6 +110,7 @@ def test_delivery_adapter_creates_live_pull_request_and_jira_comment(tmp_path: P
             jira_base_url=base_url,
             jira_email="jira@example.com",
             jira_token="jira-token",
+            draft_pull_requests=False,
         )
 
         pull_request = adapter.load_pull_request(
@@ -128,6 +131,7 @@ def test_delivery_adapter_creates_live_pull_request_and_jira_comment(tmp_path: P
     assert pull_request.url == "https://example.test/pr/42"
     assert jira_completion.status == "commented"
     assert "https://example.test/pr/42" in jira_completion.comment
+    assert b'"draft":false' in requests_log[0][2]
 
 
 def test_delivery_adapter_transitions_jira_ticket_when_configured() -> None:
@@ -159,3 +163,41 @@ def test_delivery_adapter_transitions_jira_ticket_when_configured() -> None:
         "/rest/api/3/issue/SEC-123/comment",
         "/rest/api/3/issue/SEC-123/transitions",
     ]
+
+
+def test_delivery_adapter_creates_draft_pull_request_when_policy_requires_it() -> None:
+    requests_log: list[tuple[str, str, bytes]] = []
+    with serve_routes(
+        {
+            (
+                "POST",
+                "/repos/payments-platform/payments-service/pulls",
+            ): ResponseSpec(
+                status=201,
+                body=(
+                    b'{"number": 43, "html_url": "https://example.test/pr/43", '
+                    b'"title": "SEC-123: remediate legacy-json", "state": "open", "draft": true}'
+                ),
+            ),
+        },
+        requests_log=requests_log,
+    ) as base_url:
+        adapter = DeliveryAdapter(
+            mode=ExecutionMode.LIVE,
+            github_api_base=base_url,
+            github_token="ghp_testtoken",
+            github_owner="payments-platform",
+            draft_pull_requests=True,
+        )
+
+        pull_request = adapter.load_pull_request(
+            repository="payments-service",
+            owner="payments-platform",
+            base_branch="main",
+            head_branch="sec-123-remediate-legacy-json",
+            ticket_id="SEC-123",
+            package_name="legacy-json",
+        )
+
+    assert pull_request.status == "draft"
+    assert b'"draft":true' in requests_log[0][2]

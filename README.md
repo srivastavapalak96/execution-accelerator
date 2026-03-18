@@ -9,7 +9,7 @@ Today, this repository is best understood as a **partially live remediation prot
 - workflow schemas/state are real
 - live Jira intake, repository preparation, OSV advisory lookup, Maven profile detection, and Maven verification are real
 - live remediation, live validation, and basic live delivery now exist
-- retry flows and tough-path behavior are still incomplete, and approval routing is still basic
+- retry flows and tough-path behavior are still incomplete, and policy/approval routing is still basic
 
 If you want the long-term target, read **`docs/vision.md`**.  
 If you want the truth about what works right now, read **`docs/status.md`**.

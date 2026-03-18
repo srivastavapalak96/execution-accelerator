@@ -11,6 +11,7 @@ import re
 from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig, load_credentials
 from execution_accelerator.execution import GitRunner
+from execution_accelerator.policy import PolicyEngine
 from execution_accelerator.schemas import (
     BranchPublicationResult,
     ExecutionMode,
@@ -48,6 +49,7 @@ class DeliveryAdapter:
         jira_token: str | None = None,
         jira_done_transition_id: str | None = None,
         jira_done_status_name: str | None = None,
+        draft_pull_requests: bool = True,
     ) -> None:
         self.branch_publication_fixture_path = branch_publication_fixture_path
         self.pull_request_fixture_path = pull_request_fixture_path
@@ -64,12 +66,14 @@ class DeliveryAdapter:
         self.jira_token = jira_token
         self.jira_done_transition_id = jira_done_transition_id
         self.jira_done_status_name = jira_done_status_name
+        self.draft_pull_requests = draft_pull_requests
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "DeliveryAdapter":
         """Create the delivery adapter from runtime configuration."""
 
         credentials = load_credentials(repo_root=config.repo_root)
+        policy_config = PolicyEngine(config_path=config.repo_root / "config" / "policy.yaml").load_config()
         return cls(
             branch_publication_fixture_path=config.branch_publication_fixture_path,
             pull_request_fixture_path=config.pull_request_fixture_path,
@@ -89,6 +93,7 @@ class DeliveryAdapter:
             jira_token=credentials.jira_token,
             jira_done_transition_id=config.jira_done_transition_id,
             jira_done_status_name=config.jira_done_status_name,
+            draft_pull_requests=policy_config.draft_pr_only,
         )
 
     def load_branch_publication(
@@ -229,17 +234,19 @@ class DeliveryAdapter:
                 "head": head_branch,
                 "base": base_branch or "main",
                 "body": f"Automated remediation for {ticket_id or repository}.",
+                "draft": self.draft_pull_requests,
             },
             timeout=30.0,
         )
         response.raise_for_status()
         payload = response.json()
+        draft = bool(payload.get("draft", self.draft_pull_requests))
         return PullRequestSummary(
             repository=repository,
             number=int(payload["number"]),
             url=str(payload["html_url"]),
             title=str(payload.get("title") or title),
-            status=str(payload.get("state") or "open"),
+            status="draft" if draft else str(payload.get("state") or "open"),
         )
 
     def load_jira_completion(
