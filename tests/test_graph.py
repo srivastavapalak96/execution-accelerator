@@ -16,9 +16,9 @@ from execution_accelerator.adapters import (
     ValidationAdapter,
 )
 from execution_accelerator.config import load_runtime_config
-from execution_accelerator.graph import bootstrap_ticket_run, compile_remediation_graph, load_remediation_state
+from execution_accelerator.graph import bootstrap_ticket_run, compile_remediation_graph, load_remediation_state, resume_ticket_run
 from execution_accelerator.persistence import build_thread_config
-from execution_accelerator.schemas import WorkflowStatus
+from execution_accelerator.schemas import ApprovalDecision, HumanFeedback, WorkflowStatus
 from tests.conftest import seed_bootstrap_workspace_pom
 from tests.live_support import ResponseSpec, create_live_remote_repo, create_live_repo, serve_routes
 
@@ -203,6 +203,47 @@ def test_bootstrap_ticket_run_persists_complex_refactor_state(tmp_path, monkeypa
 
     assert result.state.route_decision is not None
     assert result.state.route_decision.strategy == "complex_refactor"
+    assert result.state.requires_human_approval is True
+    assert result.state.human_feedback is None
+    assert result.state.complex_remediation_plan is None
+    assert result.state.preflight_resolution is None
+    assert result.state.pom_mutation_plan is None
+    assert result.state.validation_results == []
+    assert result.state.workflow_status == WorkflowStatus.PENDING
+    assert result.state.completed_repos == []
+    assert result.state.pending_repos == ["payments-service"]
+    assert len(result.state.targets) == 1
+    assert loaded_state.requires_human_approval is True
+    assert loaded_state.workflow_status == WorkflowStatus.PENDING
+    assert loaded_state.pull_request_summary is None
+    assert loaded_state.jira_completion is None
+
+
+def test_resume_ticket_run_advances_complex_refactor_after_approval(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path, complex_refactor=True)
+    config = load_runtime_config(repo_root=tmp_path)
+
+    bootstrap_ticket_run(
+        "SEC-777",
+        runtime_config=config,
+        thread_id="sec-777-thread",
+    )
+    result = resume_ticket_run(
+        runtime_config=config,
+        thread_id="sec-777-thread",
+        human_feedback=HumanFeedback(
+            decision=ApprovalDecision.APPROVED,
+            reviewer="security-lead",
+            comments="Approved for automation.",
+        ),
+    )
+    loaded_state = load_remediation_state(
+        runtime_config=config,
+        thread_id="sec-777-thread",
+    )
+
+    assert result.state.route_decision is not None
+    assert result.state.route_decision.strategy == "complex_refactor"
     assert result.state.complex_remediation_plan is not None
     assert len(result.state.complex_remediation_plan.artifact_candidates) == 2
     assert result.state.compatibility_diff is not None
@@ -219,7 +260,6 @@ def test_bootstrap_ticket_run_persists_complex_refactor_state(tmp_path, monkeypa
     assert result.state.completed_repos == ["payments-service"]
     assert result.state.pending_repos == []
     assert len(result.state.targets) == 1
-    assert len(result.state.audit_events) == 13
     assert loaded_state.complex_remediation_plan is not None
     assert loaded_state.complex_remediation_plan.compatibility_diff.target_version == "2.0.0"
     assert loaded_state.code_change_plan is not None

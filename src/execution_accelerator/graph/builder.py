@@ -24,6 +24,7 @@ from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.nodes import (
     bootstrap_state,
     build_apply_policy_node,
+    build_review_approval_node,
     classify_failure,
     build_detect_maven_profile_node,
     build_execute_complex_scaffold_node,
@@ -45,8 +46,12 @@ from execution_accelerator.nodes import (
 )
 from execution_accelerator.policy import PolicyEngine
 from execution_accelerator.persistence import build_default_thread_id, build_thread_config, sqlite_checkpointer
+from execution_accelerator.schemas import HumanFeedback
 from execution_accelerator.schemas import RemediationStrategy
 from execution_accelerator.state import RemediationState
+
+
+_APPROVAL_REVIEW_NODE = "review_approval"
 
 
 class BootstrapRunResult(BaseModel):
@@ -95,6 +100,7 @@ def build_remediation_graph(
         "apply_policy",
         cast(Any, build_apply_policy_node(PolicyEngine(config_path=runtime_config.repo_root / "config" / "policy.yaml"))),
     )
+    builder.add_node(_APPROVAL_REVIEW_NODE, cast(Any, build_review_approval_node()))
     builder.add_node(
         "prepare_complex_remediation",
         cast(Any, build_prepare_complex_remediation_node(complex_remediation_adapter)),
@@ -131,6 +137,18 @@ def build_remediation_graph(
         "apply_policy",
         _select_post_policy_node,
         {
+            _APPROVAL_REVIEW_NODE: _APPROVAL_REVIEW_NODE,
+            "prepare_complex_remediation": "prepare_complex_remediation",
+            "remediate_simple": "remediate_simple",
+            "remediate_transitive": "remediate_transitive",
+            END: END,
+        },
+    )
+    builder.add_conditional_edges(
+        _APPROVAL_REVIEW_NODE,
+        _select_post_approval_node,
+        {
+            "classify_failure": "classify_failure",
             "prepare_complex_remediation": "prepare_complex_remediation",
             "remediate_simple": "remediate_simple",
             "remediate_transitive": "remediate_transitive",
@@ -232,6 +250,7 @@ def bootstrap_ticket_run(
         result = graph.invoke(
             initial_state.model_dump(mode="python"),
             config=build_thread_config(resolved_thread_id),
+            interrupt_before=[_APPROVAL_REVIEW_NODE],
         )
 
     return BootstrapRunResult(
@@ -271,15 +290,45 @@ def load_remediation_state(*, runtime_config: RuntimeConfig, thread_id: str) -> 
     return RemediationState.model_validate(snapshot.values)
 
 
-def resume_ticket_run(*, runtime_config: RuntimeConfig, thread_id: str) -> BootstrapRunResult:
+def resume_ticket_run(
+    *, runtime_config: RuntimeConfig, thread_id: str, human_feedback: HumanFeedback | None = None
+) -> BootstrapRunResult:
     """Resume a persisted thread when possible, or rehydrate its latest state."""
 
-    state = load_remediation_state(runtime_config=runtime_config, thread_id=thread_id)
-    return BootstrapRunResult(
-        thread_id=thread_id,
-        checkpoint_path=runtime_config.checkpoints_path,
-        state=state,
-    )
+    jira_adapter = JiraAdapter.from_runtime_config(runtime_config)
+    repository_inventory_adapter = RepositoryInventoryAdapter.from_runtime_config(runtime_config)
+    advisory_verification_adapter = AdvisoryVerificationAdapter.from_runtime_config(runtime_config)
+    maven_verification_adapter = MavenVerificationAdapter.from_runtime_config(runtime_config)
+    complex_remediation_adapter = ComplexRemediationAdapter.from_runtime_config(runtime_config)
+    pom_mutation_adapter = PomMutationAdapter.from_runtime_config(runtime_config)
+    preflight_resolution_adapter = PreflightResolutionAdapter.from_runtime_config(runtime_config)
+    validation_adapter = ValidationAdapter.from_runtime_config(runtime_config)
+    delivery_adapter = DeliveryAdapter.from_runtime_config(runtime_config)
+    config = build_thread_config(thread_id)
+    with sqlite_checkpointer(runtime_config) as checkpointer:
+        graph = compile_remediation_graph(
+            runtime_config=runtime_config,
+            jira_adapter=jira_adapter,
+            repository_inventory_adapter=repository_inventory_adapter,
+            advisory_verification_adapter=advisory_verification_adapter,
+            maven_verification_adapter=maven_verification_adapter,
+            complex_remediation_adapter=complex_remediation_adapter,
+            pom_mutation_adapter=pom_mutation_adapter,
+            preflight_resolution_adapter=preflight_resolution_adapter,
+            validation_adapter=validation_adapter,
+            delivery_adapter=delivery_adapter,
+            checkpointer=checkpointer,
+        )
+        if human_feedback is not None:
+            graph.update_state(
+                config,
+                {"human_feedback": human_feedback.model_dump(mode="python")},
+                as_node=_APPROVAL_REVIEW_NODE,
+            )
+            state = RemediationState.model_validate(graph.invoke(None, config=config))
+        else:
+            state = RemediationState.model_validate(graph.get_state(config).values)
+    return BootstrapRunResult(thread_id=thread_id, checkpoint_path=runtime_config.checkpoints_path, state=state)
 
 
 def _select_remediation_node(state: RemediationState) -> str:
@@ -297,7 +346,17 @@ def _select_remediation_node(state: RemediationState) -> str:
 def _select_post_policy_node(state: RemediationState) -> str:
     if state.policy_decisions and not state.policy_decisions[-1].allowed:
         return END
+    if state.requires_human_approval:
+        return _APPROVAL_REVIEW_NODE
     return _select_remediation_node(state)
+
+
+def _select_post_approval_node(state: RemediationState) -> str:
+    if state.human_approval_decision == "approved":
+        return _select_remediation_node(state)
+    if state.human_approval_decision == "rejected":
+        return "classify_failure"
+    return END
 
 
 def _build_post_validation_selector(*, dry_run: bool) -> Callable[[RemediationState], str]:

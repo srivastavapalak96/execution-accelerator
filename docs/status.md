@@ -20,7 +20,7 @@ This file tracks the repository **as implemented today**, not the aspirational e
 | Failure classification | PARTIAL | Phase 0 stub routes failures through classify -> escalate. |
 | Retry matrix | PLANNED | Full retry routing is not implemented yet. |
 | Policy engine | PARTIAL | A basic policy engine runs after route selection and can block tagged repositories or require approval for complex refactors. |
-| Human approval interrupt | PLANNED | Not wired yet. |
+| Human approval interrupt | PARTIAL | Approval-required runs now pause before remediation, persist approval state, and can resume after explicit approve/reject input. |
 | Live PR creation and Jira updates | PARTIAL | PR creation is live; Jira updates currently post completion comments only. |
 | Tough-path EOL migrations | PLANNED | No real recipe/decompile/diff/mapping ladder yet. |
 | Observability and escalation bundles | PLANNED | Not implemented yet. |

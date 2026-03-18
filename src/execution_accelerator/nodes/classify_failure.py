@@ -51,6 +51,10 @@ def classify_failure(state: RemediationState) -> dict[str, object]:
 
 
 def _classify_latest_failure(state: RemediationState) -> FailureClassification:
+    if state.errors:
+        latest_error = state.errors[-1]
+        if latest_error.code in {"policy_blocked", "approval_rejected"}:
+            return FailureClassification.POLICY_BLOCK
     if not state.validation_results:
         return FailureClassification.UNKNOWN
 

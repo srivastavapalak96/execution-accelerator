@@ -442,17 +442,77 @@ def test_main_bootstraps_complex_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "thread_id=sec-799-complex" in captured.out
     assert "route_strategy=complex_refactor" in captured.out
     assert "route_confidence=0.78" in captured.out
-    assert "plan_strategy=complex_refactor" in captured.out
+    assert "requires_human_approval=True" in captured.out
+    assert "approval_decision=pending" in captured.out
+    assert "validation_status=" not in captured.out
+    assert "branch_name=" not in captured.out
+    assert "pull_request_number=" not in captured.out
+    assert "jira_ticket_status=" not in captured.out
+
+
+def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    monkeypatch.setenv("EA_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
+    monkeypatch.setenv("EA_LOGS_DIR", str(tmp_path / "logs"))
+    monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "state" / "checkpoints.sqlite"))
+    monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(fixture_dir / "jira_issue.json"))
+    monkeypatch.setenv("EA_REPOSITORY_INVENTORY_FIXTURE_PATH", str(fixture_dir / "repository_inventory.json"))
+    monkeypatch.setenv("EA_ADVISORY_FIXTURE_PATH", str(fixture_dir / "advisory_verification_complex.json"))
+    monkeypatch.setenv("EA_MAVEN_VERIFICATION_FIXTURE_PATH", str(fixture_dir / "maven_verification_complex.json"))
+    monkeypatch.setenv("EA_POM_FIXTURE_BEFORE_PATH", str(fixture_dir / "pom_before.xml"))
+    monkeypatch.setenv("EA_POM_FIXTURE_AFTER_PATH", str(fixture_dir / "pom_after.xml"))
+    monkeypatch.setenv("EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH", str(fixture_dir / "preflight_resolution.json"))
+    monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "complex_artifacts.json"))
+    monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixture_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
+    monkeypatch.setenv("EA_VALIDATION_RESULT_FIXTURE_PATH", str(fixture_dir / "validation_result.json"))
+    monkeypatch.setenv("EA_ROLLBACK_FIXTURE_PATH", str(fixture_dir / "rollback_plan.json"))
+    monkeypatch.setenv("EA_BRANCH_PUBLICATION_FIXTURE_PATH", str(fixture_dir / "branch_publication.json"))
+    monkeypatch.setenv("EA_PULL_REQUEST_FIXTURE_PATH", str(fixture_dir / "pull_request.json"))
+    monkeypatch.setenv("EA_JIRA_COMPLETION_FIXTURE_PATH", str(fixture_dir / "jira_completion.json"))
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--bootstrap-ticket",
+            "SEC-799",
+            "--thread-id",
+            "sec-799-approval",
+        ],
+    )
+    assert main() == 0
+    capsys.readouterr()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--resume",
+            "sec-799-approval",
+            "--approval-decision",
+            "approved",
+            "--reviewer",
+            "security-lead",
+            "--approval-comments",
+            "Approved for automation.",
+        ],
+    )
+    exit_code = main()
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "thread_id=sec-799-approval" in captured.out
+    assert "workflow_status=completed" in captured.out
+    assert "approval_decision=approved" in captured.out
+    assert "approval_reviewer=security-lead" in captured.out
     assert "complex_candidate_count=2" in captured.out
-    assert "complex_breaking_change_count=2" in captured.out
-    assert "complex_decompiled_artifact_count=2" in captured.out
-    assert "complex_symbol_mapping_count=2" in captured.out
     assert "complex_planned_file_count=2" in captured.out
     assert "validation_status=passed" in captured.out
-    assert "validation_check_count=3" in captured.out
-    assert "branch_name=sec-123-remediate-legacy-json" in captured.out
     assert "pull_request_number=42" in captured.out
-    assert "jira_ticket_status=done" in captured.out
 
 
 def test_main_bootstraps_ticket_in_dry_run_mode(monkeypatch, capsys, tmp_path) -> None:

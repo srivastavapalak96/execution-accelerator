@@ -37,6 +37,17 @@ def build_apply_policy_node(
             "requires_human_approval": decision.requires_human_approval,
             "audit_events": audit_events,
         }
+        if decision.requires_human_approval:
+            audit_events.append(
+                AuditEvent(
+                    event_type="approval.required",
+                    message="Human approval is required before remediation can continue.",
+                    details={
+                        "repository": state.current_working_repo,
+                    },
+                )
+            )
+            update["workflow_status"] = WorkflowStatus.PENDING
         if not decision.allowed:
             errors = list(state.errors)
             errors.append(

@@ -7,6 +7,7 @@ import os
 
 from execution_accelerator.config import load_runtime_config
 from execution_accelerator.graph import bootstrap_ticket_run, load_remediation_state, resume_ticket_run
+from execution_accelerator.schemas import ApprovalDecision, HumanFeedback
 from execution_accelerator.state import RemediationState
 from execution_accelerator.observability import configure_logging
 from execution_accelerator.version import __version__
@@ -55,6 +56,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--show-thread-state",
         metavar="THREAD_ID",
         help="Load and print the current persisted state summary for a LangGraph thread.",
+    )
+    parser.add_argument(
+        "--approval-decision",
+        choices=[ApprovalDecision.APPROVED, ApprovalDecision.REJECTED],
+        help="Record a human approval decision while resuming a persisted thread.",
+    )
+    parser.add_argument(
+        "--reviewer",
+        help="Reviewer identity recorded alongside an approval decision.",
+    )
+    parser.add_argument(
+        "--approval-comments",
+        help="Optional comments recorded alongside an approval decision.",
     )
     return parser
 
@@ -117,7 +131,11 @@ def main() -> int:
 
         if args.resume:
             config = load_runtime_config()
-            result = resume_ticket_run(runtime_config=config, thread_id=args.resume)
+            result = resume_ticket_run(
+                runtime_config=config,
+                thread_id=args.resume,
+                human_feedback=_build_human_feedback(args),
+            )
             _print_run_summary(
                 thread_id=result.thread_id,
                 checkpoint_path=str(result.checkpoint_path),
@@ -156,6 +174,20 @@ def _apply_runtime_overrides(args: argparse.Namespace) -> dict[str, str | None]:
     return previous_env
 
 
+def _build_human_feedback(args: argparse.Namespace) -> HumanFeedback | None:
+    if args.approval_decision is None:
+        if args.reviewer or args.approval_comments:
+            raise SystemExit("--reviewer and --approval-comments require --approval-decision.")
+        return None
+    if not args.resume:
+        raise SystemExit("--approval-decision requires --resume.")
+    return HumanFeedback(
+        decision=ApprovalDecision(args.approval_decision),
+        reviewer=args.reviewer,
+        comments=args.approval_comments,
+    )
+
+
 def _restore_runtime_overrides(previous_env: dict[str, str | None]) -> None:
     for key, value in previous_env.items():
         if value is None:
@@ -184,6 +216,11 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
     if state.route_decision is not None:
         print(f"route_strategy={state.route_decision.strategy}")
         print(f"route_confidence={state.route_decision.confidence:.2f}")
+    if state.requires_human_approval:
+        print(f"requires_human_approval={state.requires_human_approval}")
+        print(f"approval_decision={state.human_approval_decision}")
+        if state.human_feedback is not None and state.human_feedback.reviewer is not None:
+            print(f"approval_reviewer={state.human_feedback.reviewer}")
     if state.remediation_plan is not None:
         print(f"plan_strategy={state.remediation_plan.strategy}")
     if state.pom_mutation_plan is not None and state.pom_mutation_plan.changes:
