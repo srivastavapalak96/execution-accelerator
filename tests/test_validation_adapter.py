@@ -11,7 +11,7 @@ from execution_accelerator.adapters import (
     ValidationConfigurationError,
 )
 from execution_accelerator.config import load_runtime_config
-from execution_accelerator.schemas import ExecutionMode, MavenExecutionPlan
+from execution_accelerator.schemas import ExecutionMode, MavenDependencyKind, MavenExecutionPlan, MavenVerification, Severity, VulnerabilityDetails
 
 
 def test_validation_adapter_loads_validation_result(
@@ -59,6 +59,11 @@ def test_validation_adapter_runs_live_verify_and_parses_surefire_reports(tmp_pat
         "\n".join(
             [
                 "#!/bin/sh",
+                "if [ \"$1\" = \"dependency:tree\" ]; then",
+                "  printf '[INFO] org.example:payments-service:jar:1.0.0\\n'",
+                "  printf '[INFO] +- org.example:legacy-json:jar:1.2.4:compile\\n'",
+                "  exit 0",
+                "fi",
                 "mkdir -p target/surefire-reports",
                 "cat <<'EOF' > target/surefire-reports/TEST-demo.xml",
                 '<testsuite name="demo" tests="3" failures="0" errors="0" skipped="1" />',
@@ -83,12 +88,28 @@ def test_validation_adapter_runs_live_verify_and_parses_surefire_reports(tmp_pat
             root_pom_path=str(repo_dir / "pom.xml"),
             uses_wrapper=True,
         ),
+        vulnerability_details=VulnerabilityDetails(
+            package_name="org.example:legacy-json",
+            installed_version="1.2.3",
+            fixed_version="1.2.4",
+            summary="Upgrade legacy-json",
+            severity=Severity.HIGH,
+        ),
+        maven_verification=MavenVerification(
+            package_name="org.example:legacy-json",
+            current_version="1.2.3",
+            target_version="1.2.4",
+            dependency_kind=MavenDependencyKind.DIRECT,
+            resolver_note="Resolved to 1.2.4.",
+        ),
     )
 
     assert result.status == "passed"
     assert result.checks[0].name == "compile"
     assert result.checks[1].name == "unit-tests"
     assert "3 tests" in (result.checks[1].details or "")
+    assert result.checks[2].name == "security"
+    assert "1.2.4" in (result.checks[2].details or "")
 
 
 def test_validation_adapter_reports_live_verify_failure(tmp_path: Path) -> None:
@@ -142,3 +163,57 @@ def test_validation_adapter_applies_live_rollback(tmp_path: Path) -> None:
     assert plan.status == "applied"
     assert plan.files_to_restore == ["pom.xml"]
     assert pom_path.read_text() == "<project><version>1</version></project>\n"
+
+
+def test_validation_adapter_reports_live_security_rescan_failure(tmp_path: Path) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    wrapper = repo_dir / "mvnw"
+    wrapper.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                "if [ \"$1\" = \"dependency:tree\" ]; then",
+                "  printf '[INFO] org.example:payments-service:jar:1.0.0\\n'",
+                "  printf '[INFO] +- org.example:legacy-json:jar:1.2.3:compile\\n'",
+                "  exit 0",
+                "fi",
+                "echo '[INFO] BUILD SUCCESS'",
+            ]
+        )
+        + "\n"
+    )
+    wrapper.chmod(0o755)
+    adapter = ValidationAdapter(
+        mode=ExecutionMode.LIVE,
+        maven_runner=MavenRunner(log_dir=tmp_path / "logs"),
+    )
+
+    result = adapter.load_validation_result(
+        repository="payments-service",
+        workspace_path=repo_dir,
+        execution_plan=MavenExecutionPlan(
+            repository="payments-service",
+            command=["./mvnw"],
+            root_pom_path=str(repo_dir / "pom.xml"),
+            uses_wrapper=True,
+        ),
+        vulnerability_details=VulnerabilityDetails(
+            package_name="org.example:legacy-json",
+            installed_version="1.2.3",
+            fixed_version="1.2.4",
+            summary="Upgrade legacy-json",
+            severity=Severity.HIGH,
+        ),
+        maven_verification=MavenVerification(
+            package_name="org.example:legacy-json",
+            current_version="1.2.3",
+            target_version="1.2.4",
+            dependency_kind=MavenDependencyKind.DIRECT,
+            resolver_note="Resolved to 1.2.4.",
+        ),
+    )
+
+    assert result.status == "failed"
+    assert result.checks[-1].name == "security"
+    assert result.checks[-1].status == "failed"

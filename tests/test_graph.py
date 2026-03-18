@@ -300,7 +300,7 @@ def test_bootstrap_ticket_run_records_failure_and_rollback_state(tmp_path, monke
     assert len(result.state.audit_events) == 15
 
 
-def test_live_flow_runs_through_delivery_with_live_integrations_and_fixture_pom_mutation(tmp_path, monkeypatch) -> None:
+def test_live_flow_runs_through_delivery_with_live_integrations(tmp_path, monkeypatch) -> None:
     fixtures_dir = Path(__file__).parent / "fixtures"
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -320,6 +320,7 @@ def test_live_flow_runs_through_delivery_with_live_integrations_and_fixture_pom_
         ),
         dynamic_legacy_json_version=True,
         surefire_report_xml='<testsuite name="demo" tests="2" failures="0" errors="0" skipped="0" />',
+        simulate_openrewrite=True,
     )
     (config_dir / "jira.yaml").write_text("project_key: SEC\n")
     (config_dir / "repositories.yaml").write_text(
@@ -440,10 +441,7 @@ def test_live_flow_runs_through_delivery_with_live_integrations_and_fixture_pom_
             advisory_verification_adapter=AdvisoryVerificationAdapter.from_runtime_config(config),
             maven_verification_adapter=MavenVerificationAdapter.from_runtime_config(config),
             complex_remediation_adapter=ComplexRemediationAdapter.from_runtime_config(config),
-            pom_mutation_adapter=PomMutationAdapter(
-                fixture_before_path=fixtures_dir / "pom_before.xml",
-                fixture_after_path=fixtures_dir / "pom_after.xml",
-            ),
+            pom_mutation_adapter=PomMutationAdapter.from_runtime_config(config),
             preflight_resolution_adapter=PreflightResolutionAdapter.from_runtime_config(config),
             validation_adapter=ValidationAdapter.from_runtime_config(config),
             delivery_adapter=DeliveryAdapter.from_runtime_config(config),
@@ -485,6 +483,7 @@ def test_live_flow_runs_through_rollback_after_validation_failure(tmp_path, monk
         ),
         dynamic_legacy_json_version=True,
         verify_exit_code=1,
+        simulate_openrewrite=True,
     )
     (config_dir / "jira.yaml").write_text("project_key: SEC\n")
     (config_dir / "repositories.yaml").write_text(
@@ -590,10 +589,7 @@ def test_live_flow_runs_through_rollback_after_validation_failure(tmp_path, monk
             advisory_verification_adapter=AdvisoryVerificationAdapter.from_runtime_config(config),
             maven_verification_adapter=MavenVerificationAdapter.from_runtime_config(config),
             complex_remediation_adapter=ComplexRemediationAdapter.from_runtime_config(config),
-            pom_mutation_adapter=PomMutationAdapter(
-                fixture_before_path=fixtures_dir / "pom_before.xml",
-                fixture_after_path=fixtures_dir / "pom_after.xml",
-            ),
+            pom_mutation_adapter=PomMutationAdapter.from_runtime_config(config),
             preflight_resolution_adapter=PreflightResolutionAdapter.from_runtime_config(config),
             validation_adapter=ValidationAdapter.from_runtime_config(config),
             delivery_adapter=DeliveryAdapter.from_runtime_config(config),

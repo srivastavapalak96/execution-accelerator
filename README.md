@@ -26,7 +26,7 @@ The current repo can run a persisted local flow for:
    - simple update
    - transitive override
    - complex refactor scaffold
-6. live or fixture-backed validation
+6. live or fixture-backed validation, including a post-remediation dependency-tree rescan in live mode
 7. fixture-backed or live git-backed rollback-on-failure
 8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira completion comments and optional done transitions
 
@@ -43,7 +43,7 @@ EA_MODE=fixture
 This repository does **not** yet perform:
 
 - full Jira completion workflow handling beyond a configured done transition
-- full compile/test/security/license validation coverage
+- full compile/test/license validation coverage
 - real retry matrix behavior
 - richer policy enforcement and multi-stage approval routing
 - real tough-path/EOL migrations

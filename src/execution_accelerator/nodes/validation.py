@@ -23,6 +23,8 @@ def build_validate_remediation_node(
             repository=state.current_working_repo,
             workspace_path=Path(workspace.local_path) if workspace is not None else None,
             execution_plan=state.maven_plan,
+            vulnerability_details=state.vulnerability_details,
+            maven_verification=state.maven_verification,
         )
         validation_results = list(state.validation_results)
         validation_results.append(validation_result)

@@ -67,6 +67,7 @@ def create_live_repo(
     dynamic_legacy_json_version: bool = False,
     surefire_report_xml: str | None = None,
     verify_exit_code: int = 0,
+    simulate_openrewrite: bool = False,
 ) -> Path:
     repo_path.mkdir(parents=True, exist_ok=True)
     (repo_path / "pom.xml").write_text(pom_text)
@@ -100,8 +101,42 @@ def create_live_repo(
         if verify_exit_code
         else "  echo \"[INFO] BUILD SUCCESS\"\n  exit 0\n"
     )
+    openrewrite_body = (
+        "if [ \"$1\" = \"org.openrewrite.maven:rewrite-maven-plugin:run\" ] || "
+        "[ \"$1\" = \"org.openrewrite.maven:rewrite-maven-plugin:dryRun\" ]; then\n"
+        "  target_version=\"\"\n"
+        "  for arg in \"$@\"; do\n"
+        "    case \"$arg\" in\n"
+        "      -Drewrite.newVersion=*) target_version=\"${arg#*=}\" ;;\n"
+        "      -Drewrite.version=*) target_version=\"${arg#*=}\" ;;\n"
+        "    esac\n"
+        "  done\n"
+        "  if [ \"$1\" = \"org.openrewrite.maven:rewrite-maven-plugin:run\" ] && [ -n \"$target_version\" ]; then\n"
+        "    EA_REWRITE_TARGET=\"$target_version\" python3 - <<'PY'\n"
+        "from pathlib import Path\n"
+        "import os\n"
+        "import re\n"
+        "target = os.environ['EA_REWRITE_TARGET']\n"
+        "pom_path = Path('pom.xml')\n"
+        "pom_text = pom_path.read_text()\n"
+        "updated = re.sub(\n"
+        "    r'(<artifactId>legacy-json</artifactId>\\s*<version>)([^<]+)(</version>)',\n"
+        "    rf'\\g<1>{target}\\g<3>',\n"
+        "    pom_text,\n"
+        "    count=1,\n"
+        ")\n"
+        "pom_path.write_text(updated)\n"
+        "PY\n"
+        "  fi\n"
+        "  echo \"[INFO] Rewrite complete\"\n"
+        "  exit 0\n"
+        "fi\n"
+        if simulate_openrewrite
+        else ""
+    )
     mvnw.write_text(
         "#!/bin/sh\n"
+        f"{openrewrite_body}"
         "if [ \"$1\" = \"dependency:tree\" ]; then\n"
         f"{dependency_tree_body}"
         "  exit 0\n"
@@ -133,6 +168,7 @@ def create_live_remote_repo(
     dynamic_legacy_json_version: bool = False,
     surefire_report_xml: str | None = None,
     verify_exit_code: int = 0,
+    simulate_openrewrite: bool = False,
 ) -> Path:
     working_repo = create_live_repo(
         root_dir / "source-repo",
@@ -141,6 +177,7 @@ def create_live_remote_repo(
         dynamic_legacy_json_version=dynamic_legacy_json_version,
         surefire_report_xml=surefire_report_xml,
         verify_exit_code=verify_exit_code,
+        simulate_openrewrite=simulate_openrewrite,
     )
     remote_repo = root_dir / "origin.git"
     subprocess.run(["git", "init", "--bare", str(remote_repo)], check=True, capture_output=True)

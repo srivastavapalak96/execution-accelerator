@@ -17,11 +17,13 @@ from execution_accelerator.execution import (
 from execution_accelerator.schemas import (
     ExecutionMode,
     MavenExecutionPlan,
+    MavenVerification,
     RepositoryValidationResult,
     RollbackPlan,
     RollbackStatus,
     ValidationCheck,
     ValidationStatus,
+    VulnerabilityDetails,
 )
 
 
@@ -77,6 +79,8 @@ class ValidationAdapter:
         repository: str,
         workspace_path: Path | None = None,
         execution_plan: MavenExecutionPlan | None = None,
+        vulnerability_details: VulnerabilityDetails | None = None,
+        maven_verification: MavenVerification | None = None,
         fixture_path: Path | None = None,
     ) -> RepositoryValidationResult:
         """Load the placeholder validation result for one repository."""
@@ -86,6 +90,8 @@ class ValidationAdapter:
                 repository=repository,
                 workspace_path=workspace_path,
                 execution_plan=execution_plan,
+                vulnerability_details=vulnerability_details,
+                maven_verification=maven_verification,
             )
 
         require_fixture_mode(self.mode, capability="Validation live execution")
@@ -105,6 +111,8 @@ class ValidationAdapter:
         repository: str,
         workspace_path: Path | None,
         execution_plan: MavenExecutionPlan | None,
+        vulnerability_details: VulnerabilityDetails | None,
+        maven_verification: MavenVerification | None,
     ) -> RepositoryValidationResult:
         if self.maven_runner is None:
             raise ValidationConfigurationError("Live validation requires a configured Maven runner.")
@@ -164,6 +172,18 @@ class ValidationAdapter:
                     ),
                 )
             )
+
+        security_check = _build_security_check(
+            maven_runner=self.maven_runner,
+            workspace_path=workspace_path,
+            execution_plan=execution_plan,
+            vulnerability_details=vulnerability_details,
+            maven_verification=maven_verification,
+        )
+        checks.append(security_check)
+        if security_check.status == ValidationStatus.FAILED:
+            status = ValidationStatus.FAILED
+            summary = "Live validation detected an unresolved vulnerable dependency."
 
         return RepositoryValidationResult(
             repository=repository,
@@ -250,6 +270,67 @@ def _collect_test_reports(workspace_path: Path) -> SurefireReportSummary | None:
         total_failures=total_failures,
         total_errors=total_errors,
         total_skipped=total_skipped,
+    )
+
+
+def _build_security_check(
+    *,
+    maven_runner: MavenRunner,
+    workspace_path: Path,
+    execution_plan: MavenExecutionPlan | None,
+    vulnerability_details: VulnerabilityDetails | None,
+    maven_verification: MavenVerification | None,
+) -> ValidationCheck:
+    if vulnerability_details is None or maven_verification is None:
+        return ValidationCheck(
+            name="security",
+            status=ValidationStatus.PENDING,
+            details="Live security rescan skipped; verified dependency context was unavailable.",
+        )
+
+    group_id, artifact_id = vulnerability_details.package_name.split(":", maxsplit=1)
+    try:
+        dependency_tree = maven_runner.dependency_tree(
+            workspace_path,
+            settings_xml=Path(execution_plan.settings_xml) if execution_plan and execution_plan.settings_xml else None,
+            jdk_home=Path(execution_plan.java_home) if execution_plan and execution_plan.java_home else None,
+        )
+    except MavenCommandError as exc:
+        return ValidationCheck(
+            name="security",
+            status=ValidationStatus.FAILED,
+            details=(exc.result.stderr or exc.result.stdout or "Failed to rescan Maven dependency tree.").strip(),
+        )
+
+    matching_versions = sorted(
+        {
+            entry.coordinate.version
+            for entry in dependency_tree
+            if entry.coordinate.group_id == group_id and entry.coordinate.artifact_id == artifact_id
+        }
+    )
+    if not matching_versions:
+        return ValidationCheck(
+            name="security",
+            status=ValidationStatus.PASSED,
+            details=f"{vulnerability_details.package_name} no longer appears in the Maven dependency tree.",
+        )
+    if matching_versions == [maven_verification.target_version]:
+        return ValidationCheck(
+            name="security",
+            status=ValidationStatus.PASSED,
+            details=(
+                f"{vulnerability_details.package_name} resolves only "
+                f"{maven_verification.target_version} after remediation."
+            ),
+        )
+    return ValidationCheck(
+        name="security",
+        status=ValidationStatus.FAILED,
+        details=(
+            f"{vulnerability_details.package_name} still resolves versions "
+            f"{', '.join(matching_versions)}; expected only {maven_verification.target_version}."
+        ),
     )
 
 
