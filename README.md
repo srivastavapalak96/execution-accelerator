@@ -8,7 +8,7 @@ Today, this repository is best understood as a **partially live remediation prot
 - SQLite checkpoint persistence is real
 - workflow schemas/state are real
 - live Jira intake, repository preparation, OSV advisory lookup, Maven profile detection, and Maven verification are real
-- live remediation, live validation, and basic live delivery now exist
+- live remediation, live validation, basic live delivery, and failure escalation bundles now exist
 - retry flows and tough-path behavior are still incomplete, and policy/approval routing is still basic
 
 If you want the long-term target, read **`docs/vision.md`**.  
@@ -29,6 +29,7 @@ The current repo can run a persisted local flow for:
 6. live or fixture-backed validation, including a post-remediation dependency-tree rescan in live mode
 7. fixture-backed or live git-backed rollback-on-failure
 8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira completion comments and optional done transitions
+9. fixture-backed or live failure escalation summaries, including persisted escalation bundle paths in run output
 
 The default mode is:
 
@@ -36,7 +37,7 @@ The default mode is:
 EA_MODE=fixture
 ```
 
-`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, but Jira transition workflows and tougher remediation lanes are still incomplete.
+`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, escalation bundles, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, but Jira transition workflows and tougher remediation lanes are still incomplete.
 
 ## Current limitations
 
@@ -47,6 +48,7 @@ This repository does **not** yet perform:
 - real retry matrix behavior
 - richer policy enforcement and multi-stage approval routing
 - real tough-path/EOL migrations
+- broader observability hardening beyond the escalation bundle artifact
 
 ## Quickstart
 

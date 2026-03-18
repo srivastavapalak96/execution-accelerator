@@ -15,6 +15,7 @@ from execution_accelerator.schemas import (
     CompatibilityDiffResult,
     ComplexRemediationPlan,
     DecompiledArtifactSummary,
+    EscalationBundle,
     FailureClassification,
     JiraCompletionResult,
     LlmCallRecord,
@@ -118,6 +119,7 @@ class RemediationState(BaseSchemaModel):
     retry_count: int = Field(default=0, ge=0)
     requires_human_approval: bool = False
     human_feedback: HumanFeedback | None = None
+    escalation_bundle: EscalationBundle | None = None
     audit_events: list[AuditEvent] = Field(default_factory=list)
 
     @property

@@ -288,16 +288,24 @@ def test_bootstrap_ticket_run_records_failure_and_rollback_state(tmp_path, monke
         runtime_config=config,
         thread_id="sec-500-thread",
     )
+    loaded_state = load_remediation_state(
+        runtime_config=config,
+        thread_id="sec-500-thread",
+    )
 
     assert result.state.workflow_status == WorkflowStatus.FAILED
     assert result.state.validation_results[-1].status == "failed"
     assert result.state.rollback_plan is not None
     assert result.state.rollback_plan.status == "applied"
+    assert result.state.escalation_bundle is not None
     assert result.state.total_attempts == 1
     assert result.state.failure_classifications[-1] == "compile_error"
     assert result.state.errors[-1].code == "validation_failed"
     assert len(result.state.targets) == 1
     assert len(result.state.audit_events) == 15
+    assert Path(result.state.escalation_bundle.bundle_path).exists()
+    assert loaded_state.escalation_bundle is not None
+    assert loaded_state.escalation_bundle.bundle_path == result.state.escalation_bundle.bundle_path
 
 
 def test_live_flow_runs_through_delivery_with_live_integrations(tmp_path, monkeypatch) -> None:

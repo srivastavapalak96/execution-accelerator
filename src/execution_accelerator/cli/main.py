@@ -255,6 +255,8 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
     if state.rollback_plan is not None:
         print(f"rollback_status={state.rollback_plan.status}")
         print(f"rollback_reason={state.rollback_plan.reason}")
+    if state.escalation_bundle is not None:
+        print(f"escalation_bundle_path={state.escalation_bundle.bundle_path}")
     if state.branch_publication is not None:
         print(f"branch_name={state.branch_publication.branch_name}")
         print(f"branch_commit_sha={state.branch_publication.commit_sha}")

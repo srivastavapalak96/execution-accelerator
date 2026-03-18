@@ -25,6 +25,7 @@ from execution_accelerator.nodes import (
     bootstrap_state,
     build_apply_policy_node,
     build_review_approval_node,
+    build_escalate_node,
     classify_failure,
     build_detect_maven_profile_node,
     build_execute_complex_scaffold_node,
@@ -41,7 +42,6 @@ from execution_accelerator.nodes import (
     build_validate_remediation_node,
     build_verify_advisory_node,
     build_verify_maven_target_node,
-    escalate,
     select_route,
 )
 from execution_accelerator.policy import PolicyEngine
@@ -121,7 +121,7 @@ def build_remediation_graph(
         cast(Any, build_handle_validation_failure_node(validation_adapter)),
     )
     builder.add_node("classify_failure", cast(Any, classify_failure))
-    builder.add_node("escalate", cast(Any, escalate))
+    builder.add_node("escalate", cast(Any, build_escalate_node(runtime_config)))
     builder.add_node("skip_publish_for_dry_run", cast(Any, build_skip_publish_for_dry_run_node(runtime_config)))
     builder.add_node("publish_remediation", cast(Any, build_publish_remediation_node(delivery_adapter)))
     builder.add_edge(START, "bootstrap_state")
