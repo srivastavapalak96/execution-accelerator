@@ -255,6 +255,10 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
     if state.rollback_plan is not None:
         print(f"rollback_status={state.rollback_plan.status}")
         print(f"rollback_reason={state.rollback_plan.reason}")
+    print(f"retry_count={state.retry_count}")
+    if state.retry_decision is not None:
+        print(f"retry_next_node={state.retry_decision.next_node}")
+        print(f"retry_reason={state.retry_decision.reason}")
     if state.escalation_bundle is not None:
         print(f"escalation_bundle_path={state.escalation_bundle.bundle_path}")
     if state.branch_publication is not None:

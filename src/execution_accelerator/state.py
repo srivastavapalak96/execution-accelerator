@@ -32,6 +32,7 @@ from execution_accelerator.schemas import (
     PullRequestSummary,
     SymbolMappingEntry,
     RemediationTarget,
+    RetryDecision,
     VulnerabilityDetails,
     WorkflowStatus,
 )
@@ -117,6 +118,7 @@ class RemediationState(BaseSchemaModel):
     llm_tokens_used: int = Field(default=0, ge=0)
     errors: list[WorkflowError] = Field(default_factory=list)
     retry_count: int = Field(default=0, ge=0)
+    retry_decision: RetryDecision | None = None
     requires_human_approval: bool = False
     human_feedback: HumanFeedback | None = None
     escalation_bundle: EscalationBundle | None = None

@@ -176,7 +176,10 @@ def build_remediation_graph(
         "classify_failure",
         _select_failure_node,
         {
+            "execute_complex_scaffold": "execute_complex_scaffold",
             "escalate": "escalate",
+            "remediate_simple": "remediate_simple",
+            "remediate_transitive": "remediate_transitive",
         },
     )
     builder.add_edge("escalate", END)
@@ -373,4 +376,6 @@ def _build_post_validation_selector(*, dry_run: bool) -> Callable[[RemediationSt
 
 
 def _select_failure_node(state: RemediationState) -> str:
+    if state.retry_decision is not None:
+        return state.retry_decision.next_node
     return "escalate"

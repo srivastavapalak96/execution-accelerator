@@ -243,6 +243,7 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "preflight_resolved_version=1.2.4" in captured.out
     assert "validation_status=passed" in captured.out
     assert "validation_check_count=3" in captured.out
+    assert "retry_count=0" in captured.out
     assert "branch_name=sec-123-remediate-legacy-json" in captured.out
     assert "pull_request_number=42" in captured.out
     assert "jira_ticket_status=done" in captured.out
@@ -299,6 +300,7 @@ def test_main_prints_escalation_bundle_for_failed_ticket(monkeypatch, capsys, tm
     assert "workflow_status=failed" in captured.out
     assert "validation_status=failed" in captured.out
     assert "rollback_status=applied" in captured.out
+    assert "retry_count=0" in captured.out
     bundle_line = next(
         line for line in captured.out.splitlines() if line.startswith("escalation_bundle_path=")
     )
