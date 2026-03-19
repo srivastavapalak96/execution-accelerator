@@ -1,3 +1,5 @@
 draft_pr_only: true
 complex_refactor_requires_human_approval: true
+transitive_override_requires_human_approval: false
+approval_required_tags: []
 blocked_tags: []

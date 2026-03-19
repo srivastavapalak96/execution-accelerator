@@ -13,6 +13,8 @@ from execution_accelerator.state import RemediationState
 class PolicyConfig:
     draft_pr_only: bool = True
     complex_refactor_requires_human_approval: bool = True
+    transitive_override_requires_human_approval: bool = False
+    approval_required_tags: tuple[str, ...] = ()
     blocked_tags: tuple[str, ...] = ()
 
 
@@ -34,18 +36,14 @@ class PolicyEngine:
             )
 
         requires_human_approval = state.requires_human_approval
-        if state.route_decision is not None and (
-            state.route_decision.requires_human_approval
-            or (
-                state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR
-                and config.complex_refactor_requires_human_approval
-            )
-        ):
+        approval_reasons = _collect_approval_reasons(state, config, target_tags=target_tags)
+        if approval_reasons:
             requires_human_approval = True
 
         return PolicyDecision(
             allowed=True,
             requires_human_approval=requires_human_approval,
+            approval_reason="; ".join(dict.fromkeys(approval_reasons)) or None,
             blocked_reason=None,
         )
 
@@ -60,11 +58,20 @@ class PolicyEngine:
             for tag in loaded.get("blocked_tags", [])
             if isinstance(tag, str) and tag.strip()
         )
+        approval_required_tags = tuple(
+            tag
+            for tag in loaded.get("approval_required_tags", [])
+            if isinstance(tag, str) and tag.strip()
+        )
         return PolicyConfig(
             draft_pr_only=bool(loaded.get("draft_pr_only", True)),
             complex_refactor_requires_human_approval=bool(
                 loaded.get("complex_refactor_requires_human_approval", True)
             ),
+            transitive_override_requires_human_approval=bool(
+                loaded.get("transitive_override_requires_human_approval", False)
+            ),
+            approval_required_tags=approval_required_tags,
             blocked_tags=blocked_tags,
         )
 
@@ -75,3 +82,40 @@ def _current_target_tags(state: RemediationState) -> set[str]:
     if state.targets and state.current_target_index < len(state.targets):
         return set(state.targets[state.current_target_index].tags)
     return set()
+
+
+def _policy_requires_route_approval(state: RemediationState, config: PolicyConfig) -> bool:
+    if state.route_decision is None:
+        return False
+    if (
+        state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR
+        and config.complex_refactor_requires_human_approval
+    ):
+        return True
+    return (
+        state.route_decision.strategy == RemediationStrategy.TRANSITIVE_OVERRIDE
+        and config.transitive_override_requires_human_approval
+    )
+
+
+def _collect_approval_reasons(
+    state: RemediationState, config: PolicyConfig, *, target_tags: set[str]
+) -> list[str]:
+    reasons: list[str] = []
+    if state.route_decision is not None:
+        if state.route_decision.requires_human_approval:
+            reasons.append(f"Route requires approval: {state.route_decision.reason}")
+        if (
+            state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR
+            and config.complex_refactor_requires_human_approval
+        ):
+            reasons.append("Policy requires approval for complex_refactor remediation.")
+        if (
+            state.route_decision.strategy == RemediationStrategy.TRANSITIVE_OVERRIDE
+            and config.transitive_override_requires_human_approval
+        ):
+            reasons.append("Policy requires approval for transitive_override remediation.")
+    tagged_reasons = sorted(tag for tag in target_tags if tag in config.approval_required_tags)
+    if tagged_reasons:
+        reasons.append(f"Repository tags require approval: {', '.join(tagged_reasons)}")
+    return reasons

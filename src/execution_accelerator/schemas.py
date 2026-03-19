@@ -460,6 +460,7 @@ class PolicyDecision(BaseSchemaModel):
 
     allowed: bool = True
     requires_human_approval: bool = False
+    approval_reason: str | None = None
     blocked_reason: str | None = None
 
 

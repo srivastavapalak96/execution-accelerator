@@ -27,6 +27,7 @@ def build_apply_policy_node(
                 details={
                     "allowed": decision.allowed,
                     "requires_human_approval": decision.requires_human_approval,
+                    "approval_reason": decision.approval_reason,
                     "blocked_reason": decision.blocked_reason,
                 },
             )
@@ -44,6 +45,7 @@ def build_apply_policy_node(
                     message="Human approval is required before remediation can continue.",
                     details={
                         "repository": state.current_working_repo,
+                        "approval_reason": decision.approval_reason,
                     },
                 )
             )

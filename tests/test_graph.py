@@ -187,6 +187,77 @@ def test_bootstrap_ticket_run_persists_transitive_override_state(tmp_path, monke
     assert loaded_state.completed_repos == ["payments-service"]
 
 
+def test_bootstrap_ticket_run_pauses_transitive_override_when_policy_requires_approval(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path, transitive=True)
+    policy_dir = tmp_path / "config"
+    policy_dir.mkdir(exist_ok=True)
+    (policy_dir / "policy.yaml").write_text("transitive_override_requires_human_approval: true\n")
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-421",
+        repository_name="payments-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_transitive_before.xml",
+    )
+    config = load_runtime_config(repo_root=tmp_path)
+
+    result = bootstrap_ticket_run(
+        "SEC-421",
+        runtime_config=config,
+        thread_id="sec-421-thread",
+    )
+    loaded_state = load_remediation_state(
+        runtime_config=config,
+        thread_id="sec-421-thread",
+    )
+
+    assert result.state.route_decision is not None
+    assert result.state.route_decision.strategy == "transitive_override"
+    assert result.state.requires_human_approval is True
+    assert result.state.workflow_status == WorkflowStatus.PENDING
+    assert result.state.preflight_resolution is None
+    assert result.state.validation_results == []
+    assert result.state.policy_decisions[-1].approval_reason == (
+        "Policy requires approval for transitive_override remediation."
+    )
+    assert loaded_state.workflow_status == WorkflowStatus.PENDING
+    assert loaded_state.policy_decisions[-1].approval_reason == (
+        "Policy requires approval for transitive_override remediation."
+    )
+
+
+def test_resume_ticket_run_advances_transitive_override_after_policy_approval(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path, transitive=True)
+    policy_dir = tmp_path / "config"
+    policy_dir.mkdir(exist_ok=True)
+    (policy_dir / "policy.yaml").write_text("transitive_override_requires_human_approval: true\n")
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-421",
+        repository_name="payments-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_transitive_before.xml",
+    )
+    config = load_runtime_config(repo_root=tmp_path)
+
+    bootstrap_ticket_run(
+        "SEC-421",
+        runtime_config=config,
+        thread_id="sec-421-thread",
+    )
+    result = resume_ticket_run(
+        runtime_config=config,
+        thread_id="sec-421-thread",
+        human_feedback=HumanFeedback(
+            decision=ApprovalDecision.APPROVED,
+            reviewer="security-lead",
+            comments="Transitive override approved.",
+        ),
+    )
+
+    assert result.state.workflow_status == WorkflowStatus.COMPLETED
+    assert result.state.preflight_resolution is not None
+    assert result.state.validation_results[-1].status == "passed"
+    assert result.state.pull_request_summary is not None
+
 def test_bootstrap_ticket_run_persists_complex_refactor_state(tmp_path, monkeypatch) -> None:
     _configure_runtime(monkeypatch, tmp_path, complex_refactor=True)
     config = load_runtime_config(repo_root=tmp_path)
