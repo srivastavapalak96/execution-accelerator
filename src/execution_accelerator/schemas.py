@@ -399,6 +399,7 @@ class ComplexRemediationPlan(BaseSchemaModel):
         default="Breaking changes are narrow enough to handle with direct symbol replacements in affected files.",
         min_length=1,
     )
+    migration_steps: list[str] = Field(default_factory=list)
     requires_code_changes: bool = True
 
 

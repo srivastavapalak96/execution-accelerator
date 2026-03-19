@@ -14,7 +14,7 @@ This file tracks the repository **as implemented today**, not the aspirational e
 | Maven verification | PARTIAL | Fixture-backed by default; live metadata + dependency-tree verification now exists, including direct/transitive classification and risk evaluation. |
 | Simple remediation lane | PARTIAL | Fixture-backed default path remains, and live mode now delegates direct upgrades through OpenRewrite-backed mutation. |
 | Transitive remediation lane | PARTIAL | Fixture-backed default path remains, and live mode now delegates managed dependency overrides through OpenRewrite-backed mutation. |
-| Complex remediation lane | PARTIAL | Analysis/execution scaffold exists, and the persisted complex plan now records a primary migration tactic derived from compatibility analysis, but real migration execution logic is still missing. |
+| Complex remediation lane | PARTIAL | Analysis/execution scaffold exists, and the persisted complex plan now records a primary migration tactic plus actionable migration steps derived from compatibility analysis, but real migration execution logic is still missing. |
 | Validation | PARTIAL | Live preflight resolution now checks the workspace dependency tree, live validation runs `mvn verify`, parses Surefire/Failsafe results, rescans the dependency tree for the remediated version, and can trigger git-backed rollback on failure. |
 | Delivery | PARTIAL | Live branch publication and PR creation now exist; Jira completion can post a comment and optionally fire a configured done transition, but richer workflow handling is still missing. |
 | Failure classification | PARTIAL | Failures route through classify -> rollback -> escalate, and failed runs now persist escalation bundle metadata. |

@@ -77,6 +77,20 @@ def test_complex_remediation_adapter_selects_adapter_shim_for_mixed_breaking_cha
     assert "compatibility adapter" in rationale
 
 
+def test_complex_remediation_adapter_builds_migration_steps_from_guidance(tmp_path, monkeypatch) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixture_dir / "compatibility_diff.json"))
+    config = load_runtime_config(repo_root=tmp_path)
+    adapter = ComplexRemediationAdapter.from_runtime_config(config)
+
+    steps = adapter.build_migration_steps(adapter.load_compatibility_diff())
+
+    assert steps == [
+        "Replace direct parse calls with builder.create().parse(...)",
+        "Introduce a config factory and update dependency injection wiring.",
+    ]
+
+
 def test_complex_remediation_adapter_requires_configuration() -> None:
     adapter = ComplexRemediationAdapter()
 

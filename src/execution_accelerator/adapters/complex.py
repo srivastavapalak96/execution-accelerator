@@ -152,3 +152,14 @@ class ComplexRemediationAdapter:
             ComplexMigrationTactic.TARGETED_SYMBOL_REWRITE,
             "Breaking changes are narrow enough to handle with direct symbol replacements in affected files.",
         )
+
+    def build_migration_steps(self, compatibility_diff: CompatibilityDiffResult) -> list[str]:
+        """Derive an ordered checklist from compatibility guidance."""
+
+        steps: list[str] = []
+        for change in compatibility_diff.breaking_changes:
+            if change.guidance:
+                steps.append(change.guidance)
+            else:
+                steps.append(f"Address {change.symbol}: {change.impact}")
+        return steps
