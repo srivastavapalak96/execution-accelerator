@@ -22,6 +22,7 @@ def classify_failure(state: RemediationState) -> dict[str, object]:
     latest_error = state.errors[-1] if state.errors else None
     can_retry = (
         retry_next_node is not None
+        and _is_retryable_classification(classification)
         and total_attempts < max_total_attempts
         and state.retry_count < max_retry_attempts
         and latest_error is not None
@@ -29,10 +30,12 @@ def classify_failure(state: RemediationState) -> dict[str, object]:
     )
     reason = _build_retry_reason(
         can_retry=can_retry,
+        classification=classification,
         total_attempts=total_attempts,
         max_total_attempts=max_total_attempts,
         retry_count=state.retry_count,
         max_retry_attempts=max_retry_attempts,
+        latest_error_recoverable=latest_error.recoverable if latest_error is not None else False,
     )
     retry_decision = RetryDecision(
         classification=classification,
@@ -97,18 +100,28 @@ def _select_retry_node(state: RemediationState) -> str | None:
     return None
 
 
+def _is_retryable_classification(classification: FailureClassification) -> bool:
+    return classification == FailureClassification.TEST_FAILURE
+
+
 def _build_retry_reason(
     *,
     can_retry: bool,
+    classification: FailureClassification,
     total_attempts: int,
     max_total_attempts: int,
     retry_count: int,
     max_retry_attempts: int,
+    latest_error_recoverable: bool,
 ) -> str:
     if can_retry:
-        return "Recoverable validation failure will retry the remediation lane."
+        return "Retryable test failure will rerun the active remediation lane."
     if total_attempts >= max_total_attempts:
         return "Total attempt budget reached; escalation is required."
+    if not _is_retryable_classification(classification):
+        return f"{classification} failures are not automatically retried."
     if retry_count >= max_retry_attempts:
         return "Retry budget reached; escalation is required."
+    if not latest_error_recoverable:
+        return "Failure is not retryable by the current retry matrix."
     return "Failure is not retryable by the current retry matrix."

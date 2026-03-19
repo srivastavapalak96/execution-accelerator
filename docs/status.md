@@ -18,7 +18,7 @@ This file tracks the repository **as implemented today**, not the aspirational e
 | Validation | PARTIAL | Live preflight resolution now checks the workspace dependency tree, live validation runs `mvn verify`, parses Surefire/Failsafe results, rescans the dependency tree for the remediated version, and can trigger git-backed rollback on failure. |
 | Delivery | PARTIAL | Live branch publication and PR creation now exist; Jira completion can post a comment and optionally fire a configured done transition, but richer workflow handling is still missing. |
 | Failure classification | PARTIAL | Failures route through classify -> rollback -> escalate, and failed runs now persist escalation bundle metadata. |
-| Retry matrix | PARTIAL | Recoverable validation failures can now re-run the active remediation lane within a bounded retry budget before escalating; richer retry policies are still missing. |
+| Retry matrix | PARTIAL | Retryable test failures can now re-run the active remediation lane within a bounded retry budget before escalating; compile failures still escalate immediately and richer retry policies are still missing. |
 | Policy engine | PARTIAL | A basic policy engine runs after route selection, can block tagged repositories, can require approval for complex refactors, and now drives draft PR publication policy. |
 | Human approval interrupt | PARTIAL | Approval-required runs now pause before remediation, persist approval state, and can resume after explicit approve/reject input. |
 | Live PR creation and Jira updates | PARTIAL | PR creation is live; Jira updates can post completion comments and optionally apply a configured done transition. |

@@ -1,0 +1,22 @@
+{
+  "repository": "payments-service",
+  "status": "failed",
+  "checks": [
+    {
+      "name": "compile",
+      "status": "passed",
+      "details": "Compilation completed successfully."
+    },
+    {
+      "name": "unit-tests",
+      "status": "failed",
+      "details": "A flaky regression test failed after remediation execution."
+    },
+    {
+      "name": "security-scan",
+      "status": "passed",
+      "details": "Security scan confirmed the remediated dependency version."
+    }
+  ],
+  "summary": "Validation failed during unit tests after remediation execution."
+}

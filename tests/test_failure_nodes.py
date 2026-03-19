@@ -41,9 +41,10 @@ def test_classify_failure_schedules_retry_for_recoverable_simple_update(monkeypa
                 "repository": "payments-service",
                 "status": ValidationStatus.FAILED,
                 "checks": [
-                    ValidationCheck(name="compile", status=ValidationStatus.FAILED, details="Compilation failed.")
+                    ValidationCheck(name="compile", status=ValidationStatus.PASSED, details="Compile passed."),
+                    ValidationCheck(name="unit-tests", status=ValidationStatus.FAILED, details="Tests failed."),
                 ],
-                "summary": "Compile failed.",
+                "summary": "Tests failed.",
             }
         ],
     )
@@ -53,6 +54,31 @@ def test_classify_failure_schedules_retry_for_recoverable_simple_update(monkeypa
     assert update["retry_count"] == 1
     assert update["retry_decision"].next_node == "remediate_simple"
     assert update["workflow_status"] == "in_progress"
+
+
+def test_classify_failure_escalates_compile_failure_even_with_retry_budget(monkeypatch) -> None:
+    monkeypatch.setenv("EA_MAX_RETRY_ATTEMPTS", "2")
+    state = RemediationState(
+        initial_ticket_id="SEC-124",
+        route_decision={"strategy": RemediationStrategy.SIMPLE_UPDATE, "confidence": 0.93, "reason": "Direct fix."},
+        errors=[{"code": "validation_failed", "message": "Compile failed.", "recoverable": True}],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": ValidationStatus.FAILED,
+                "checks": [
+                    ValidationCheck(name="compile", status=ValidationStatus.FAILED, details="Compilation failed.")
+                ],
+                "summary": "Compile failed.",
+            }
+        ],
+    )
+
+    update = classify_failure(state)
+
+    assert update["retry_count"] == 0
+    assert update["retry_decision"].next_node == "escalate"
+    assert update["workflow_status"] == "failed"
 
 
 def test_escalate_records_terminal_audit_event() -> None:

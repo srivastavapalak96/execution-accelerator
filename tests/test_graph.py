@@ -299,6 +299,9 @@ def test_bootstrap_ticket_run_records_failure_and_rollback_state(tmp_path, monke
     assert result.state.rollback_plan.status == "applied"
     assert result.state.escalation_bundle is not None
     assert result.state.total_attempts == 1
+    assert result.state.retry_count == 0
+    assert result.state.retry_decision is not None
+    assert result.state.retry_decision.next_node == "escalate"
     assert result.state.failure_classifications[-1] == "compile_error"
     assert result.state.errors[-1].code == "validation_failed"
     assert len(result.state.targets) == 1
@@ -313,7 +316,7 @@ def test_bootstrap_ticket_run_retries_once_before_escalating(tmp_path, monkeypat
     monkeypatch.setenv("EA_MAX_RETRY_ATTEMPTS", "1")
     monkeypatch.setenv(
         "EA_VALIDATION_RESULT_FIXTURE_PATH",
-        str(Path(__file__).parent / "fixtures" / "validation_result_failure.json"),
+        str(Path(__file__).parent / "fixtures" / "validation_result_test_failure.json"),
     )
     seed_bootstrap_workspace_pom(
         tmp_path / "workspace",
@@ -335,7 +338,7 @@ def test_bootstrap_ticket_run_retries_once_before_escalating(tmp_path, monkeypat
     assert result.state.retry_decision.next_node == "escalate"
     assert result.state.total_attempts == 2
     assert len(result.state.validation_results) == 2
-    assert len(result.state.failure_classifications) == 2
+    assert result.state.failure_classifications == ["test_failure", "test_failure"]
     assert result.state.escalation_bundle is not None
 
 
