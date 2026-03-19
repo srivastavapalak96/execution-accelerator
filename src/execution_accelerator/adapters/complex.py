@@ -11,6 +11,7 @@ from execution_accelerator.schemas import (
     ExecutionMode,
     ArtifactCandidate,
     ComplexCodeChangePlan,
+    ComplexMigrationTactic,
     CompatibilityDiffResult,
     DecompiledArtifactSummary,
     SymbolMappingEntry,
@@ -129,3 +130,25 @@ class ComplexRemediationAdapter:
             )
 
         return ComplexCodeChangePlan.model_validate(json.loads(resolved_fixture_path.read_text()))
+
+    def select_migration_tactic(
+        self, compatibility_diff: CompatibilityDiffResult
+    ) -> tuple[ComplexMigrationTactic, str]:
+        """Choose a primary migration tactic from the compatibility diff."""
+
+        change_types = {change.change_type for change in compatibility_diff.breaking_changes}
+        if {"removed", "modified"}.issubset(change_types):
+            return (
+                ComplexMigrationTactic.ADAPTER_SHIM,
+                "Removed APIs and constructor changes suggest insulating callers behind a compatibility adapter "
+                "while parser and serializer internals migrate.",
+            )
+        if any("<init>" in change.symbol for change in compatibility_diff.breaking_changes):
+            return (
+                ComplexMigrationTactic.FACTORY_INTRODUCTION,
+                "Constructor changes suggest introducing an explicit factory/config seam before touching call sites.",
+            )
+        return (
+            ComplexMigrationTactic.TARGETED_SYMBOL_REWRITE,
+            "Breaking changes are narrow enough to handle with direct symbol replacements in affected files.",
+        )

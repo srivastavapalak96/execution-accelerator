@@ -286,6 +286,14 @@ class CompatibilityChangeType(StrEnum):
     DEPRECATED = "deprecated"
 
 
+class ComplexMigrationTactic(StrEnum):
+    """Primary tactic chosen for the complex remediation lane."""
+
+    ADAPTER_SHIM = "adapter_shim"
+    FACTORY_INTRODUCTION = "factory_introduction"
+    TARGETED_SYMBOL_REWRITE = "targeted_symbol_rewrite"
+
+
 class CompatibilityDiffEntry(BaseSchemaModel):
     """One compatibility finding for the complex remediation lane."""
 
@@ -386,6 +394,11 @@ class ComplexRemediationPlan(BaseSchemaModel):
     summary: str = Field(min_length=1)
     artifact_candidates: list[ArtifactCandidate] = Field(default_factory=list)
     compatibility_diff: CompatibilityDiffResult
+    migration_tactic: ComplexMigrationTactic = ComplexMigrationTactic.TARGETED_SYMBOL_REWRITE
+    tactic_rationale: str = Field(
+        default="Breaking changes are narrow enough to handle with direct symbol replacements in affected files.",
+        min_length=1,
+    )
     requires_code_changes: bool = True
 
 

@@ -9,7 +9,7 @@ Today, this repository is best understood as a **partially live remediation prot
 - workflow schemas/state are real
 - live Jira intake, repository preparation, OSV advisory lookup, Maven profile detection, and Maven verification are real
 - bounded retry routing for retryable test failures, live remediation, live validation, basic live delivery, and failure escalation bundles now exist
-- tougher retry policies and tough-path behavior are still incomplete, but policy-driven approval routing is broader
+- the complex lane now persists a concrete migration tactic, but tougher tough-path behavior is still incomplete
 
 If you want the long-term target, read **`docs/vision.md`**.  
 If you want the truth about what works right now, read **`docs/status.md`**.
@@ -31,6 +31,7 @@ The current repo can run a persisted local flow for:
 8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira completion comments and optional done transitions
 9. fixture-backed or live failure escalation summaries, including persisted escalation bundle paths in run output
 10. persisted approval pauses for complex refactors, transitive overrides, and approval-tagged repositories, with surfaced approval reasons in CLI summaries
+11. complex-refactor planning that now persists a primary migration tactic derived from compatibility analysis
 
 The default mode is:
 
@@ -38,7 +39,7 @@ The default mode is:
 EA_MODE=fixture
 ```
 
-`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, bounded retry routing for retryable test failures, escalation bundles, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, including policy-driven approval for transitive overrides and tagged repositories, but Jira transition workflows and tougher remediation lanes are still incomplete.
+`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, bounded retry routing for retryable test failures, escalation bundles, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, including policy-driven approval for transitive overrides and tagged repositories; the complex lane also persists a concrete migration tactic, but tougher remediation lanes are still incomplete.
 
 ## Current limitations
 
@@ -48,7 +49,7 @@ This repository does **not** yet perform:
 - full compile/test/license validation coverage
 - richer retry policies beyond the current bounded test-failure remediation re-run
 - multi-stage approval routing and richer policy enforcement beyond the current route/tag approval rules
-- real tough-path/EOL migrations
+- real tough-path/EOL migrations beyond the current tactic-bearing complex scaffold
 - broader observability hardening beyond the escalation bundle artifact
 
 ## Quickstart

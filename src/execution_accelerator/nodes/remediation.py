@@ -177,6 +177,7 @@ def build_prepare_complex_remediation_node(
         repository = state.current_working_repo or state.pending_repos[0]
         artifact_candidates = complex_adapter.load_artifact_candidates()
         compatibility_diff = complex_adapter.load_compatibility_diff()
+        migration_tactic, tactic_rationale = complex_adapter.select_migration_tactic(compatibility_diff)
         complex_plan = ComplexRemediationPlan(
             repository=repository,
             summary=(
@@ -186,6 +187,8 @@ def build_prepare_complex_remediation_node(
             ),
             artifact_candidates=artifact_candidates,
             compatibility_diff=compatibility_diff,
+            migration_tactic=migration_tactic,
+            tactic_rationale=tactic_rationale,
         )
 
         audit_events = list(state.audit_events)
@@ -197,6 +200,7 @@ def build_prepare_complex_remediation_node(
                     "repository": repository,
                     "candidate_count": len(artifact_candidates),
                     "breaking_change_count": len(compatibility_diff.breaking_changes),
+                    "migration_tactic": migration_tactic,
                 },
             )
         )

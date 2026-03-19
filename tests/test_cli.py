@@ -636,6 +636,7 @@ def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_pat
     assert "approval_decision=approved" in captured.out
     assert "approval_reviewer=security-lead" in captured.out
     assert "complex_candidate_count=2" in captured.out
+    assert "complex_migration_tactic=adapter_shim" in captured.out
     assert "complex_planned_file_count=2" in captured.out
     assert "validation_status=passed" in captured.out
     assert "pull_request_number=42" in captured.out

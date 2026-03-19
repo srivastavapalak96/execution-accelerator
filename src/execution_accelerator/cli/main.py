@@ -237,6 +237,7 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
             "complex_breaking_change_count="
             f"{len(state.complex_remediation_plan.compatibility_diff.breaking_changes)}"
         )
+        print(f"complex_migration_tactic={state.complex_remediation_plan.migration_tactic}")
     if state.code_change_plan is not None:
         print(f"complex_decompiled_artifact_count={len(state.decompiled_artifacts)}")
         print(f"complex_symbol_mapping_count={len(state.symbol_mappings)}")

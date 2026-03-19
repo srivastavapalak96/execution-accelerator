@@ -318,6 +318,7 @@ def test_prepare_complex_remediation_node_records_analysis_placeholders(tmp_path
     assert len(update["artifact_candidates"]) == 2
     assert update["compatibility_diff"].risk == "high"
     assert update["complex_remediation_plan"].strategy == "complex_refactor"
+    assert update["complex_remediation_plan"].migration_tactic == "adapter_shim"
     assert update["audit_events"][-1].event_type == "remediation.complex_prepare"
 
 
