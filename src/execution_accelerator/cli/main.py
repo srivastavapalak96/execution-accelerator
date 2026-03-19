@@ -264,6 +264,11 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
     if state.rollback_plan is not None:
         print(f"rollback_status={state.rollback_plan.status}")
         print(f"rollback_reason={state.rollback_plan.reason}")
+    if state.errors:
+        latest_error = state.errors[-1]
+        print(f"error_count={len(state.errors)}")
+        print(f"latest_error_code={latest_error.code}")
+        print(f"latest_error_message={latest_error.message}")
     print(f"retry_count={state.retry_count}")
     if state.retry_decision is not None:
         print(f"retry_next_node={state.retry_decision.next_node}")

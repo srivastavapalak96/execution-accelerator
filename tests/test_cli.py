@@ -303,6 +303,8 @@ def test_main_prints_escalation_bundle_for_failed_ticket(monkeypatch, capsys, tm
     assert "workflow_status=failed" in captured.out
     assert "validation_status=failed" in captured.out
     assert "rollback_status=applied" in captured.out
+    assert "error_count=1" in captured.out
+    assert "latest_error_code=validation_failed" in captured.out
     assert "retry_count=0" in captured.out
     bundle_line = next(
         line for line in captured.out.splitlines() if line.startswith("escalation_bundle_path=")
@@ -347,6 +349,45 @@ def test_main_prints_skipped_repository_summary(monkeypatch, capsys, tmp_path) -
     assert "skipped_repo_count=1" in captured.out
     assert "skipped_repo_1=payments-service" in captured.out
     assert "skipped_repo_reason_1=existing_pr:https://github.com/example/payments-service/pull/7" in captured.out
+
+
+def test_main_prints_latest_error_summary(monkeypatch, capsys, tmp_path) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--bootstrap-ticket",
+            "SEC-701",
+            "--thread-id",
+            "sec-701-error",
+        ],
+    )
+    monkeypatch.setattr(
+        "execution_accelerator.cli.main.bootstrap_ticket_run",
+        lambda ticket_id, runtime_config, thread_id=None: BootstrapRunResult(
+            thread_id=thread_id or "sec-701-error",
+            checkpoint_path=tmp_path / "state" / "checkpoints.sqlite",
+            state=RemediationState(
+                initial_ticket_id=ticket_id,
+                workflow_status="failed",
+                errors=[
+                    {
+                        "code": "approval_rejected",
+                        "message": "Human reviewer rejected automated remediation.",
+                        "recoverable": False,
+                    }
+                ],
+            ),
+        ),
+    )
+
+    exit_code = main()
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "error_count=1" in captured.out
+    assert "latest_error_code=approval_rejected" in captured.out
+    assert "latest_error_message=Human reviewer rejected automated remediation." in captured.out
 
 
 def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> None:

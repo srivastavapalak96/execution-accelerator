@@ -33,6 +33,7 @@ The current repo can run a persisted local flow for:
 10. persisted approval pauses for complex refactors, transitive overrides, and approval-tagged repositories, with surfaced approval reasons in CLI summaries
 11. complex-refactor planning that now persists a primary migration tactic and actionable migration steps derived from compatibility analysis
 12. CLI summaries that surface skipped repositories and raw skip reasons such as existing open remediation PRs
+13. CLI summaries that surface the latest terminal workflow error for failed or blocked runs
 
 The default mode is:
 
