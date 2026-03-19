@@ -215,6 +215,11 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
         print(f"dependency_kind={state.maven_verification.dependency_kind}")
     print(f"pending_repos={','.join(state.pending_repos)}")
     print(f"completed_repos={','.join(state.completed_repos)}")
+    if state.skipped_repos:
+        print(f"skipped_repo_count={len(state.skipped_repos)}")
+        for index, skipped_repo in enumerate(state.skipped_repos, start=1):
+            print(f"skipped_repo_{index}={skipped_repo.name}")
+            print(f"skipped_repo_reason_{index}={skipped_repo.reason}")
     if state.route_decision is not None:
         print(f"route_strategy={state.route_decision.strategy}")
         print(f"route_confidence={state.route_decision.confidence:.2f}")

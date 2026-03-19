@@ -4,6 +4,8 @@ from pathlib import Path
 
 from execution_accelerator.cli.main import main
 from execution_accelerator.config import load_runtime_config
+from execution_accelerator.graph import BootstrapRunResult
+from execution_accelerator.state import RemediationState
 from tests.conftest import seed_bootstrap_workspace_pom
 
 
@@ -308,6 +310,43 @@ def test_main_prints_escalation_bundle_for_failed_ticket(monkeypatch, capsys, tm
     bundle_path = Path(bundle_line.removeprefix("escalation_bundle_path="))
     assert bundle_path.exists()
     assert bundle_path.parent == tmp_path / "data" / "escalations"
+
+
+def test_main_prints_skipped_repository_summary(monkeypatch, capsys, tmp_path) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--bootstrap-ticket",
+            "SEC-700",
+            "--thread-id",
+            "sec-700-skip",
+        ],
+    )
+    monkeypatch.setattr(
+        "execution_accelerator.cli.main.bootstrap_ticket_run",
+        lambda ticket_id, runtime_config, thread_id=None: BootstrapRunResult(
+            thread_id=thread_id or "sec-700-skip",
+            checkpoint_path=tmp_path / "state" / "checkpoints.sqlite",
+            state=RemediationState(
+                initial_ticket_id=ticket_id,
+                skipped_repos=[
+                    {
+                        "name": "payments-service",
+                        "reason": "existing_pr:https://github.com/example/payments-service/pull/7",
+                    }
+                ],
+            ),
+        ),
+    )
+
+    exit_code = main()
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "skipped_repo_count=1" in captured.out
+    assert "skipped_repo_1=payments-service" in captured.out
+    assert "skipped_repo_reason_1=existing_pr:https://github.com/example/payments-service/pull/7" in captured.out
 
 
 def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> None:

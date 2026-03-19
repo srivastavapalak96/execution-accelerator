@@ -32,6 +32,7 @@ The current repo can run a persisted local flow for:
 9. fixture-backed or live failure escalation summaries, including persisted escalation bundle paths in run output
 10. persisted approval pauses for complex refactors, transitive overrides, and approval-tagged repositories, with surfaced approval reasons in CLI summaries
 11. complex-refactor planning that now persists a primary migration tactic derived from compatibility analysis
+12. CLI summaries that surface skipped repositories and raw skip reasons such as existing open remediation PRs
 
 The default mode is:
 
