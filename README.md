@@ -28,7 +28,7 @@ The current repo can run a persisted local flow for:
    - complex refactor scaffold
 6. live or fixture-backed validation, including a post-remediation dependency-tree rescan in live mode
 7. fixture-backed or live git-backed rollback-on-failure
-8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira completion comments and optional done transitions
+8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira completion comments and optional done transitions; delivery-approved complex runs can now publish ready PRs instead of remaining draft-only
 9. fixture-backed or live failure escalation summaries, including persisted escalation bundle paths in run output
 10. persisted approval pauses for complex refactors, transitive overrides, and approval-tagged repositories, plus an optional second delivery approval gate for complex publication
 11. complex-refactor planning that now persists a primary migration tactic and actionable migration steps derived from compatibility analysis

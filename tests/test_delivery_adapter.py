@@ -201,3 +201,42 @@ def test_delivery_adapter_creates_draft_pull_request_when_policy_requires_it() -
 
     assert pull_request.status == "draft"
     assert b'"draft":true' in requests_log[0][2]
+
+
+def test_delivery_adapter_creates_ready_pull_request_when_draft_override_is_disabled() -> None:
+    requests_log: list[tuple[str, str, bytes]] = []
+    with serve_routes(
+        {
+            (
+                "POST",
+                "/repos/payments-platform/payments-service/pulls",
+            ): ResponseSpec(
+                status=201,
+                body=(
+                    b'{"number": 44, "html_url": "https://example.test/pr/44", '
+                    b'"title": "SEC-123: remediate legacy-json", "state": "open", "draft": false}'
+                ),
+            ),
+        },
+        requests_log=requests_log,
+    ) as base_url:
+        adapter = DeliveryAdapter(
+            mode=ExecutionMode.LIVE,
+            github_api_base=base_url,
+            github_token="ghp_testtoken",
+            github_owner="payments-platform",
+            draft_pull_requests=True,
+        )
+
+        pull_request = adapter.load_pull_request(
+            repository="payments-service",
+            owner="payments-platform",
+            base_branch="main",
+            head_branch="sec-123-remediate-legacy-json",
+            ticket_id="SEC-123",
+            package_name="legacy-json",
+            draft_pull_request=False,
+        )
+
+    assert pull_request.status == "open"
+    assert b'"draft":false' in requests_log[0][2]

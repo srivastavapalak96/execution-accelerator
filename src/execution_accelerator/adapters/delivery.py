@@ -176,6 +176,7 @@ class DeliveryAdapter:
         head_branch: str | None = None,
         ticket_id: str | None = None,
         package_name: str | None = None,
+        draft_pull_request: bool | None = None,
         fixture_path: Path | None = None,
     ) -> PullRequestSummary:
         """Load placeholder pull request metadata."""
@@ -188,6 +189,7 @@ class DeliveryAdapter:
                 head_branch=head_branch,
                 ticket_id=ticket_id,
                 package_name=package_name,
+                draft_pull_request=draft_pull_request,
             )
         require_fixture_mode(self.mode, capability="Delivery live pull-request creation")
         resolved_fixture_path = fixture_path or self.pull_request_fixture_path
@@ -209,6 +211,7 @@ class DeliveryAdapter:
         head_branch: str | None,
         ticket_id: str | None,
         package_name: str | None,
+        draft_pull_request: bool | None,
     ) -> PullRequestSummary:
         if not self.github_api_base or not self.github_token:
             raise DeliveryConfigurationError("Live pull-request creation requires GitHub API credentials.")
@@ -223,6 +226,7 @@ class DeliveryAdapter:
             if ticket_id
             else f"Remediate {package_name or repository}"
         )
+        effective_draft = self.draft_pull_requests if draft_pull_request is None else draft_pull_request
         response = httpx.post(
             f"{self.github_api_base.rstrip('/')}/repos/{repository_owner}/{repository}/pulls",
             headers={
@@ -234,13 +238,13 @@ class DeliveryAdapter:
                 "head": head_branch,
                 "base": base_branch or "main",
                 "body": f"Automated remediation for {ticket_id or repository}.",
-                "draft": self.draft_pull_requests,
+                "draft": effective_draft,
             },
             timeout=30.0,
         )
         response.raise_for_status()
         payload = response.json()
-        draft = bool(payload.get("draft", self.draft_pull_requests))
+        draft = bool(payload.get("draft", effective_draft))
         return PullRequestSummary(
             repository=repository,
             number=int(payload["number"]),

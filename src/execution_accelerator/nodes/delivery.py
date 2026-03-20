@@ -7,6 +7,7 @@ from pathlib import Path
 
 from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.adapters import DeliveryAdapter
+from execution_accelerator.schemas import ApprovalStage
 from execution_accelerator.schemas import AuditEvent, WorkflowStatus
 from execution_accelerator.state import RemediationState
 
@@ -33,6 +34,7 @@ def build_publish_remediation_node(
             head_branch=branch_publication.branch_name,
             ticket_id=state.initial_ticket_id,
             package_name=state.vulnerability_details.package_name if state.vulnerability_details is not None else None,
+            draft_pull_request=not _has_delivery_approval(state) if state.requires_delivery_approval else None,
         )
         jira_completion = delivery_adapter.load_jira_completion(
             ticket_id=state.initial_ticket_id,
@@ -72,6 +74,10 @@ def build_publish_remediation_node(
         }
 
     return publish_remediation
+
+
+def _has_delivery_approval(state: RemediationState) -> bool:
+    return any(record.stage == ApprovalStage.DELIVERY and record.decision == "approved" for record in state.approval_history)
 
 
 def build_skip_publish_for_dry_run_node(
