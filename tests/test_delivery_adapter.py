@@ -165,6 +165,50 @@ def test_delivery_adapter_transitions_jira_ticket_when_configured() -> None:
     ]
 
 
+def test_delivery_adapter_accepts_already_done_jira_transition() -> None:
+    requests_log: list[tuple[str, str, bytes]] = []
+    with serve_routes(
+        {
+            ("POST", "/rest/api/3/issue/SEC-123/comment"): ResponseSpec(status=201, body=b'{"id":"10001"}'),
+            (
+                "POST",
+                "/rest/api/3/issue/SEC-123/transitions",
+            ): ResponseSpec(
+                status=409,
+                body=(
+                    b'{"errorMessages":["Issue has already been transitioned to the target status."],"errors":{}}'
+                ),
+            ),
+            (
+                "GET",
+                "/rest/api/3/issue/SEC-123",
+            ): ResponseSpec(
+                status=200,
+                body=b'{"fields":{"status":{"name":"Done"}}}',
+            ),
+        },
+        requests_log=requests_log,
+    ) as base_url:
+        adapter = DeliveryAdapter(
+            mode=ExecutionMode.LIVE,
+            jira_base_url=base_url,
+            jira_email="jira@example.com",
+            jira_token="jira-token",
+            jira_done_transition_id="31",
+            jira_done_status_name="Done",
+        )
+
+        jira_completion = adapter.load_jira_completion(
+            ticket_id="SEC-123",
+            repository="payments-service",
+            pull_request_url="https://example.test/pr/42",
+        )
+
+    assert jira_completion.status == "Done"
+    assert [method for method, _, _ in requests_log] == ["POST", "POST", "GET"]
+    assert requests_log[2][1].startswith("/rest/api/3/issue/SEC-123?fields=status")
+
+
 def test_delivery_adapter_creates_draft_pull_request_when_policy_requires_it() -> None:
     requests_log: list[tuple[str, str, bytes]] = []
     with serve_routes(

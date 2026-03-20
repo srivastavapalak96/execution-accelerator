@@ -346,13 +346,44 @@ class DeliveryAdapter:
                 json={"transition": {"id": self.jira_done_transition_id}},
                 timeout=30.0,
             )
-            transition_response.raise_for_status()
-            status = self.jira_done_status_name or "done"
+            if transition_response.is_success:
+                status = self.jira_done_status_name or "done"
+            elif self.jira_done_status_name and _is_transition_already_applied(transition_response):
+                current_status = self._load_live_jira_status(ticket_id=ticket_id)
+                if current_status == self.jira_done_status_name:
+                    status = current_status
+                else:
+                    transition_response.raise_for_status()
+            else:
+                transition_response.raise_for_status()
         return JiraCompletionResult(
             ticket_id=ticket_id,
             status=status,
             comment=comment,
         )
+
+    def _load_live_jira_status(self, *, ticket_id: str) -> str:
+        assert self.jira_base_url is not None
+        assert self.jira_email is not None
+        assert self.jira_token is not None
+        response = httpx.get(
+            f"{self.jira_base_url.rstrip('/')}/rest/api/3/issue/{ticket_id}",
+            auth=(self.jira_email, self.jira_token),
+            params={"fields": "status"},
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        fields = payload.get("fields")
+        if not isinstance(fields, dict):
+            raise DeliveryAdapterError(f"Live Jira issue payload for '{ticket_id}' is missing fields.")
+        status_payload = fields.get("status")
+        if not isinstance(status_payload, dict):
+            raise DeliveryAdapterError(f"Live Jira issue payload for '{ticket_id}' is missing a status name.")
+        status_name = status_payload.get("name")
+        if not isinstance(status_name, str):
+            raise DeliveryAdapterError(f"Live Jira issue payload for '{ticket_id}' is missing a status name.")
+        return status_name
 
 
 def _slugify(value: str) -> str:
@@ -402,3 +433,23 @@ def _build_pull_request_summary(
         title=str(payload.get("title") or default_title),
         status="draft" if draft else str(payload.get("state") or "open"),
     )
+
+
+def _is_transition_already_applied(response: httpx.Response) -> bool:
+    if response.status_code not in (400, 409):
+        return False
+    try:
+        payload = response.json()
+    except ValueError:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    error_messages = payload.get("errorMessages", [])
+    errors = payload.get("errors", {})
+    fragments: list[str] = []
+    if isinstance(error_messages, list):
+        fragments.extend(str(message) for message in error_messages)
+    if isinstance(errors, dict):
+        fragments.extend(str(value) for value in errors.values())
+    lowered = " ".join(fragments).lower()
+    return "already" in lowered or "current status" in lowered
