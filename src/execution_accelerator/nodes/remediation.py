@@ -233,6 +233,12 @@ def build_execute_complex_scaffold_node(
         decompiled_artifacts = complex_adapter.load_decompiled_artifacts()
         symbol_mappings = complex_adapter.load_symbol_mappings()
         code_change_plan = complex_adapter.load_code_change_plan()
+        complex_plan = state.complex_remediation_plan.model_copy(
+            update={
+                "target_files": code_change_plan.target_files,
+                "symbol_mappings": symbol_mappings,
+            }
+        )
 
         audit_events = list(state.audit_events)
         audit_events.append(
@@ -252,6 +258,7 @@ def build_execute_complex_scaffold_node(
             "decompiled_artifacts": decompiled_artifacts,
             "symbol_mappings": symbol_mappings,
             "code_change_plan": code_change_plan,
+            "complex_remediation_plan": complex_plan,
             "audit_events": audit_events,
         }
 

@@ -407,6 +407,8 @@ class ComplexRemediationPlan(BaseSchemaModel):
         min_length=1,
     )
     migration_steps: list[str] = Field(default_factory=list)
+    target_files: list[CodeChangeTarget] = Field(default_factory=list)
+    symbol_mappings: list[SymbolMappingEntry] = Field(default_factory=list)
     requires_code_changes: bool = True
 
 

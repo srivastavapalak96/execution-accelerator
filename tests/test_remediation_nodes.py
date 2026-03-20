@@ -342,4 +342,6 @@ def test_execute_complex_scaffold_node_records_decompile_and_change_plan(tmp_pat
     assert len(update["decompiled_artifacts"]) == 2
     assert len(update["symbol_mappings"]) == 2
     assert update["code_change_plan"].target_files[0].file_path.endswith("LegacyJsonAdapter.java")
+    assert update["complex_remediation_plan"].target_files[0].file_path.endswith("LegacyJsonAdapter.java")
+    assert update["complex_remediation_plan"].symbol_mappings[0].legacy_symbol == "org.example.LegacyParser#parse"
     assert update["audit_events"][-1].event_type == "remediation.complex_scaffold"

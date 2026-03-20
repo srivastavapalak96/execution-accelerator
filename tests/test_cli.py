@@ -752,6 +752,14 @@ def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_pat
     assert "complex_candidate_count=2" in captured.out
     assert "complex_migration_tactic=adapter_shim" in captured.out
     assert "complex_migration_step_count=2" in captured.out
+    assert "complex_target_symbol_count=2" in captured.out
+    assert "complex_primary_legacy_symbol=org.example.LegacyParser#parse" in captured.out
+    assert "complex_primary_replacement_symbol=org.example.JsonParserBuilder#create().parse" in captured.out
+    assert "complex_target_file_count=2" in captured.out
+    assert (
+        "complex_primary_target_file="
+        "src/main/java/com/example/payments/LegacyJsonAdapter.java"
+    ) in captured.out
     assert "complex_planned_file_count=2" in captured.out
     assert "validation_status=passed" in captured.out
     assert "pull_request_number=42" in captured.out
