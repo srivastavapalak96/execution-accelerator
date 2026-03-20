@@ -240,3 +240,55 @@ def test_delivery_adapter_creates_ready_pull_request_when_draft_override_is_disa
 
     assert pull_request.status == "open"
     assert b'"draft":false' in requests_log[0][2]
+
+
+def test_delivery_adapter_recovers_existing_pull_request_after_conflict() -> None:
+    requests_log: list[tuple[str, str, bytes]] = []
+    with serve_routes(
+        {
+            (
+                "POST",
+                "/repos/payments-platform/payments-service/pulls",
+            ): ResponseSpec(
+                status=422,
+                body=(
+                    b'{"message":"Validation Failed","errors":[{"message":"A pull request already exists for '
+                    b'payments-platform:sec-123-remediate-legacy-json."}]}'
+                ),
+            ),
+            (
+                "GET",
+                "/repos/payments-platform/payments-service/pulls",
+            ): ResponseSpec(
+                status=200,
+                body=(
+                    b'[{"number": 45, "html_url": "https://example.test/pr/45", '
+                    b'"title": "SEC-123: remediate legacy-json", "state": "open", "draft": false}]'
+                ),
+            ),
+        },
+        requests_log=requests_log,
+    ) as base_url:
+        adapter = DeliveryAdapter(
+            mode=ExecutionMode.LIVE,
+            github_api_base=base_url,
+            github_token="ghp_testtoken",
+            github_owner="payments-platform",
+            draft_pull_requests=False,
+        )
+
+        pull_request = adapter.load_pull_request(
+            repository="payments-service",
+            owner="payments-platform",
+            base_branch="main",
+            head_branch="sec-123-remediate-legacy-json",
+            ticket_id="SEC-123",
+            package_name="legacy-json",
+        )
+
+    assert pull_request.number == 45
+    assert pull_request.url == "https://example.test/pr/45"
+    assert [method for method, _, _ in requests_log] == ["POST", "GET"]
+    assert requests_log[1][1].startswith(
+        "/repos/payments-platform/payments-service/pulls?head=payments-platform%3Asec-123-remediate-legacy-json"
+    )

@@ -242,15 +242,55 @@ class DeliveryAdapter:
             },
             timeout=30.0,
         )
+        if response.status_code == 422:
+            existing_pull_request = self._load_existing_pull_request(
+                repository=repository,
+                owner=repository_owner,
+                head_branch=head_branch,
+                base_branch=base_branch,
+            )
+            if existing_pull_request is not None:
+                return existing_pull_request
+        response.raise_for_status()
+        return _build_pull_request_summary(
+            repository=repository,
+            payload=response.json(),
+            default_title=title,
+            default_draft=effective_draft,
+        )
+
+    def _load_existing_pull_request(
+        self,
+        *,
+        repository: str,
+        owner: str,
+        head_branch: str,
+        base_branch: str | None,
+    ) -> PullRequestSummary | None:
+        assert self.github_api_base is not None
+        assert self.github_token is not None
+        response = httpx.get(
+            f"{self.github_api_base.rstrip('/')}/repos/{owner}/{repository}/pulls",
+            headers={
+                "Authorization": f"Bearer {self.github_token}",
+                "Accept": "application/vnd.github+json",
+            },
+            params={
+                "head": f"{owner}:{head_branch}",
+                "state": "open",
+                "base": base_branch or "main",
+            },
+            timeout=30.0,
+        )
         response.raise_for_status()
         payload = response.json()
-        draft = bool(payload.get("draft", effective_draft))
-        return PullRequestSummary(
+        if not isinstance(payload, list) or not payload:
+            return None
+        return _build_pull_request_summary(
             repository=repository,
-            number=int(payload["number"]),
-            url=str(payload["html_url"]),
-            title=str(payload.get("title") or title),
-            status="draft" if draft else str(payload.get("state") or "open"),
+            payload=payload[0],
+            default_title=f"Remediate {repository}",
+            default_draft=self.draft_pull_requests,
         )
 
     def load_jira_completion(
@@ -343,3 +383,22 @@ def _build_jira_doc(text: str) -> dict[str, object]:
             }
         ],
     }
+
+
+def _build_pull_request_summary(
+    *,
+    repository: str,
+    payload: object,
+    default_title: str,
+    default_draft: bool,
+) -> PullRequestSummary:
+    if not isinstance(payload, dict):
+        raise DeliveryAdapterError("Live pull-request payload was not an object.")
+    draft = bool(payload.get("draft", default_draft))
+    return PullRequestSummary(
+        repository=repository,
+        number=int(payload["number"]),
+        url=str(payload["html_url"]),
+        title=str(payload.get("title") or default_title),
+        status="draft" if draft else str(payload.get("state") or "open"),
+    )
