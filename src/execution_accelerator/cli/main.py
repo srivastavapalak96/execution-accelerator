@@ -225,9 +225,11 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
         print(f"route_confidence={state.route_decision.confidence:.2f}")
     if state.requires_human_approval:
         print(f"requires_human_approval={state.requires_human_approval}")
+        if state.pending_approval_stage is not None:
+            print(f"pending_approval_stage={state.pending_approval_stage}")
         print(f"approval_decision={state.human_approval_decision}")
-        if state.policy_decisions and state.policy_decisions[-1].approval_reason is not None:
-            print(f"approval_reason={state.policy_decisions[-1].approval_reason}")
+        if state.pending_approval_reason is not None:
+            print(f"approval_reason={state.pending_approval_reason}")
         if state.human_feedback is not None and state.human_feedback.reviewer is not None:
             print(f"approval_reviewer={state.human_feedback.reviewer}")
     if state.remediation_plan is not None:

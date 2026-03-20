@@ -344,6 +344,102 @@ def test_resume_ticket_run_advances_complex_refactor_after_approval(tmp_path, mo
     assert loaded_state.jira_completion is not None
 
 
+def test_resume_ticket_run_pauses_complex_refactor_for_delivery_approval(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path, complex_refactor=True)
+    policy_dir = tmp_path / "config"
+    policy_dir.mkdir(exist_ok=True)
+    (policy_dir / "policy.yaml").write_text(
+        "\n".join(
+            [
+                "draft_pr_only: true",
+                "complex_refactor_requires_human_approval: true",
+                "complex_refactor_requires_delivery_approval: true",
+                "blocked_tags: []",
+            ]
+        )
+        + "\n"
+    )
+    config = load_runtime_config(repo_root=tmp_path)
+
+    bootstrap_ticket_run(
+        "SEC-778",
+        runtime_config=config,
+        thread_id="sec-778-thread",
+    )
+    result = resume_ticket_run(
+        runtime_config=config,
+        thread_id="sec-778-thread",
+        human_feedback=HumanFeedback(
+            decision=ApprovalDecision.APPROVED,
+            reviewer="security-lead",
+            comments="Approved for remediation.",
+        ),
+    )
+    loaded_state = load_remediation_state(
+        runtime_config=config,
+        thread_id="sec-778-thread",
+    )
+
+    assert result.state.workflow_status == WorkflowStatus.PENDING
+    assert result.state.pending_approval_stage == "delivery"
+    assert result.state.pending_approval_reason == (
+        "Policy requires approval before publishing complex remediation results."
+    )
+    assert len(result.state.validation_results) == 1
+    assert result.state.validation_results[-1].status == "passed"
+    assert result.state.pull_request_summary is None
+    assert loaded_state.pending_approval_stage == "delivery"
+    assert loaded_state.pull_request_summary is None
+
+
+def test_resume_ticket_run_completes_delivery_after_second_approval(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path, complex_refactor=True)
+    policy_dir = tmp_path / "config"
+    policy_dir.mkdir(exist_ok=True)
+    (policy_dir / "policy.yaml").write_text(
+        "\n".join(
+            [
+                "draft_pr_only: true",
+                "complex_refactor_requires_human_approval: true",
+                "complex_refactor_requires_delivery_approval: true",
+                "blocked_tags: []",
+            ]
+        )
+        + "\n"
+    )
+    config = load_runtime_config(repo_root=tmp_path)
+
+    bootstrap_ticket_run(
+        "SEC-778",
+        runtime_config=config,
+        thread_id="sec-778-thread",
+    )
+    resume_ticket_run(
+        runtime_config=config,
+        thread_id="sec-778-thread",
+        human_feedback=HumanFeedback(
+            decision=ApprovalDecision.APPROVED,
+            reviewer="security-lead",
+            comments="Approved for remediation.",
+        ),
+    )
+    result = resume_ticket_run(
+        runtime_config=config,
+        thread_id="sec-778-thread",
+        human_feedback=HumanFeedback(
+            decision=ApprovalDecision.APPROVED,
+            reviewer="release-manager",
+            comments="Approved for publication.",
+        ),
+    )
+
+    assert result.state.workflow_status == WorkflowStatus.COMPLETED
+    assert result.state.pull_request_summary is not None
+    assert result.state.jira_completion is not None
+    assert result.state.pending_approval_stage is None
+    assert len(result.state.approval_history) == 2
+
+
 def test_bootstrap_ticket_run_records_failure_and_rollback_state(tmp_path, monkeypatch) -> None:
     _configure_runtime(monkeypatch, tmp_path)
     monkeypatch.setenv(

@@ -65,6 +65,8 @@ def build_publish_remediation_node(
             "jira_completion": jira_completion,
             "completed_repos": completed_repos,
             "pending_repos": pending_repos,
+            "pending_approval_stage": None,
+            "pending_approval_reason": None,
             "workflow_status": WorkflowStatus.COMPLETED,
             "audit_events": audit_events,
         }

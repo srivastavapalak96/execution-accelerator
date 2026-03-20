@@ -6,6 +6,8 @@ from pydantic import Field
 
 from execution_accelerator.schemas import (
     ApprovalDecision,
+    ApprovalRecord,
+    ApprovalStage,
     AdvisoryVerification,
     ArtifactCandidate,
     AuditEvent,
@@ -120,7 +122,11 @@ class RemediationState(BaseSchemaModel):
     retry_count: int = Field(default=0, ge=0)
     retry_decision: RetryDecision | None = None
     requires_human_approval: bool = False
+    requires_delivery_approval: bool = False
+    pending_approval_stage: ApprovalStage | None = None
+    pending_approval_reason: str | None = None
     human_feedback: HumanFeedback | None = None
+    approval_history: list[ApprovalRecord] = Field(default_factory=list)
     escalation_bundle: EscalationBundle | None = None
     audit_events: list[AuditEvent] = Field(default_factory=list)
 

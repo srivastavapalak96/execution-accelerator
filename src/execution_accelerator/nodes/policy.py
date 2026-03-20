@@ -27,6 +27,7 @@ def build_apply_policy_node(
                 details={
                     "allowed": decision.allowed,
                     "requires_human_approval": decision.requires_human_approval,
+                    "requires_delivery_approval": decision.requires_delivery_approval,
                     "approval_reason": decision.approval_reason,
                     "blocked_reason": decision.blocked_reason,
                 },
@@ -36,6 +37,7 @@ def build_apply_policy_node(
         update: dict[str, object] = {
             "policy_decisions": policy_decisions,
             "requires_human_approval": decision.requires_human_approval,
+            "requires_delivery_approval": decision.requires_delivery_approval,
             "audit_events": audit_events,
         }
         if decision.requires_human_approval:
@@ -46,10 +48,13 @@ def build_apply_policy_node(
                     details={
                         "repository": state.current_working_repo,
                         "approval_reason": decision.approval_reason,
+                        "approval_stage": "remediation",
                     },
                 )
             )
             update["workflow_status"] = WorkflowStatus.PENDING
+            update["pending_approval_stage"] = "remediation"
+            update["pending_approval_reason"] = decision.approval_reason
         if not decision.allowed:
             errors = list(state.errors)
             errors.append(

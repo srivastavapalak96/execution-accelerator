@@ -13,6 +13,7 @@ from execution_accelerator.state import RemediationState
 class PolicyConfig:
     draft_pr_only: bool = True
     complex_refactor_requires_human_approval: bool = True
+    complex_refactor_requires_delivery_approval: bool = False
     transitive_override_requires_human_approval: bool = False
     approval_required_tags: tuple[str, ...] = ()
     blocked_tags: tuple[str, ...] = ()
@@ -43,6 +44,7 @@ class PolicyEngine:
         return PolicyDecision(
             allowed=True,
             requires_human_approval=requires_human_approval,
+            requires_delivery_approval=_requires_delivery_approval(state, config),
             approval_reason="; ".join(dict.fromkeys(approval_reasons)) or None,
             blocked_reason=None,
         )
@@ -67,6 +69,9 @@ class PolicyEngine:
             draft_pr_only=bool(loaded.get("draft_pr_only", True)),
             complex_refactor_requires_human_approval=bool(
                 loaded.get("complex_refactor_requires_human_approval", True)
+            ),
+            complex_refactor_requires_delivery_approval=bool(
+                loaded.get("complex_refactor_requires_delivery_approval", False)
             ),
             transitive_override_requires_human_approval=bool(
                 loaded.get("transitive_override_requires_human_approval", False)
@@ -95,6 +100,14 @@ def _policy_requires_route_approval(state: RemediationState, config: PolicyConfi
     return (
         state.route_decision.strategy == RemediationStrategy.TRANSITIVE_OVERRIDE
         and config.transitive_override_requires_human_approval
+    )
+
+
+def _requires_delivery_approval(state: RemediationState, config: PolicyConfig) -> bool:
+    return (
+        state.route_decision is not None
+        and state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR
+        and config.complex_refactor_requires_delivery_approval
     )
 
 

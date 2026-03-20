@@ -24,6 +24,7 @@ from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.nodes import (
     bootstrap_state,
     build_apply_policy_node,
+    build_prepare_delivery_approval_node,
     build_review_approval_node,
     build_escalate_node,
     classify_failure,
@@ -46,12 +47,13 @@ from execution_accelerator.nodes import (
 )
 from execution_accelerator.policy import PolicyEngine
 from execution_accelerator.persistence import build_default_thread_id, build_thread_config, sqlite_checkpointer
-from execution_accelerator.schemas import HumanFeedback
-from execution_accelerator.schemas import RemediationStrategy
+from execution_accelerator.schemas import ApprovalStage, HumanFeedback, RemediationStrategy
 from execution_accelerator.state import RemediationState
 
 
-_APPROVAL_REVIEW_NODE = "review_approval"
+_REMEDIATION_APPROVAL_REVIEW_NODE = "review_remediation_approval"
+_PREPARE_DELIVERY_APPROVAL_NODE = "prepare_delivery_approval"
+_DELIVERY_APPROVAL_REVIEW_NODE = "review_delivery_approval"
 
 
 class BootstrapRunResult(BaseModel):
@@ -100,7 +102,18 @@ def build_remediation_graph(
         "apply_policy",
         cast(Any, build_apply_policy_node(PolicyEngine(config_path=runtime_config.repo_root / "config" / "policy.yaml"))),
     )
-    builder.add_node(_APPROVAL_REVIEW_NODE, cast(Any, build_review_approval_node()))
+    builder.add_node(
+        _REMEDIATION_APPROVAL_REVIEW_NODE,
+        cast(Any, build_review_approval_node(ApprovalStage.REMEDIATION)),
+    )
+    builder.add_node(
+        _PREPARE_DELIVERY_APPROVAL_NODE,
+        cast(Any, build_prepare_delivery_approval_node()),
+    )
+    builder.add_node(
+        _DELIVERY_APPROVAL_REVIEW_NODE,
+        cast(Any, build_review_approval_node(ApprovalStage.DELIVERY)),
+    )
     builder.add_node(
         "prepare_complex_remediation",
         cast(Any, build_prepare_complex_remediation_node(complex_remediation_adapter)),
@@ -137,7 +150,7 @@ def build_remediation_graph(
         "apply_policy",
         _select_post_policy_node,
         {
-            _APPROVAL_REVIEW_NODE: _APPROVAL_REVIEW_NODE,
+            _REMEDIATION_APPROVAL_REVIEW_NODE: _REMEDIATION_APPROVAL_REVIEW_NODE,
             "prepare_complex_remediation": "prepare_complex_remediation",
             "remediate_simple": "remediate_simple",
             "remediate_transitive": "remediate_transitive",
@@ -145,7 +158,7 @@ def build_remediation_graph(
         },
     )
     builder.add_conditional_edges(
-        _APPROVAL_REVIEW_NODE,
+        _REMEDIATION_APPROVAL_REVIEW_NODE,
         _select_post_approval_node,
         {
             "classify_failure": "classify_failure",
@@ -165,8 +178,19 @@ def build_remediation_graph(
         post_validation_selector,
         {
             "handle_validation_failure": "handle_validation_failure",
+            _PREPARE_DELIVERY_APPROVAL_NODE: _PREPARE_DELIVERY_APPROVAL_NODE,
             "skip_publish_for_dry_run": "skip_publish_for_dry_run",
             "publish_remediation": "publish_remediation",
+        },
+    )
+    builder.add_edge(_PREPARE_DELIVERY_APPROVAL_NODE, _DELIVERY_APPROVAL_REVIEW_NODE)
+    builder.add_conditional_edges(
+        _DELIVERY_APPROVAL_REVIEW_NODE,
+        _select_post_delivery_approval_node,
+        {
+            "classify_failure": "classify_failure",
+            "publish_remediation": "publish_remediation",
+            END: END,
         },
     )
     builder.add_edge("publish_remediation", END)
@@ -253,7 +277,7 @@ def bootstrap_ticket_run(
         result = graph.invoke(
             initial_state.model_dump(mode="python"),
             config=build_thread_config(resolved_thread_id),
-            interrupt_before=[_APPROVAL_REVIEW_NODE],
+            interrupt_before=[_REMEDIATION_APPROVAL_REVIEW_NODE, _DELIVERY_APPROVAL_REVIEW_NODE],
         )
 
     return BootstrapRunResult(
@@ -323,10 +347,26 @@ def resume_ticket_run(
             checkpointer=checkpointer,
         )
         if human_feedback is not None:
+            snapshot = graph.get_state(config)
+            current_state = RemediationState.model_validate(snapshot.values)
+            approval_stage = (
+                ApprovalStage.DELIVERY
+                if current_state.pending_approval_stage == ApprovalStage.DELIVERY
+                else ApprovalStage.REMEDIATION
+            )
+            approval_node = (
+                _DELIVERY_APPROVAL_REVIEW_NODE
+                if approval_stage == ApprovalStage.DELIVERY
+                else _REMEDIATION_APPROVAL_REVIEW_NODE
+            )
+            review_update = build_review_approval_node(approval_stage)(
+                current_state.model_copy(update={"human_feedback": human_feedback})
+            )
+            review_update["human_feedback"] = human_feedback.model_dump(mode="python")
             graph.update_state(
                 config,
-                {"human_feedback": human_feedback.model_dump(mode="python")},
-                as_node=_APPROVAL_REVIEW_NODE,
+                review_update,
+                as_node=approval_node,
             )
             state = RemediationState.model_validate(graph.invoke(None, config=config))
         else:
@@ -350,7 +390,7 @@ def _select_post_policy_node(state: RemediationState) -> str:
     if state.policy_decisions and not state.policy_decisions[-1].allowed:
         return END
     if state.requires_human_approval:
-        return _APPROVAL_REVIEW_NODE
+        return _REMEDIATION_APPROVAL_REVIEW_NODE
     return _select_remediation_node(state)
 
 
@@ -370,6 +410,8 @@ def _build_post_validation_selector(*, dry_run: bool) -> Callable[[RemediationSt
             return "handle_validation_failure"
         if dry_run:
             return "skip_publish_for_dry_run"
+        if state.requires_delivery_approval and not _has_approved_stage(state, ApprovalStage.DELIVERY):
+            return _PREPARE_DELIVERY_APPROVAL_NODE
         return "publish_remediation"
 
     return select_post_validation_node
@@ -379,3 +421,15 @@ def _select_failure_node(state: RemediationState) -> str:
     if state.retry_decision is not None:
         return state.retry_decision.next_node
     return "escalate"
+
+
+def _select_post_delivery_approval_node(state: RemediationState) -> str:
+    if state.human_approval_decision == "approved":
+        return "publish_remediation"
+    if state.human_approval_decision == "rejected":
+        return "classify_failure"
+    return END
+
+
+def _has_approved_stage(state: RemediationState, stage: ApprovalStage) -> bool:
+    return any(record.stage == stage and record.decision == "approved" for record in state.approval_history)

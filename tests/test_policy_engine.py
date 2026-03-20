@@ -52,6 +52,27 @@ def test_policy_engine_requires_human_approval_for_transitive_override_when_conf
     assert decision.approval_reason == "Policy requires approval for transitive_override remediation."
 
 
+def test_policy_engine_requires_delivery_approval_for_complex_refactor_when_configured(tmp_path: Path) -> None:
+    config_path = tmp_path / "policy.yaml"
+    config_path.write_text("complex_refactor_requires_delivery_approval: true\n")
+    engine = PolicyEngine(config_path=config_path)
+    state = RemediationState(
+        initial_ticket_id="SEC-777",
+        current_working_repo="payments-service",
+        route_decision=RemediationRouteDecision(
+            strategy=RemediationStrategy.COMPLEX_REFACTOR,
+            reason="complex",
+            confidence=0.78,
+            requires_human_approval=True,
+        ),
+    )
+
+    decision = engine.evaluate(state)
+
+    assert decision.allowed is True
+    assert decision.requires_delivery_approval is True
+
+
 def test_policy_engine_blocks_repositories_with_blocked_tags(tmp_path: Path) -> None:
     config_path = tmp_path / "policy.yaml"
     config_path.write_text("blocked_tags:\n  - legacy-blocked\n")

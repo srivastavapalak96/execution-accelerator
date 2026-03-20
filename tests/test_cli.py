@@ -390,6 +390,40 @@ def test_main_prints_latest_error_summary(monkeypatch, capsys, tmp_path) -> None
     assert "latest_error_message=Human reviewer rejected automated remediation." in captured.out
 
 
+def test_main_prints_delivery_approval_stage_summary(monkeypatch, capsys, tmp_path) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--bootstrap-ticket",
+            "SEC-779",
+            "--thread-id",
+            "sec-779-delivery-approval",
+        ],
+    )
+    monkeypatch.setattr(
+        "execution_accelerator.cli.main.bootstrap_ticket_run",
+        lambda ticket_id, runtime_config, thread_id=None: BootstrapRunResult(
+            thread_id=thread_id or "sec-779-delivery-approval",
+            checkpoint_path=tmp_path / "state" / "checkpoints.sqlite",
+            state=RemediationState(
+                initial_ticket_id=ticket_id,
+                workflow_status="pending",
+                requires_human_approval=True,
+                pending_approval_stage="delivery",
+                pending_approval_reason="Policy requires approval before publishing complex remediation results.",
+            ),
+        ),
+    )
+
+    exit_code = main()
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "pending_approval_stage=delivery" in captured.out
+    assert "approval_reason=Policy requires approval before publishing complex remediation results." in captured.out
+
+
 def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
     monkeypatch.setenv("EA_DATA_DIR", str(tmp_path / "data"))

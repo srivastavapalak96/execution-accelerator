@@ -30,7 +30,7 @@ The current repo can run a persisted local flow for:
 7. fixture-backed or live git-backed rollback-on-failure
 8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira completion comments and optional done transitions
 9. fixture-backed or live failure escalation summaries, including persisted escalation bundle paths in run output
-10. persisted approval pauses for complex refactors, transitive overrides, and approval-tagged repositories, with surfaced approval reasons in CLI summaries
+10. persisted approval pauses for complex refactors, transitive overrides, and approval-tagged repositories, plus an optional second delivery approval gate for complex publication
 11. complex-refactor planning that now persists a primary migration tactic and actionable migration steps derived from compatibility analysis
 12. CLI summaries that surface skipped repositories and raw skip reasons such as existing open remediation PRs
 13. CLI summaries that surface the latest terminal workflow error for failed or blocked runs
@@ -41,7 +41,7 @@ The default mode is:
 EA_MODE=fixture
 ```
 
-`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, bounded retry routing for retryable test failures, escalation bundles, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, including policy-driven approval for transitive overrides and tagged repositories; the complex lane also persists a concrete migration tactic plus actionable migration steps, but tougher remediation lanes are still incomplete.
+`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, bounded retry routing for retryable test failures, escalation bundles, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, including policy-driven approval for transitive overrides, tagged repositories, and optional second-stage complex delivery approval; the complex lane also persists a concrete migration tactic plus actionable migration steps, but tougher remediation lanes are still incomplete.
 
 ## Current limitations
 
@@ -50,7 +50,7 @@ This repository does **not** yet perform:
 - full Jira completion workflow handling beyond a configured done transition
 - full compile/test/license validation coverage
 - richer retry policies beyond the current bounded test-failure remediation re-run
-- multi-stage approval routing and richer policy enforcement beyond the current route/tag approval rules
+- richer policy enforcement beyond the current route/tag and complex-delivery approval rules
 - real tough-path/EOL migrations beyond the current tactic-and-checklist complex scaffold
 - broader observability hardening beyond the escalation bundle artifact
 

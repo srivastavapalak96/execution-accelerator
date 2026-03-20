@@ -85,6 +85,13 @@ class ApprovalDecision(StrEnum):
     REJECTED = "rejected"
 
 
+class ApprovalStage(StrEnum):
+    """Named approval checkpoints in the workflow."""
+
+    REMEDIATION = "remediation"
+    DELIVERY = "delivery"
+
+
 class FailureClassification(StrEnum):
     """Normalized failure classes for retry and escalation routing."""
 
@@ -474,8 +481,18 @@ class PolicyDecision(BaseSchemaModel):
 
     allowed: bool = True
     requires_human_approval: bool = False
+    requires_delivery_approval: bool = False
     approval_reason: str | None = None
     blocked_reason: str | None = None
+
+
+class ApprovalRecord(BaseSchemaModel):
+    """One persisted human approval decision."""
+
+    stage: ApprovalStage = ApprovalStage.REMEDIATION
+    decision: ApprovalDecision = ApprovalDecision.PENDING
+    reviewer: str | None = None
+    comments: str | None = None
 
 
 class ValidationCheck(BaseSchemaModel):
