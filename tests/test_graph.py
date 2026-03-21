@@ -321,6 +321,7 @@ def test_resume_ticket_run_advances_complex_refactor_after_approval(tmp_path, mo
     assert len(result.state.complex_remediation_plan.migration_steps) == 2
     assert result.state.complex_remediation_plan.target_files[0].file_path.endswith("LegacyJsonAdapter.java")
     assert result.state.complex_remediation_plan.symbol_mappings[0].legacy_symbol == "org.example.LegacyParser#parse"
+    assert result.state.complex_remediation_plan.open_questions[0].startswith("Should adapter construction")
     assert result.state.compatibility_diff is not None
     assert result.state.compatibility_diff.risk == "high"
     assert len(result.state.decompiled_artifacts) == 2
@@ -341,6 +342,7 @@ def test_resume_ticket_run_advances_complex_refactor_after_approval(tmp_path, mo
     assert len(loaded_state.complex_remediation_plan.migration_steps) == 2
     assert loaded_state.complex_remediation_plan.target_files[0].file_path.endswith("LegacyJsonAdapter.java")
     assert loaded_state.complex_remediation_plan.symbol_mappings[0].legacy_symbol == "org.example.LegacyParser#parse"
+    assert loaded_state.complex_remediation_plan.open_questions[0].startswith("Should adapter construction")
     assert loaded_state.code_change_plan is not None
     assert loaded_state.code_change_plan.target_files[0].file_path.endswith("LegacyJsonAdapter.java")
     assert loaded_state.workflow_status == WorkflowStatus.COMPLETED

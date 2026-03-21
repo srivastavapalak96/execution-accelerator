@@ -409,6 +409,7 @@ class ComplexRemediationPlan(BaseSchemaModel):
     migration_steps: list[str] = Field(default_factory=list)
     target_files: list[CodeChangeTarget] = Field(default_factory=list)
     symbol_mappings: list[SymbolMappingEntry] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
     requires_code_changes: bool = True
 
 

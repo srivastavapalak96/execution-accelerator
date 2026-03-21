@@ -255,6 +255,9 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
             primary_target_file = state.complex_remediation_plan.target_files[0]
             print(f"complex_target_file_count={len(state.complex_remediation_plan.target_files)}")
             print(f"complex_primary_target_file={primary_target_file.file_path}")
+        if state.complex_remediation_plan.open_questions:
+            print(f"complex_open_question_count={len(state.complex_remediation_plan.open_questions)}")
+            print(f"complex_primary_open_question={state.complex_remediation_plan.open_questions[0]}")
     if state.code_change_plan is not None:
         print(f"complex_decompiled_artifact_count={len(state.decompiled_artifacts)}")
         print(f"complex_symbol_mapping_count={len(state.symbol_mappings)}")

@@ -237,6 +237,7 @@ def build_execute_complex_scaffold_node(
             update={
                 "target_files": code_change_plan.target_files,
                 "symbol_mappings": symbol_mappings,
+                "open_questions": code_change_plan.open_questions,
             }
         )
 
@@ -250,6 +251,7 @@ def build_execute_complex_scaffold_node(
                     "decompiled_artifact_count": len(decompiled_artifacts),
                     "symbol_mapping_count": len(symbol_mappings),
                     "planned_file_count": len(code_change_plan.target_files),
+                    "open_question_count": len(code_change_plan.open_questions),
                 },
             )
         )
