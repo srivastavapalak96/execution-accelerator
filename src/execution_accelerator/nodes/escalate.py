@@ -68,6 +68,9 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
     failure_classification = (
         state.failure_classifications[-1] if state.failure_classifications else FailureClassification.UNKNOWN
     )
+    complex_plan = state.complex_remediation_plan
+    complex_target_files = [target.file_path for target in complex_plan.target_files] if complex_plan is not None else []
+    complex_open_questions = list(complex_plan.open_questions) if complex_plan is not None else []
     payload = {
         "ticket_id": state.initial_ticket_id,
         "workflow_status": state.workflow_status,
@@ -75,6 +78,9 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
         "error_codes": [error.code for error in state.errors],
         "errors": [error.model_dump(mode="python") for error in state.errors],
         "modified_files": state.modified_files,
+        "complex_migration_tactic": complex_plan.migration_tactic if complex_plan is not None else None,
+        "complex_target_files": complex_target_files,
+        "complex_open_questions": complex_open_questions,
         "log_files": log_files,
         "audit_event_count": len(state.audit_events),
     }
@@ -84,6 +90,9 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
         failure_classification=failure_classification,
         error_codes=[error.code for error in state.errors],
         modified_files=list(state.modified_files),
+        complex_migration_tactic=complex_plan.migration_tactic if complex_plan is not None else None,
+        complex_target_files=complex_target_files,
+        complex_open_questions=complex_open_questions,
         log_files=log_files,
         audit_event_count=len(state.audit_events),
     )

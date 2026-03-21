@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from execution_accelerator.config import load_runtime_config
@@ -111,3 +112,55 @@ def test_escalate_node_writes_bundle(tmp_path: Path) -> None:
     bundle_path = Path(update["escalation_bundle"].bundle_path)
     assert bundle_path.exists()
     assert update["audit_events"][-1].details["bundle_path"] == str(bundle_path)
+
+
+def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
+    config = load_runtime_config(repo_root=tmp_path)
+    node = __import__("execution_accelerator.nodes", fromlist=["build_escalate_node"]).build_escalate_node(config)
+    state = RemediationState(
+        initial_ticket_id="SEC-777",
+        total_attempts=2,
+        failure_classifications=[FailureClassification.TEST_FAILURE],
+        errors=[{"code": "validation_failed", "message": "Tests failed.", "recoverable": False}],
+        complex_remediation_plan={
+            "repository": "payments-service",
+            "summary": "Analyze the major-version jump before attempting code changes.",
+            "compatibility_diff": {
+                "package_name": "org.example:legacy-json",
+                "baseline_version": "1.2.3",
+                "target_version": "2.0.0",
+                "summary": "Major-version upgrade removes legacy parser entry points.",
+                "risk": "high",
+                "breaking_changes": [
+                    {
+                        "symbol": "org.example.LegacyParser#parse",
+                        "change_type": "removed",
+                        "impact": "Call sites must migrate to JsonParserBuilder.",
+                        "guidance": "Replace direct parse calls with builder.create().parse(...)",
+                    }
+                ],
+            },
+            "migration_tactic": "adapter_shim",
+            "target_files": [
+                {
+                    "file_path": "src/main/java/com/example/payments/LegacyJsonAdapter.java",
+                    "change_summary": "Replace removed parser entry point with the builder-backed parser.",
+                    "related_symbols": ["org.example.LegacyParser#parse"],
+                }
+            ],
+            "open_questions": ["Should adapter construction move behind a Spring bean factory?"],
+        },
+    )
+
+    update = node(state)
+
+    bundle = update["escalation_bundle"]
+    bundle_path = Path(bundle.bundle_path)
+    payload = json.loads(bundle_path.read_text())
+
+    assert bundle.complex_migration_tactic == "adapter_shim"
+    assert bundle.complex_target_files == ["src/main/java/com/example/payments/LegacyJsonAdapter.java"]
+    assert bundle.complex_open_questions == ["Should adapter construction move behind a Spring bean factory?"]
+    assert payload["complex_migration_tactic"] == "adapter_shim"
+    assert payload["complex_target_files"] == ["src/main/java/com/example/payments/LegacyJsonAdapter.java"]
+    assert payload["complex_open_questions"] == ["Should adapter construction move behind a Spring bean factory?"]

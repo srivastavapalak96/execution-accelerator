@@ -522,6 +522,9 @@ class EscalationBundle(BaseSchemaModel):
     failure_classification: FailureClassification = FailureClassification.UNKNOWN
     error_codes: list[str] = Field(default_factory=list)
     modified_files: list[str] = Field(default_factory=list)
+    complex_migration_tactic: ComplexMigrationTactic | None = None
+    complex_target_files: list[str] = Field(default_factory=list)
+    complex_open_questions: list[str] = Field(default_factory=list)
     log_files: list[str] = Field(default_factory=list)
     audit_event_count: int = Field(default=0, ge=0)
 
