@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import shutil
 import shlex
 from typing import Final
 
@@ -86,6 +87,37 @@ class GitRunner:
             cwd=repo_dir,
             action="restore",
         )
+
+    def partition_tracked_paths(self, repo_dir: Path, *, paths: list[str]) -> tuple[list[str], list[str]]:
+        tracked: list[str] = []
+        untracked: list[str] = []
+        for path in paths:
+            result = run_command(
+                ["git", "ls-files", "--error-unmatch", "--", path],
+                cwd=Path(repo_dir).resolve(),
+                timeout=self.timeout,
+                env=None,
+                log_path=self._next_log_path("ls-files"),
+                secrets=self.secrets,
+            )
+            if result.returncode == 0:
+                tracked.append(path)
+            else:
+                untracked.append(path)
+        return tracked, untracked
+
+    def remove_untracked_paths(self, repo_dir: Path, *, paths: list[str]) -> None:
+        repo_root = Path(repo_dir).resolve()
+        for path in paths:
+            candidate = (repo_root / path).resolve()
+            try:
+                candidate.relative_to(repo_root)
+            except ValueError:
+                continue
+            if candidate.is_dir():
+                shutil.rmtree(candidate)
+            elif candidate.exists():
+                candidate.unlink()
 
     def status_clean(self, repo_dir: Path) -> bool:
         result = self._run_git(["status", "--porcelain"], cwd=repo_dir, action="status")

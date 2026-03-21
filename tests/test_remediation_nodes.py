@@ -345,4 +345,7 @@ def test_execute_complex_scaffold_node_records_decompile_and_change_plan(tmp_pat
     assert update["complex_remediation_plan"].target_files[0].file_path.endswith("LegacyJsonAdapter.java")
     assert update["complex_remediation_plan"].symbol_mappings[0].legacy_symbol == "org.example.LegacyParser#parse"
     assert update["complex_remediation_plan"].open_questions[0].startswith("Should adapter construction")
+    assert len(update["modified_files"]) == 2
+    assert Path(update["modified_files"][0]).read_text().startswith("package com.example.payments;")
+    assert update["code_diffs"][0].file_path.endswith("LegacyJsonAdapter.java")
     assert update["audit_events"][-1].event_type == "remediation.complex_scaffold"

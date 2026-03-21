@@ -233,9 +233,18 @@ class ValidationAdapter:
 
         files_to_restore = _relative_restore_paths(workspace_path, modified_files)
         if files_to_restore:
-            self.git_runner.restore_paths(workspace_path, paths=files_to_restore)
+            tracked_paths, untracked_paths = self.git_runner.partition_tracked_paths(
+                workspace_path,
+                paths=files_to_restore,
+            )
+            if tracked_paths:
+                self.git_runner.restore_paths(workspace_path, paths=tracked_paths)
+            if untracked_paths:
+                self.git_runner.remove_untracked_paths(workspace_path, paths=untracked_paths)
             status = RollbackStatus.APPLIED
-            reason = "Restored modified files from HEAD after validation failure."
+            reason = (
+                "Restored tracked files from HEAD and removed untracked remediation files after validation failure."
+            )
         else:
             status = RollbackStatus.SKIPPED
             reason = "No tracked file changes were available for rollback."

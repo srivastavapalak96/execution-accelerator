@@ -52,6 +52,26 @@ def test_git_runner_configures_user_and_signing_settings(tmp_path: Path) -> None
     assert _git_output(cloned_repo, "config", "--get", "commit.gpgsign") == "true"
 
 
+def test_git_runner_partitions_and_removes_untracked_paths(tmp_path: Path) -> None:
+    source_repo = _create_source_repo(tmp_path / "source")
+    runner = GitRunner(log_dir=tmp_path / "logs")
+    cloned_repo = runner.clone(str(source_repo), tmp_path / "clone", branch="main")
+    tracked_file = cloned_repo / "README.md"
+    untracked_file = cloned_repo / "notes.txt"
+    untracked_file.write_text("temporary\n")
+
+    tracked, untracked = runner.partition_tracked_paths(
+        cloned_repo,
+        paths=["README.md", "notes.txt"],
+    )
+    runner.remove_untracked_paths(cloned_repo, paths=untracked)
+
+    assert tracked == ["README.md"]
+    assert untracked == ["notes.txt"]
+    assert tracked_file.exists() is True
+    assert untracked_file.exists() is False
+
+
 def _create_source_repo(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     _git(path.parent, "init", "--initial-branch=main", str(path))

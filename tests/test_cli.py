@@ -763,6 +763,11 @@ def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_pat
     assert "complex_open_question_count=2" in captured.out
     assert "complex_primary_open_question=Should adapter construction move behind a Spring bean factory?" in captured.out
     assert "complex_planned_file_count=2" in captured.out
+    assert "modified_file_count=2" in captured.out
+    assert (
+        "modified_file="
+        f"{tmp_path / 'workspace' / 'sec-799' / 'payments-service' / 'src/main/java/com/example/payments/LegacyJsonAdapter.java'}"
+    ) in captured.out
     assert "validation_status=passed" in captured.out
     assert "pull_request_number=42" in captured.out
 

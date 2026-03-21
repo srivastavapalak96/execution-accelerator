@@ -9,7 +9,7 @@ Today, this repository is best understood as a **partially live remediation prot
 - workflow schemas/state are real
 - live Jira intake, repository preparation, OSV advisory lookup, Maven profile detection, and Maven verification are real
 - bounded retry routing for retryable test failures, live remediation, live validation, basic live delivery, and failure escalation bundles now exist
-- the complex lane now persists a concrete migration tactic plus concrete file/symbol targets and open questions, but tougher tough-path behavior is still incomplete
+- the complex lane now persists a concrete migration tactic plus concrete file/symbol targets and open questions, and it now materializes deterministic scaffolded file changes before validation, but tougher tough-path behavior is still incomplete
 
 If you want the long-term target, read **`docs/vision.md`**.  
 If you want the truth about what works right now, read **`docs/status.md`**.
@@ -27,11 +27,11 @@ The current repo can run a persisted local flow for:
    - transitive override
    - complex refactor scaffold
 6. live or fixture-backed validation, including a post-remediation dependency-tree rescan in live mode
-7. fixture-backed or live git-backed rollback-on-failure
+7. fixture-backed or live git-backed rollback-on-failure, including cleanup of untracked remediation files in live mode
 8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira completion comments and optional done transitions; delivery-approved complex runs can now publish ready PRs instead of remaining draft-only, GitHub PR-create conflicts can recover the existing open PR instead of failing delivery, and Jira done-transition conflicts can recover when the issue is already in the target status
 9. fixture-backed or live failure escalation summaries, including persisted escalation bundle paths in run output and richer complex-plan context for tough-path failures
 10. persisted approval pauses for complex refactors, transitive overrides, and approval-tagged repositories, plus an optional second delivery approval gate for complex publication
-11. complex-refactor planning that now persists a primary migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions derived from compatibility analysis
+11. complex-refactor planning and scaffold execution that now persist a primary migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions derived from compatibility analysis, and materialize deterministic scaffolded file changes before validation
 12. CLI summaries that surface skipped repositories and raw skip reasons such as existing open remediation PRs
 13. CLI summaries that surface the latest terminal workflow error for failed or blocked runs
 
@@ -41,7 +41,7 @@ The default mode is:
 EA_MODE=fixture
 ```
 
-`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, bounded retry routing for retryable test failures, escalation bundles, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, including policy-driven approval for transitive overrides, tagged repositories, and optional second-stage complex delivery approval; the complex lane also persists a concrete migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions, but tougher remediation lanes are still incomplete.
+`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, bounded retry routing for retryable test failures, escalation bundles, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, including policy-driven approval for transitive overrides, tagged repositories, and optional second-stage complex delivery approval; the complex lane also persists a concrete migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions, and now materializes deterministic scaffolded file changes before validation, but tougher remediation lanes are still incomplete.
 
 ## Current limitations
 

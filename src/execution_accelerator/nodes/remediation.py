@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+import re
 
 from execution_accelerator.adapters import (
     ComplexRemediationAdapter,
@@ -12,6 +13,8 @@ from execution_accelerator.adapters import (
 )
 from execution_accelerator.schemas import (
     AuditEvent,
+    CodeChangeTarget,
+    ComplexCodeChangePlan,
     ComplexRemediationPlan,
     DependencyCoordinate,
     PomMutationChange,
@@ -230,6 +233,9 @@ def build_execute_complex_scaffold_node(
         assert state.current_working_repo is not None
         assert state.complex_remediation_plan is not None
 
+        workspace = state.repo_map.get(state.current_working_repo)
+        if workspace is None:
+            raise WorkspaceError("workspace context missing; repository intake failed")
         decompiled_artifacts = complex_adapter.load_decompiled_artifacts()
         symbol_mappings = complex_adapter.load_symbol_mappings()
         code_change_plan = complex_adapter.load_code_change_plan()
@@ -239,6 +245,11 @@ def build_execute_complex_scaffold_node(
                 "symbol_mappings": symbol_mappings,
                 "open_questions": code_change_plan.open_questions,
             }
+        )
+        modified_files, code_diffs = _materialize_complex_scaffold(
+            workspace_path=Path(workspace.local_path),
+            complex_plan=complex_plan,
+            code_change_plan=code_change_plan,
         )
 
         audit_events = list(state.audit_events)
@@ -261,6 +272,8 @@ def build_execute_complex_scaffold_node(
             "symbol_mappings": symbol_mappings,
             "code_change_plan": code_change_plan,
             "complex_remediation_plan": complex_plan,
+            "modified_files": modified_files,
+            "code_diffs": code_diffs,
             "audit_events": audit_events,
         }
 
@@ -354,3 +367,129 @@ def _build_change_summary(change: PomMutationChange) -> str:
         f"Updated {change.dependency.group_id}:{change.dependency.artifact_id} "
         f"from {change.previous_version} to {change.target_version}."
     )
+
+
+def _materialize_complex_scaffold(
+    *,
+    workspace_path: Path,
+    complex_plan: ComplexRemediationPlan,
+    code_change_plan: ComplexCodeChangePlan,
+) -> tuple[list[str], list[CodeDiffSummary]]:
+    modified_files: list[str] = []
+    code_diffs: list[CodeDiffSummary] = []
+    for target in code_change_plan.target_files:
+        target_path = _resolve_workspace_file(workspace_path, target.file_path)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists():
+            existing_text = target_path.read_text()
+            rendered_text = _append_complex_scaffold_note(
+                existing_text=existing_text,
+                target=target,
+                complex_plan=complex_plan,
+            )
+            additions = max(rendered_text.count("\n") - existing_text.count("\n"), 0)
+        else:
+            existing_text = None
+            rendered_text = _render_complex_scaffold_file(target=target, complex_plan=complex_plan)
+            additions = rendered_text.count("\n")
+        target_path.write_text(rendered_text)
+        modified_files.append(str(target_path))
+        code_diffs.append(
+            CodeDiffSummary(
+                file_path=target.file_path,
+                change_summary=target.change_summary,
+                additions=additions,
+                deletions=0,
+            )
+        )
+    return modified_files, code_diffs
+
+
+def _resolve_workspace_file(workspace_path: Path, relative_path: str) -> Path:
+    candidate = Path(relative_path)
+    if candidate.is_absolute():
+        raise WorkspaceError("complex scaffold target must be relative to the repository workspace")
+    resolved = (workspace_path / candidate).resolve()
+    try:
+        resolved.relative_to(workspace_path.resolve())
+    except ValueError as error:
+        raise WorkspaceError("complex scaffold target escapes the repository workspace") from error
+    return resolved
+
+
+def _append_complex_scaffold_note(
+    *,
+    existing_text: str,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> str:
+    marker = "Execution Accelerator complex scaffold."
+    if marker in existing_text:
+        return existing_text
+    note = _render_complex_scaffold_note(target=target, complex_plan=complex_plan)
+    return existing_text.rstrip() + "\n\n" + note + "\n"
+
+
+def _render_complex_scaffold_file(
+    *,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> str:
+    target_path = Path(target.file_path)
+    if target_path.suffix == ".java":
+        package_line = _build_java_package_line(target_path)
+        class_name = _sanitize_java_identifier(target_path.stem)
+        lines: list[str] = []
+        if package_line is not None:
+            lines.append(package_line)
+            lines.append("")
+        lines.append(f"public final class {class_name} {{")
+        for note_line in _render_complex_scaffold_note(
+            target=target,
+            complex_plan=complex_plan,
+        ).splitlines():
+            lines.append(f"    {note_line}")
+        lines.append("}")
+        lines.append("")
+        return "\n".join(lines)
+    return _render_complex_scaffold_note(target=target, complex_plan=complex_plan) + "\n"
+
+
+def _render_complex_scaffold_note(
+    *,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> str:
+    note_lines = [
+        "/*",
+        " * Execution Accelerator complex scaffold.",
+        f" * Change summary: {target.change_summary}",
+        f" * Migration tactic: {complex_plan.migration_tactic}",
+    ]
+    if target.related_symbols:
+        note_lines.append(f" * Related symbols: {', '.join(target.related_symbols)}")
+    if complex_plan.open_questions:
+        note_lines.append(f" * Open questions: {' | '.join(complex_plan.open_questions)}")
+    note_lines.append(" */")
+    return "\n".join(note_lines)
+
+
+def _build_java_package_line(target_path: Path) -> str | None:
+    parts = target_path.parts
+    try:
+        java_root = parts.index("java")
+    except ValueError:
+        return None
+    package_parts = parts[java_root + 1 : -1]
+    if not package_parts:
+        return None
+    return f"package {'.'.join(package_parts)};"
+
+
+def _sanitize_java_identifier(name: str) -> str:
+    sanitized = re.sub(r"[^0-9A-Za-z_]", "", name)
+    if not sanitized:
+        return "ComplexScaffold"
+    if sanitized[0].isdigit():
+        return f"Complex{sanitized}"
+    return sanitized
