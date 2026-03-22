@@ -35,6 +35,7 @@ def build_publish_remediation_node(
             ticket_id=state.initial_ticket_id,
             package_name=state.vulnerability_details.package_name if state.vulnerability_details is not None else None,
             draft_pull_request=not _has_delivery_approval(state) if state.requires_delivery_approval else None,
+            body=_build_pull_request_body(state),
         )
         jira_completion = delivery_adapter.load_jira_completion(
             ticket_id=state.initial_ticket_id,
@@ -78,6 +79,31 @@ def build_publish_remediation_node(
 
 def _has_delivery_approval(state: RemediationState) -> bool:
     return any(record.stage == ApprovalStage.DELIVERY and record.decision == "approved" for record in state.approval_history)
+
+
+def _build_pull_request_body(state: RemediationState) -> str:
+    lines = [f"Automated remediation for {state.initial_ticket_id}."]
+    if state.vulnerability_details is not None:
+        lines.append("")
+        lines.append(f"- Package: {state.vulnerability_details.package_name}")
+        lines.append(f"- Installed version: {state.vulnerability_details.installed_version}")
+    if state.maven_verification is not None:
+        lines.append(f"- Target version: {state.maven_verification.target_version}")
+        lines.append(f"- Dependency kind: {state.maven_verification.dependency_kind}")
+    if state.route_decision is not None:
+        lines.append(f"- Route: {state.route_decision.strategy}")
+    if state.validation_results:
+        validation = state.validation_results[-1]
+        lines.append(f"- Validation status: {validation.status}")
+        if validation.summary:
+            lines.append(f"- Validation summary: {validation.summary}")
+    if state.complex_remediation_plan is not None:
+        lines.append(f"- Complex migration tactic: {state.complex_remediation_plan.migration_tactic}")
+        if state.complex_remediation_plan.target_files:
+            lines.append(f"- Primary target file: {state.complex_remediation_plan.target_files[0].file_path}")
+        if state.complex_remediation_plan.open_questions:
+            lines.append(f"- Open question: {state.complex_remediation_plan.open_questions[0]}")
+    return "\n".join(lines)
 
 
 def build_skip_publish_for_dry_run_node(

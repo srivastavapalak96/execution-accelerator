@@ -39,6 +39,7 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
     class StubDeliveryAdapter:
         def __init__(self) -> None:
             self.draft_pull_request: bool | None = None
+            self.body: str | None = None
 
         def load_branch_publication(self, **_: object) -> BranchPublicationResult:
             return BranchPublicationResult(
@@ -51,6 +52,7 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
 
         def load_pull_request(self, **kwargs: object) -> PullRequestSummary:
             self.draft_pull_request = kwargs.get("draft_pull_request")
+            self.body = kwargs.get("body")
             return PullRequestSummary(
                 repository="payments-service",
                 number=42,
@@ -74,9 +76,51 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
         pending_repos=["payments-service"],
         requires_delivery_approval=True,
         approval_history=[{"stage": "delivery", "decision": "approved", "reviewer": "release-manager"}],
+        vulnerability_details={
+            "package_name": "org.example:legacy-json",
+            "installed_version": "1.2.3",
+            "summary": "Upgrade legacy-json",
+        },
+        maven_verification={
+            "package_name": "org.example:legacy-json",
+            "current_version": "1.2.3",
+            "target_version": "2.0.0",
+            "resolver_note": "Resolved to 2.0.0.",
+        },
+        route_decision={"strategy": "complex_refactor", "confidence": 0.78, "reason": "Breaking API changes."},
+        validation_results=[{"repository": "payments-service", "status": "passed", "summary": "Validation passed."}],
+        complex_remediation_plan={
+            "repository": "payments-service",
+            "summary": "Analyze the major-version jump before attempting code changes.",
+            "compatibility_diff": {
+                "package_name": "org.example:legacy-json",
+                "baseline_version": "1.2.3",
+                "target_version": "2.0.0",
+                "summary": "Major-version upgrade removes legacy parser entry points.",
+                "risk": "high",
+                "breaking_changes": [
+                    {
+                        "symbol": "org.example.LegacyParser#parse",
+                        "change_type": "removed",
+                        "impact": "Call sites must migrate to JsonParserBuilder.",
+                    }
+                ],
+            },
+            "migration_tactic": "adapter_shim",
+            "target_files": [
+                {
+                    "file_path": "src/main/java/com/example/payments/LegacyJsonAdapter.java",
+                    "change_summary": "Replace removed parser entry point with the builder-backed parser.",
+                }
+            ],
+            "open_questions": ["Should adapter construction move behind a Spring bean factory?"],
+        },
     )
 
     update = node(state)
 
     assert adapter.draft_pull_request is False
+    assert adapter.body is not None
+    assert "Complex migration tactic: adapter_shim" in adapter.body
+    assert "Primary target file: src/main/java/com/example/payments/LegacyJsonAdapter.java" in adapter.body
     assert cast(PullRequestSummary, update["pull_request_summary"]).status == "open"

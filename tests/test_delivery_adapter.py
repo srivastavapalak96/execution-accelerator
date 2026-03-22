@@ -120,6 +120,7 @@ def test_delivery_adapter_creates_live_pull_request_and_jira_comment(tmp_path: P
             head_branch="sec-123-remediate-legacy-json",
             ticket_id="SEC-123",
             package_name="legacy-json",
+            body="Automated remediation for SEC-123.\n\n- Package: org.example:legacy-json",
         )
         jira_completion = adapter.load_jira_completion(
             ticket_id="SEC-123",
@@ -132,6 +133,7 @@ def test_delivery_adapter_creates_live_pull_request_and_jira_comment(tmp_path: P
     assert jira_completion.status == "commented"
     assert "https://example.test/pr/42" in jira_completion.comment
     assert b'"draft":false' in requests_log[0][2]
+    assert b'"body":"Automated remediation for SEC-123.\\n\\n- Package: org.example:legacy-json"' in requests_log[0][2]
 
 
 def test_delivery_adapter_transitions_jira_ticket_when_configured() -> None:
