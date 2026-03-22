@@ -315,6 +315,8 @@ def test_resume_ticket_run_advances_complex_refactor_after_approval(tmp_path, mo
 
     assert result.state.route_decision is not None
     assert result.state.route_decision.strategy == "complex_refactor"
+    assert result.state.remediation_plan is not None
+    assert result.state.remediation_plan.strategy == "complex_refactor"
     assert result.state.complex_remediation_plan is not None
     assert len(result.state.complex_remediation_plan.artifact_candidates) == 2
     assert result.state.complex_remediation_plan.migration_tactic == "adapter_shim"
@@ -334,6 +336,8 @@ def test_resume_ticket_run_advances_complex_refactor_after_approval(tmp_path, mo
     assert result.state.pom_mutation_plan is None
     assert len(result.state.validation_results) == 1
     assert result.state.validation_results[-1].status == "passed"
+    assert result.state.remediation_plan is not None
+    assert result.state.remediation_plan.summary.endswith("Prepared deterministic scaffold edits for 2 files.")
     assert result.state.workflow_status == WorkflowStatus.COMPLETED
     assert result.state.completed_repos == ["payments-service"]
     assert result.state.pending_repos == []
@@ -346,6 +350,8 @@ def test_resume_ticket_run_advances_complex_refactor_after_approval(tmp_path, mo
     assert loaded_state.complex_remediation_plan.symbol_mappings[0].legacy_symbol == "org.example.LegacyParser#parse"
     assert loaded_state.complex_remediation_plan.open_questions[0].startswith("Should adapter construction")
     assert len(loaded_state.modified_files) == 2
+    assert loaded_state.remediation_plan is not None
+    assert loaded_state.remediation_plan.summary.endswith("Prepared deterministic scaffold edits for 2 files.")
     assert loaded_state.code_change_plan is not None
     assert loaded_state.code_change_plan.target_files[0].file_path.endswith("LegacyJsonAdapter.java")
     assert loaded_state.workflow_status == WorkflowStatus.COMPLETED

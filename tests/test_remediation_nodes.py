@@ -320,6 +320,8 @@ def test_prepare_complex_remediation_node_records_analysis_placeholders(tmp_path
     assert update["complex_remediation_plan"].strategy == "complex_refactor"
     assert update["complex_remediation_plan"].migration_tactic == "adapter_shim"
     assert len(update["complex_remediation_plan"].migration_steps) == 2
+    assert update["remediation_plan"].summary.startswith("Analyze org.example:legacy-json from 1.2.3 to 2.0.0")
+    assert "compatibility adapter" in update["remediation_plan"].rationale
     assert update["audit_events"][-1].event_type == "remediation.complex_prepare"
 
 
@@ -348,4 +350,6 @@ def test_execute_complex_scaffold_node_records_decompile_and_change_plan(tmp_pat
     assert len(update["modified_files"]) == 2
     assert Path(update["modified_files"][0]).read_text().startswith("package com.example.payments;")
     assert update["code_diffs"][0].file_path.endswith("LegacyJsonAdapter.java")
+    assert update["remediation_plan"].summary.endswith("Prepared deterministic scaffold edits for 2 files.")
+    assert "2 target files and 2 unresolved questions" in update["remediation_plan"].rationale
     assert update["audit_events"][-1].event_type == "remediation.complex_scaffold"

@@ -749,6 +749,8 @@ def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_pat
     assert "workflow_status=completed" in captured.out
     assert "approval_decision=approved" in captured.out
     assert "approval_reviewer=security-lead" in captured.out
+    assert "plan_summary=Analyze org.example:legacy-json from 1.2.3 to 2.0.0 before attempting code changes. Prepared deterministic scaffold edits for 2 files." in captured.out
+    assert "plan_rationale=Removed APIs and constructor changes suggest insulating callers behind a compatibility adapter while parser and serializer internals migrate. Current scaffold covers 2 target files and 2 unresolved questions." in captured.out
     assert "complex_candidate_count=2" in captured.out
     assert "complex_migration_tactic=adapter_shim" in captured.out
     assert "complex_migration_step_count=2" in captured.out

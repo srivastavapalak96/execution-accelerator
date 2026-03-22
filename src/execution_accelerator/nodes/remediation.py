@@ -21,6 +21,7 @@ from execution_accelerator.schemas import (
     PomMutationKind,
     PomMutationPlan,
     PomSectionTarget,
+    RemediationPlan,
     RemediationStrategy,
 )
 from execution_accelerator.state import CodeDiffSummary, RemediationState
@@ -195,6 +196,10 @@ def build_prepare_complex_remediation_node(
             tactic_rationale=tactic_rationale,
             migration_steps=migration_steps,
         )
+        remediation_plan = _refine_complex_remediation_plan(
+            state=state,
+            complex_plan=complex_plan,
+        )
 
         audit_events = list(state.audit_events)
         audit_events.append(
@@ -216,6 +221,7 @@ def build_prepare_complex_remediation_node(
             "artifact_candidates": artifact_candidates,
             "compatibility_diff": compatibility_diff,
             "complex_remediation_plan": complex_plan,
+            "remediation_plan": remediation_plan,
             "audit_events": audit_events,
         }
 
@@ -246,6 +252,11 @@ def build_execute_complex_scaffold_node(
                 "open_questions": code_change_plan.open_questions,
             }
         )
+        remediation_plan = _refine_complex_execution_plan(
+            state=state,
+            complex_plan=complex_plan,
+            code_change_plan=code_change_plan,
+        )
         modified_files, code_diffs = _materialize_complex_scaffold(
             workspace_path=Path(workspace.local_path),
             complex_plan=complex_plan,
@@ -272,6 +283,7 @@ def build_execute_complex_scaffold_node(
             "symbol_mappings": symbol_mappings,
             "code_change_plan": code_change_plan,
             "complex_remediation_plan": complex_plan,
+            "remediation_plan": remediation_plan,
             "modified_files": modified_files,
             "code_diffs": code_diffs,
             "audit_events": audit_events,
@@ -366,6 +378,48 @@ def _build_change_summary(change: PomMutationChange) -> str:
     return (
         f"Updated {change.dependency.group_id}:{change.dependency.artifact_id} "
         f"from {change.previous_version} to {change.target_version}."
+    )
+
+
+def _refine_complex_remediation_plan(
+    *,
+    state: RemediationState,
+    complex_plan: ComplexRemediationPlan,
+) -> RemediationPlan:
+    current_plan = state.remediation_plan
+    target_repositories = (
+        list(current_plan.target_repositories)
+        if current_plan is not None
+        else list(state.pending_repos or state.repo_map.keys())
+    )
+    return RemediationPlan(
+        strategy=RemediationStrategy.COMPLEX_REFACTOR,
+        summary=complex_plan.summary,
+        rationale=complex_plan.tactic_rationale,
+        target_repositories=target_repositories,
+        requires_human_approval=current_plan.requires_human_approval if current_plan is not None else True,
+    )
+
+
+def _refine_complex_execution_plan(
+    *,
+    state: RemediationState,
+    complex_plan: ComplexRemediationPlan,
+    code_change_plan: ComplexCodeChangePlan,
+) -> RemediationPlan:
+    base_plan = _refine_complex_remediation_plan(state=state, complex_plan=complex_plan)
+    return base_plan.model_copy(
+        update={
+            "summary": (
+                f"{complex_plan.summary} Prepared deterministic scaffold edits for "
+                f"{len(code_change_plan.target_files)} files."
+            ),
+            "rationale": (
+                f"{complex_plan.tactic_rationale} "
+                f"Current scaffold covers {len(code_change_plan.target_files)} target files and "
+                f"{len(code_change_plan.open_questions)} unresolved questions."
+            ),
+        }
     )
 
 

@@ -234,6 +234,8 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
             print(f"approval_reviewer={state.human_feedback.reviewer}")
     if state.remediation_plan is not None:
         print(f"plan_strategy={state.remediation_plan.strategy}")
+        print(f"plan_summary={state.remediation_plan.summary}")
+        print(f"plan_rationale={state.remediation_plan.rationale}")
     if state.pom_mutation_plan is not None and state.pom_mutation_plan.changes:
         change = state.pom_mutation_plan.changes[0]
         print(f"pom_change_kind={change.mutation_kind}")
