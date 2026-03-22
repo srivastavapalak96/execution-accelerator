@@ -768,6 +768,10 @@ def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_pat
         "modified_file="
         f"{tmp_path / 'workspace' / 'sec-799' / 'payments-service' / 'src/main/java/com/example/payments/LegacyJsonAdapter.java'}"
     ) in captured.out
+    assert "code_diff_count=2" in captured.out
+    assert (
+        "primary_code_diff_summary=Replace removed parser entry point with the builder-backed parser."
+    ) in captured.out
     assert "validation_status=passed" in captured.out
     assert "pull_request_number=42" in captured.out
 

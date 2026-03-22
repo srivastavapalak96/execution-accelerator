@@ -267,6 +267,9 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
     print(f"modified_file_count={len(state.modified_files)}")
     if state.modified_files:
         print(f"modified_file={state.modified_files[0]}")
+    if state.code_diffs:
+        print(f"code_diff_count={len(state.code_diffs)}")
+        print(f"primary_code_diff_summary={state.code_diffs[0].change_summary}")
     if state.preflight_resolution is not None:
         print(f"preflight_status={state.preflight_resolution.status}")
         print(f"preflight_dependency_kind={state.preflight_resolution.dependency_kind}")

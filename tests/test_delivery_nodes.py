@@ -91,6 +91,14 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
         },
         route_decision={"strategy": "complex_refactor", "confidence": 0.78, "reason": "Breaking API changes."},
         validation_results=[{"repository": "payments-service", "status": "passed", "summary": "Validation passed."}],
+        code_diffs=[
+            {
+                "file_path": "src/main/java/com/example/payments/LegacyJsonAdapter.java",
+                "change_summary": "Replace removed parser entry point with the builder-backed parser.",
+                "additions": 12,
+                "deletions": 0,
+            }
+        ],
         complex_remediation_plan={
             "repository": "payments-service",
             "summary": "Analyze the major-version jump before attempting code changes.",
@@ -125,6 +133,8 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
     assert adapter.body is not None
     assert adapter.comment is not None
     assert "Complex migration tactic: adapter_shim" in adapter.body
+    assert "Changed file count: 1" in adapter.body
+    assert "Primary change: Replace removed parser entry point with the builder-backed parser." in adapter.body
     assert "Primary target file: src/main/java/com/example/payments/LegacyJsonAdapter.java" in adapter.body
     assert "Pull request: https://example.test/pr/42" in adapter.comment
     assert cast(PullRequestSummary, update["pull_request_summary"]).status == "open"
