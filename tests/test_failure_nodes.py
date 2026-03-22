@@ -122,6 +122,14 @@ def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
         total_attempts=2,
         failure_classifications=[FailureClassification.TEST_FAILURE],
         errors=[{"code": "validation_failed", "message": "Tests failed.", "recoverable": False}],
+        code_diffs=[
+            {
+                "file_path": "src/main/java/com/example/payments/LegacyJsonAdapter.java",
+                "change_summary": "Replace removed parser entry point with the builder-backed parser.",
+                "additions": 12,
+                "deletions": 0,
+            }
+        ],
         complex_remediation_plan={
             "repository": "payments-service",
             "summary": "Analyze the major-version jump before attempting code changes.",
@@ -159,8 +167,10 @@ def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
     payload = json.loads(bundle_path.read_text())
 
     assert bundle.complex_migration_tactic == "adapter_shim"
+    assert bundle.code_diff_summaries == ["Replace removed parser entry point with the builder-backed parser."]
     assert bundle.complex_target_files == ["src/main/java/com/example/payments/LegacyJsonAdapter.java"]
     assert bundle.complex_open_questions == ["Should adapter construction move behind a Spring bean factory?"]
+    assert payload["code_diff_summaries"] == ["Replace removed parser entry point with the builder-backed parser."]
     assert payload["complex_migration_tactic"] == "adapter_shim"
     assert payload["complex_target_files"] == ["src/main/java/com/example/payments/LegacyJsonAdapter.java"]
     assert payload["complex_open_questions"] == ["Should adapter construction move behind a Spring bean factory?"]
