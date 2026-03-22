@@ -7,7 +7,7 @@ from pathlib import Path
 
 from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.adapters import DeliveryAdapter
-from execution_accelerator.schemas import ApprovalStage
+from execution_accelerator.schemas import ApprovalRecord, ApprovalStage
 from execution_accelerator.schemas import AuditEvent, WorkflowStatus
 from execution_accelerator.state import RemediationState
 
@@ -111,6 +111,11 @@ def _build_delivery_summary_lines(state: RemediationState) -> list[str]:
     if state.code_diffs:
         lines.append(f"- Changed file count: {len(state.code_diffs)}")
         lines.append(f"- Primary change: {state.code_diffs[0].change_summary}")
+    latest_approval = _find_latest_approved_record(state)
+    if latest_approval is not None:
+        lines.append(f"- Approval stage: {latest_approval.stage}")
+        if latest_approval.reviewer is not None:
+            lines.append(f"- Approved by: {latest_approval.reviewer}")
     if state.complex_remediation_plan is not None:
         lines.append(f"- Complex migration tactic: {state.complex_remediation_plan.migration_tactic}")
         if state.complex_remediation_plan.target_files:
@@ -118,6 +123,13 @@ def _build_delivery_summary_lines(state: RemediationState) -> list[str]:
         if state.complex_remediation_plan.open_questions:
             lines.append(f"- Open question: {state.complex_remediation_plan.open_questions[0]}")
     return lines
+
+
+def _find_latest_approved_record(state: RemediationState) -> ApprovalRecord | None:
+    for record in reversed(state.approval_history):
+        if record.decision == "approved":
+            return record
+    return None
 
 
 def build_skip_publish_for_dry_run_node(
