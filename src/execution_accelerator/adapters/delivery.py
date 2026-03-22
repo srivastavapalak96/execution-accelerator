@@ -303,6 +303,7 @@ class DeliveryAdapter:
         ticket_id: str,
         repository: str | None = None,
         pull_request_url: str | None = None,
+        comment: str | None = None,
         fixture_path: Path | None = None,
     ) -> JiraCompletionResult:
         """Load placeholder Jira completion metadata."""
@@ -312,6 +313,7 @@ class DeliveryAdapter:
                 ticket_id=ticket_id,
                 repository=repository,
                 pull_request_url=pull_request_url,
+                comment=comment,
             )
         require_fixture_mode(self.mode, capability="Delivery live Jira completion")
         resolved_fixture_path = fixture_path or self.jira_completion_fixture_path
@@ -330,15 +332,16 @@ class DeliveryAdapter:
         ticket_id: str,
         repository: str | None,
         pull_request_url: str | None,
+        comment: str | None,
     ) -> JiraCompletionResult:
         if not self.jira_base_url or not self.jira_email or not self.jira_token:
             raise DeliveryConfigurationError("Live Jira completion requires Jira credentials.")
 
-        comment = _build_jira_comment(repository=repository, pull_request_url=pull_request_url)
+        resolved_comment = comment or _build_jira_comment(repository=repository, pull_request_url=pull_request_url)
         response = httpx.post(
             f"{self.jira_base_url.rstrip('/')}/rest/api/3/issue/{ticket_id}/comment",
             auth=(self.jira_email, self.jira_token),
-            json={"body": _build_jira_doc(comment)},
+            json={"body": _build_jira_doc(resolved_comment)},
             timeout=30.0,
         )
         response.raise_for_status()
@@ -363,7 +366,7 @@ class DeliveryAdapter:
         return JiraCompletionResult(
             ticket_id=ticket_id,
             status=status,
-            comment=comment,
+            comment=resolved_comment,
         )
 
     def _load_live_jira_status(self, *, ticket_id: str) -> str:

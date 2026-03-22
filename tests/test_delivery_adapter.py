@@ -126,6 +126,7 @@ def test_delivery_adapter_creates_live_pull_request_and_jira_comment(tmp_path: P
             ticket_id="SEC-123",
             repository="payments-service",
             pull_request_url=pull_request.url,
+            comment="Automated remediation for SEC-123.\n\n- Pull request: https://example.test/pr/42",
         )
 
     assert pull_request.number == 42
@@ -134,6 +135,7 @@ def test_delivery_adapter_creates_live_pull_request_and_jira_comment(tmp_path: P
     assert "https://example.test/pr/42" in jira_completion.comment
     assert b'"draft":false' in requests_log[0][2]
     assert b'"body":"Automated remediation for SEC-123.\\n\\n- Package: org.example:legacy-json"' in requests_log[0][2]
+    assert b'Automated remediation for SEC-123.\\n\\n- Pull request: https://example.test/pr/42' in requests_log[1][2]
 
 
 def test_delivery_adapter_transitions_jira_ticket_when_configured() -> None:

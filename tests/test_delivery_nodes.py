@@ -40,6 +40,7 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
         def __init__(self) -> None:
             self.draft_pull_request: bool | None = None
             self.body: str | None = None
+            self.comment: str | None = None
 
         def load_branch_publication(self, **_: object) -> BranchPublicationResult:
             return BranchPublicationResult(
@@ -62,6 +63,7 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
             )
 
         def load_jira_completion(self, **_: object) -> JiraCompletionResult:
+            self.comment = _.get("comment")
             return JiraCompletionResult(
                 ticket_id="SEC-123",
                 status="commented",
@@ -121,6 +123,8 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
 
     assert adapter.draft_pull_request is False
     assert adapter.body is not None
+    assert adapter.comment is not None
     assert "Complex migration tactic: adapter_shim" in adapter.body
     assert "Primary target file: src/main/java/com/example/payments/LegacyJsonAdapter.java" in adapter.body
+    assert "Pull request: https://example.test/pr/42" in adapter.comment
     assert cast(PullRequestSummary, update["pull_request_summary"]).status == "open"

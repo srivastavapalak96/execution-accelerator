@@ -41,6 +41,7 @@ def build_publish_remediation_node(
             ticket_id=state.initial_ticket_id,
             repository=state.current_working_repo,
             pull_request_url=pull_request_summary.url,
+            comment=_build_jira_completion_comment(state, pull_request_summary.url),
         )
 
         completed_repos = list(state.completed_repos)
@@ -82,6 +83,16 @@ def _has_delivery_approval(state: RemediationState) -> bool:
 
 
 def _build_pull_request_body(state: RemediationState) -> str:
+    return "\n".join(_build_delivery_summary_lines(state))
+
+
+def _build_jira_completion_comment(state: RemediationState, pull_request_url: str) -> str:
+    lines = _build_delivery_summary_lines(state)
+    lines.append(f"- Pull request: {pull_request_url}")
+    return "\n".join(lines)
+
+
+def _build_delivery_summary_lines(state: RemediationState) -> list[str]:
     lines = [f"Automated remediation for {state.initial_ticket_id}."]
     if state.vulnerability_details is not None:
         lines.append("")
@@ -103,7 +114,7 @@ def _build_pull_request_body(state: RemediationState) -> str:
             lines.append(f"- Primary target file: {state.complex_remediation_plan.target_files[0].file_path}")
         if state.complex_remediation_plan.open_questions:
             lines.append(f"- Open question: {state.complex_remediation_plan.open_questions[0]}")
-    return "\n".join(lines)
+    return lines
 
 
 def build_skip_publish_for_dry_run_node(
