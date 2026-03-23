@@ -353,3 +353,46 @@ def test_execute_complex_scaffold_node_records_decompile_and_change_plan(tmp_pat
     assert update["remediation_plan"].summary.endswith("Prepared deterministic scaffold edits for 2 files.")
     assert "2 target files and 2 unresolved questions" in update["remediation_plan"].rationale
     assert update["audit_events"][-1].event_type == "remediation.complex_scaffold"
+
+
+def test_execute_complex_scaffold_node_rewrites_existing_java_symbols(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    adapter = ComplexRemediationAdapter(
+        artifact_fixture_path=fixture_dir / "complex_artifacts.json",
+        compatibility_diff_fixture_path=fixture_dir / "compatibility_diff.json",
+        decompiled_artifact_fixture_path=fixture_dir / "decompiled_artifacts.json",
+        symbol_mapping_fixture_path=fixture_dir / "symbol_mappings.json",
+        code_change_plan_fixture_path=fixture_dir / "code_change_plan.json",
+    )
+    prepare_node = build_prepare_complex_remediation_node(adapter)
+    scaffold_node = build_execute_complex_scaffold_node(adapter)
+    base_state = build_state(tmp_path, complex_refactor=True)
+    prepared_state = base_state.model_copy(update=prepare_node(base_state))
+    existing_target = (
+        Path(prepared_state.repo_map["payments-service"].local_path)
+        / "src/main/java/com/example/payments/LegacyJsonAdapter.java"
+    )
+    existing_target.parent.mkdir(parents=True, exist_ok=True)
+    existing_target.write_text(
+        "\n".join(
+            [
+                "package com.example.payments;",
+                "",
+                "public final class LegacyJsonAdapter {",
+                "    String parse(String payload) {",
+                "        return LegacyParser.parse(payload);",
+                "    }",
+                "}",
+                "",
+            ]
+        )
+    )
+
+    update = scaffold_node(prepared_state)
+
+    rendered_text = existing_target.read_text()
+    assert "LegacyParser.parse(payload)" not in rendered_text
+    assert "org.example.JsonParserBuilder.create().parse(payload)" in rendered_text
+    assert "Execution Accelerator complex scaffold." in rendered_text
+    assert update["code_diffs"][0].additions >= 1
+    assert update["code_diffs"][0].deletions >= 1

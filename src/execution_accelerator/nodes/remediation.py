@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import difflib
 from pathlib import Path
 import re
 
@@ -436,16 +437,20 @@ def _materialize_complex_scaffold(
         target_path.parent.mkdir(parents=True, exist_ok=True)
         if target_path.exists():
             existing_text = target_path.read_text()
-            rendered_text = _append_complex_scaffold_note(
+            rewritten_text = _apply_complex_symbol_rewrites(
                 existing_text=existing_text,
                 target=target,
                 complex_plan=complex_plan,
             )
-            additions = max(rendered_text.count("\n") - existing_text.count("\n"), 0)
+            rendered_text = _append_complex_scaffold_note(
+                existing_text=rewritten_text,
+                target=target,
+                complex_plan=complex_plan,
+            )
         else:
-            existing_text = None
+            existing_text = ""
             rendered_text = _render_complex_scaffold_file(target=target, complex_plan=complex_plan)
-            additions = rendered_text.count("\n")
+        additions, deletions = _summarize_text_diff(existing_text, rendered_text)
         target_path.write_text(rendered_text)
         modified_files.append(str(target_path))
         code_diffs.append(
@@ -453,7 +458,7 @@ def _materialize_complex_scaffold(
                 file_path=target.file_path,
                 change_summary=target.change_summary,
                 additions=additions,
-                deletions=0,
+                deletions=deletions,
             )
         )
     return modified_files, code_diffs
@@ -482,6 +487,44 @@ def _append_complex_scaffold_note(
         return existing_text
     note = _render_complex_scaffold_note(target=target, complex_plan=complex_plan)
     return existing_text.rstrip() + "\n\n" + note + "\n"
+
+
+def _apply_complex_symbol_rewrites(
+    *,
+    existing_text: str,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> str:
+    rewritten_text = existing_text
+    for legacy_call, replacement_call in _iter_complex_symbol_rewrites(
+        target=target,
+        complex_plan=complex_plan,
+    ):
+        rewritten_text = rewritten_text.replace(legacy_call, replacement_call)
+    return rewritten_text
+
+
+def _iter_complex_symbol_rewrites(
+    *,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> list[tuple[str, str]]:
+    rewrites: list[tuple[str, str]] = []
+    related_symbols = set(target.related_symbols)
+    for mapping in complex_plan.symbol_mappings:
+        if mapping.legacy_symbol not in related_symbols and mapping.replacement_symbol not in related_symbols:
+            continue
+        replacement_call = _render_java_method_call(mapping.replacement_symbol, qualified=True)
+        if replacement_call is None:
+            continue
+        for qualified in (False, True):
+            legacy_call = _render_java_method_call(mapping.legacy_symbol, qualified=qualified)
+            if legacy_call is None:
+                continue
+            rewrite = (legacy_call, replacement_call)
+            if rewrite not in rewrites:
+                rewrites.append(rewrite)
+    return rewrites
 
 
 def _render_complex_scaffold_file(
@@ -547,3 +590,24 @@ def _sanitize_java_identifier(name: str) -> str:
     if sanitized[0].isdigit():
         return f"Complex{sanitized}"
     return sanitized
+
+
+def _render_java_method_call(symbol: str, *, qualified: bool) -> str | None:
+    if "#" not in symbol:
+        return None
+    class_name, member_expression = symbol.split("#", maxsplit=1)
+    if not class_name or not member_expression or "<init>" in member_expression:
+        return None
+    rendered_class = class_name if qualified else class_name.rsplit(".", maxsplit=1)[-1]
+    return f"{rendered_class}.{member_expression}("
+
+
+def _summarize_text_diff(previous_text: str, updated_text: str) -> tuple[int, int]:
+    additions = 0
+    deletions = 0
+    for line in difflib.ndiff(previous_text.splitlines(), updated_text.splitlines()):
+        if line.startswith("+ "):
+            additions += 1
+        elif line.startswith("- "):
+            deletions += 1
+    return additions, deletions
