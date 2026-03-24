@@ -104,6 +104,20 @@ def test_escalate_node_writes_bundle(tmp_path: Path) -> None:
         failure_classifications=[FailureClassification.COMPILE_ERROR],
         modified_files=["/tmp/workspace/pom.xml"],
         errors=[{"code": "validation_failed", "message": "Compile failed.", "recoverable": False}],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": ValidationStatus.FAILED,
+                "checks": [
+                    {
+                        "name": "compile",
+                        "status": ValidationStatus.FAILED,
+                        "details": "Compilation failed.",
+                    }
+                ],
+                "summary": "Compile failed.",
+            }
+        ],
     )
 
     update = node(state)
@@ -112,6 +126,11 @@ def test_escalate_node_writes_bundle(tmp_path: Path) -> None:
     bundle_path = Path(update["escalation_bundle"].bundle_path)
     assert bundle_path.exists()
     assert update["audit_events"][-1].details["bundle_path"] == str(bundle_path)
+    payload = json.loads(bundle_path.read_text())
+    assert update["escalation_bundle"].validation_status == ValidationStatus.FAILED
+    assert update["escalation_bundle"].primary_validation_check == "compile"
+    assert payload["validation_summary"] == "Compile failed."
+    assert payload["primary_validation_check_status"] == ValidationStatus.FAILED
 
 
 def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
@@ -122,6 +141,20 @@ def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
         total_attempts=2,
         failure_classifications=[FailureClassification.TEST_FAILURE],
         errors=[{"code": "validation_failed", "message": "Tests failed.", "recoverable": False}],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": ValidationStatus.FAILED,
+                "checks": [
+                    {
+                        "name": "unit-tests",
+                        "status": ValidationStatus.FAILED,
+                        "details": "2 tests failed.",
+                    }
+                ],
+                "summary": "Tests failed.",
+            }
+        ],
         code_diffs=[
             {
                 "file_path": "src/main/java/com/example/payments/LegacyJsonAdapter.java",
@@ -168,9 +201,15 @@ def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
 
     assert bundle.complex_migration_tactic == "adapter_shim"
     assert bundle.code_diff_summaries == ["Replace removed parser entry point with the builder-backed parser."]
+    assert bundle.validation_status == ValidationStatus.FAILED
+    assert bundle.primary_validation_check == "unit-tests"
+    assert bundle.primary_validation_check_status == ValidationStatus.FAILED
     assert bundle.complex_target_files == ["src/main/java/com/example/payments/LegacyJsonAdapter.java"]
     assert bundle.complex_open_questions == ["Should adapter construction move behind a Spring bean factory?"]
     assert payload["code_diff_summaries"] == ["Replace removed parser entry point with the builder-backed parser."]
+    assert payload["validation_summary"] == "Tests failed."
+    assert payload["primary_validation_check"] == "unit-tests"
+    assert payload["primary_validation_check_details"] == "2 tests failed."
     assert payload["complex_migration_tactic"] == "adapter_shim"
     assert payload["complex_target_files"] == ["src/main/java/com/example/payments/LegacyJsonAdapter.java"]
     assert payload["complex_open_questions"] == ["Should adapter construction move behind a Spring bean factory?"]

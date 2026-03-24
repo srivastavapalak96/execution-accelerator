@@ -68,6 +68,8 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
     failure_classification = (
         state.failure_classifications[-1] if state.failure_classifications else FailureClassification.UNKNOWN
     )
+    latest_validation = state.validation_results[-1] if state.validation_results else None
+    primary_validation_check = latest_validation.checks[0] if latest_validation and latest_validation.checks else None
     complex_plan = state.complex_remediation_plan
     complex_target_files = [target.file_path for target in complex_plan.target_files] if complex_plan is not None else []
     complex_open_questions = list(complex_plan.open_questions) if complex_plan is not None else []
@@ -78,6 +80,15 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
         "failure_classification": failure_classification,
         "error_codes": [error.code for error in state.errors],
         "errors": [error.model_dump(mode="python") for error in state.errors],
+        "validation_status": latest_validation.status if latest_validation is not None else None,
+        "validation_summary": latest_validation.summary if latest_validation is not None else None,
+        "primary_validation_check": primary_validation_check.name if primary_validation_check is not None else None,
+        "primary_validation_check_status": (
+            primary_validation_check.status if primary_validation_check is not None else None
+        ),
+        "primary_validation_check_details": (
+            primary_validation_check.details if primary_validation_check is not None else None
+        ),
         "modified_files": state.modified_files,
         "code_diff_summaries": code_diff_summaries,
         "complex_migration_tactic": complex_plan.migration_tactic if complex_plan is not None else None,
@@ -91,6 +102,13 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
         bundle_path=str(bundle_path),
         failure_classification=failure_classification,
         error_codes=[error.code for error in state.errors],
+        validation_status=latest_validation.status if latest_validation is not None else None,
+        validation_summary=latest_validation.summary if latest_validation is not None else None,
+        primary_validation_check=primary_validation_check.name if primary_validation_check is not None else None,
+        primary_validation_check_status=primary_validation_check.status if primary_validation_check is not None else None,
+        primary_validation_check_details=(
+            primary_validation_check.details if primary_validation_check is not None else None
+        ),
         modified_files=list(state.modified_files),
         code_diff_summaries=code_diff_summaries,
         complex_migration_tactic=complex_plan.migration_tactic if complex_plan is not None else None,

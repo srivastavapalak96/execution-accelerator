@@ -521,6 +521,11 @@ class EscalationBundle(BaseSchemaModel):
     bundle_path: str = Field(min_length=1)
     failure_classification: FailureClassification = FailureClassification.UNKNOWN
     error_codes: list[str] = Field(default_factory=list)
+    validation_status: ValidationStatus | None = None
+    validation_summary: str | None = None
+    primary_validation_check: str | None = None
+    primary_validation_check_status: ValidationStatus | None = None
+    primary_validation_check_details: str | None = None
     modified_files: list[str] = Field(default_factory=list)
     code_diff_summaries: list[str] = Field(default_factory=list)
     complex_migration_tactic: ComplexMigrationTactic | None = None
