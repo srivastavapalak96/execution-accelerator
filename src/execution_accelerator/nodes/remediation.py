@@ -496,6 +496,15 @@ def _apply_complex_symbol_rewrites(
     complex_plan: ComplexRemediationPlan,
 ) -> str:
     rewritten_text = existing_text
+    for constructor_class, factory_call in _iter_complex_constructor_rewrites(
+        target=target,
+        complex_plan=complex_plan,
+    ):
+        rewritten_text = _rewrite_java_constructor_calls(
+            rewritten_text,
+            constructor_class=constructor_class,
+            factory_call=factory_call,
+        )
     for legacy_call, replacement_call in _iter_complex_symbol_rewrites(
         target=target,
         complex_plan=complex_plan,
@@ -524,6 +533,28 @@ def _iter_complex_symbol_rewrites(
             rewrite = (legacy_call, replacement_call)
             if rewrite not in rewrites:
                 rewrites.append(rewrite)
+    return rewrites
+
+
+def _iter_complex_constructor_rewrites(
+    *,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> list[tuple[str, str]]:
+    rewrites: list[tuple[str, str]] = []
+    related_symbols = set(target.related_symbols)
+    for mapping in complex_plan.symbol_mappings:
+        if mapping.legacy_symbol not in related_symbols and mapping.replacement_symbol not in related_symbols:
+            continue
+        constructor_class = _parse_java_constructor_class(mapping.legacy_symbol)
+        if constructor_class is None:
+            continue
+        factory_call = _render_java_factory_call(mapping.replacement_symbol, qualified=True)
+        if factory_call is None:
+            continue
+        rewrite = (constructor_class, factory_call)
+        if rewrite not in rewrites:
+            rewrites.append(rewrite)
     return rewrites
 
 
@@ -600,6 +631,72 @@ def _render_java_method_call(symbol: str, *, qualified: bool) -> str | None:
         return None
     rendered_class = class_name if qualified else class_name.rsplit(".", maxsplit=1)[-1]
     return f"{rendered_class}.{member_expression}("
+
+
+def _parse_java_constructor_class(symbol: str) -> str | None:
+    if "#<init>" in symbol:
+        class_name, _, _ = symbol.partition("#<init>")
+        return class_name or None
+    if ".<init>" in symbol:
+        class_name, _, _ = symbol.partition(".<init>")
+        return class_name or None
+    return None
+
+
+def _render_java_factory_call(symbol: str, *, qualified: bool) -> str | None:
+    if "#" not in symbol:
+        return None
+    class_name, member_expression = symbol.split("#", maxsplit=1)
+    if not class_name or not member_expression or "<init>" in member_expression:
+        return None
+    method_name = member_expression.split("(", maxsplit=1)[0]
+    rendered_class = class_name if qualified else class_name.rsplit(".", maxsplit=1)[-1]
+    return f"{rendered_class}.{method_name}"
+
+
+def _rewrite_java_constructor_calls(
+    text: str,
+    *,
+    constructor_class: str,
+    factory_call: str,
+) -> str:
+    rewritten_text = text
+    for qualified in (False, True):
+        rendered_class = constructor_class if qualified else constructor_class.rsplit(".", maxsplit=1)[-1]
+        pattern = re.compile(rf"new\s+{re.escape(rendered_class)}\s*\(")
+        cursor = 0
+        segments: list[str] = []
+        for match in pattern.finditer(rewritten_text):
+            open_paren_index = match.end() - 1
+            close_paren_index = _find_matching_parenthesis(rewritten_text, open_paren_index)
+            if close_paren_index is None:
+                continue
+            arguments = rewritten_text[open_paren_index + 1 : close_paren_index]
+            normalized_arguments = arguments.strip()
+            if normalized_arguments.startswith(f"{factory_call}("):
+                continue
+            segments.append(rewritten_text[cursor : open_paren_index + 1])
+            wrapped_arguments = f"{factory_call}({normalized_arguments})" if normalized_arguments else f"{factory_call}()"
+            segments.append(wrapped_arguments)
+            cursor = close_paren_index
+        if not segments:
+            continue
+        segments.append(rewritten_text[cursor:])
+        rewritten_text = "".join(segments)
+    return rewritten_text
+
+
+def _find_matching_parenthesis(text: str, open_paren_index: int) -> int | None:
+    depth = 0
+    for index in range(open_paren_index, len(text)):
+        current = text[index]
+        if current == "(":
+            depth += 1
+        elif current == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
 
 
 def _summarize_text_diff(previous_text: str, updated_text: str) -> tuple[int, int]:

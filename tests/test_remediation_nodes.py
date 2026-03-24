@@ -396,3 +396,47 @@ def test_execute_complex_scaffold_node_rewrites_existing_java_symbols(tmp_path) 
     assert "Execution Accelerator complex scaffold." in rendered_text
     assert update["code_diffs"][0].additions >= 1
     assert update["code_diffs"][0].deletions >= 1
+
+
+def test_execute_complex_scaffold_node_rewrites_existing_java_constructor_symbols(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    adapter = ComplexRemediationAdapter(
+        artifact_fixture_path=fixture_dir / "complex_artifacts.json",
+        compatibility_diff_fixture_path=fixture_dir / "compatibility_diff.json",
+        decompiled_artifact_fixture_path=fixture_dir / "decompiled_artifacts.json",
+        symbol_mapping_fixture_path=fixture_dir / "symbol_mappings.json",
+        code_change_plan_fixture_path=fixture_dir / "code_change_plan.json",
+    )
+    prepare_node = build_prepare_complex_remediation_node(adapter)
+    scaffold_node = build_execute_complex_scaffold_node(adapter)
+    base_state = build_state(tmp_path, complex_refactor=True)
+    prepared_state = base_state.model_copy(update=prepare_node(base_state))
+    existing_target = (
+        Path(prepared_state.repo_map["payments-service"].local_path)
+        / "src/main/java/com/example/payments/LegacySerializerConfig.java"
+    )
+    existing_target.parent.mkdir(parents=True, exist_ok=True)
+    existing_target.write_text(
+        "\n".join(
+            [
+                "package com.example.payments;",
+                "",
+                "public final class LegacySerializerConfig {",
+                "    Object createSerializer() {",
+                "        return new LegacySerializer(true);",
+                "    }",
+                "}",
+                "",
+            ]
+        )
+    )
+
+    update = scaffold_node(prepared_state)
+
+    rendered_text = existing_target.read_text()
+    assert "new LegacySerializer(true)" not in rendered_text
+    assert "new LegacySerializer(org.example.SerializationConfigFactory.create(true))" in rendered_text
+    assert "Execution Accelerator complex scaffold." in rendered_text
+    serializer_diff = next(diff for diff in update["code_diffs"] if diff.file_path.endswith("LegacySerializerConfig.java"))
+    assert serializer_diff.additions >= 1
+    assert serializer_diff.deletions >= 1

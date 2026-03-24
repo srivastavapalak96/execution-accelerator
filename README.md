@@ -34,7 +34,7 @@ The current repo can run a persisted local flow for:
 11. complex-refactor planning and scaffold execution that now persist a primary migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions derived from compatibility analysis, and materialize deterministic scaffolded file changes before validation
 12. CLI summaries that surface skipped repositories and raw skip reasons such as existing open remediation PRs, plus changed-file counts, aggregate diff totals, primary validation checks, and primary change summaries
 13. CLI summaries that surface the latest terminal workflow error for failed or blocked runs and now show remediation plan summary/rationale directly
-14. Complex scaffold execution that can deterministically rewrite supported Java symbol call sites in existing files before appending operator-facing scaffold notes
+14. Complex scaffold execution that can deterministically rewrite supported Java method-call and constructor migration sites in existing files before appending operator-facing scaffold notes
 
 The default mode is:
 
