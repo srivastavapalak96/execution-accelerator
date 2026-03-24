@@ -103,6 +103,9 @@ def _build_delivery_summary_lines(state: RemediationState) -> list[str]:
         lines.append(f"- Dependency kind: {state.maven_verification.dependency_kind}")
     if state.route_decision is not None:
         lines.append(f"- Route: {state.route_decision.strategy}")
+    if state.remediation_plan is not None:
+        lines.append(f"- Plan summary: {state.remediation_plan.summary}")
+        lines.append(f"- Plan rationale: {state.remediation_plan.rationale}")
     if state.validation_results:
         validation = state.validation_results[-1]
         lines.append(f"- Validation status: {validation.status}")

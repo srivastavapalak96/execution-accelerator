@@ -89,6 +89,13 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
             "target_version": "2.0.0",
             "resolver_note": "Resolved to 2.0.0.",
         },
+        remediation_plan={
+            "strategy": "complex_refactor",
+            "summary": "Prepare adapter-backed parser migration before publication.",
+            "rationale": "Removed parser entry points require a compatibility seam while downstream callers migrate.",
+            "target_repositories": ["payments-service"],
+            "requires_human_approval": True,
+        },
         route_decision={"strategy": "complex_refactor", "confidence": 0.78, "reason": "Breaking API changes."},
         validation_results=[{"repository": "payments-service", "status": "passed", "summary": "Validation passed."}],
         code_diffs=[
@@ -134,10 +141,13 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
     assert adapter.comment is not None
     assert "Approval stage: delivery" in adapter.body
     assert "Approved by: release-manager" in adapter.body
+    assert "Plan summary: Prepare adapter-backed parser migration before publication." in adapter.body
+    assert "Plan rationale: Removed parser entry points require a compatibility seam while downstream callers migrate." in adapter.body
     assert "Complex migration tactic: adapter_shim" in adapter.body
     assert "Changed file count: 1" in adapter.body
     assert "Primary change: Replace removed parser entry point with the builder-backed parser." in adapter.body
     assert "Primary target file: src/main/java/com/example/payments/LegacyJsonAdapter.java" in adapter.body
     assert "Approved by: release-manager" in adapter.comment
+    assert "Plan summary: Prepare adapter-backed parser migration before publication." in adapter.comment
     assert "Pull request: https://example.test/pr/42" in adapter.comment
     assert cast(PullRequestSummary, update["pull_request_summary"]).status == "open"
