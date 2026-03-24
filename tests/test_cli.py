@@ -778,6 +778,9 @@ def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_pat
     assert "code_diff_total_deletions=0" in captured.out
     assert "validation_status=passed" in captured.out
     assert "pull_request_number=42" in captured.out
+    assert "primary_validation_check=compile" in captured.out
+    assert "primary_validation_check_status=passed" in captured.out
+    assert "primary_validation_check_details=Maven compile completed successfully." in captured.out
 
 
 def test_main_bootstraps_ticket_in_dry_run_mode(monkeypatch, capsys, tmp_path) -> None:

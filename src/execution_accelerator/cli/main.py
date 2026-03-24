@@ -282,6 +282,11 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
         validation = state.validation_results[-1]
         print(f"validation_status={validation.status}")
         print(f"validation_check_count={len(validation.checks)}")
+        if validation.checks:
+            primary_check = validation.checks[0]
+            print(f"primary_validation_check={primary_check.name}")
+            print(f"primary_validation_check_status={primary_check.status}")
+            print(f"primary_validation_check_details={primary_check.details}")
     if state.rollback_plan is not None:
         print(f"rollback_status={state.rollback_plan.status}")
         print(f"rollback_reason={state.rollback_plan.reason}")

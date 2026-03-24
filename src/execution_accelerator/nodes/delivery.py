@@ -111,6 +111,11 @@ def _build_delivery_summary_lines(state: RemediationState) -> list[str]:
         lines.append(f"- Validation status: {validation.status}")
         if validation.summary:
             lines.append(f"- Validation summary: {validation.summary}")
+        if validation.checks:
+            primary_check = validation.checks[0]
+            lines.append(f"- Primary validation check: {primary_check.name} ({primary_check.status})")
+            if primary_check.details:
+                lines.append(f"- Primary validation detail: {primary_check.details}")
     if state.code_diffs:
         lines.append(f"- Changed file count: {len(state.code_diffs)}")
         lines.append(f"- Primary change: {state.code_diffs[0].change_summary}")

@@ -97,7 +97,20 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
             "requires_human_approval": True,
         },
         route_decision={"strategy": "complex_refactor", "confidence": 0.78, "reason": "Breaking API changes."},
-        validation_results=[{"repository": "payments-service", "status": "passed", "summary": "Validation passed."}],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": "passed",
+                "summary": "Validation passed.",
+                "checks": [
+                    {
+                        "name": "compile",
+                        "status": "passed",
+                        "details": "Maven compile completed successfully.",
+                    }
+                ],
+            }
+        ],
         code_diffs=[
             {
                 "file_path": "src/main/java/com/example/payments/LegacyJsonAdapter.java",
@@ -143,6 +156,8 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
     assert "Approved by: release-manager" in adapter.body
     assert "Plan summary: Prepare adapter-backed parser migration before publication." in adapter.body
     assert "Plan rationale: Removed parser entry points require a compatibility seam while downstream callers migrate." in adapter.body
+    assert "Primary validation check: compile (passed)" in adapter.body
+    assert "Primary validation detail: Maven compile completed successfully." in adapter.body
     assert "Complex migration tactic: adapter_shim" in adapter.body
     assert "Changed file count: 1" in adapter.body
     assert "Primary change: Replace removed parser entry point with the builder-backed parser." in adapter.body
@@ -151,6 +166,7 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
     assert "Primary target file: src/main/java/com/example/payments/LegacyJsonAdapter.java" in adapter.body
     assert "Approved by: release-manager" in adapter.comment
     assert "Plan summary: Prepare adapter-backed parser migration before publication." in adapter.comment
+    assert "Primary validation check: compile (passed)" in adapter.comment
     assert "Total additions: 12" in adapter.comment
     assert "Pull request: https://example.test/pr/42" in adapter.comment
     assert cast(PullRequestSummary, update["pull_request_summary"]).status == "open"
