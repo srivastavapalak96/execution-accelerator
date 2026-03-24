@@ -272,6 +272,8 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
     if state.code_diffs:
         print(f"code_diff_count={len(state.code_diffs)}")
         print(f"primary_code_diff_summary={state.code_diffs[0].change_summary}")
+        print(f"code_diff_total_additions={sum(diff.additions for diff in state.code_diffs)}")
+        print(f"code_diff_total_deletions={sum(diff.deletions for diff in state.code_diffs)}")
     if state.preflight_resolution is not None:
         print(f"preflight_status={state.preflight_resolution.status}")
         print(f"preflight_dependency_kind={state.preflight_resolution.dependency_kind}")

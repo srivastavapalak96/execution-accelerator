@@ -114,6 +114,8 @@ def _build_delivery_summary_lines(state: RemediationState) -> list[str]:
     if state.code_diffs:
         lines.append(f"- Changed file count: {len(state.code_diffs)}")
         lines.append(f"- Primary change: {state.code_diffs[0].change_summary}")
+        lines.append(f"- Total additions: {sum(diff.additions for diff in state.code_diffs)}")
+        lines.append(f"- Total deletions: {sum(diff.deletions for diff in state.code_diffs)}")
     latest_approval = _find_latest_approved_record(state)
     if latest_approval is not None:
         lines.append(f"- Approval stage: {latest_approval.stage}")

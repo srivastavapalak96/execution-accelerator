@@ -774,6 +774,8 @@ def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_pat
     assert (
         "primary_code_diff_summary=Replace removed parser entry point with the builder-backed parser."
     ) in captured.out
+    assert "code_diff_total_additions=22" in captured.out
+    assert "code_diff_total_deletions=0" in captured.out
     assert "validation_status=passed" in captured.out
     assert "pull_request_number=42" in captured.out
 

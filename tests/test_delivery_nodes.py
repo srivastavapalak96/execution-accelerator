@@ -146,8 +146,11 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
     assert "Complex migration tactic: adapter_shim" in adapter.body
     assert "Changed file count: 1" in adapter.body
     assert "Primary change: Replace removed parser entry point with the builder-backed parser." in adapter.body
+    assert "Total additions: 12" in adapter.body
+    assert "Total deletions: 0" in adapter.body
     assert "Primary target file: src/main/java/com/example/payments/LegacyJsonAdapter.java" in adapter.body
     assert "Approved by: release-manager" in adapter.comment
     assert "Plan summary: Prepare adapter-backed parser migration before publication." in adapter.comment
+    assert "Total additions: 12" in adapter.comment
     assert "Pull request: https://example.test/pr/42" in adapter.comment
     assert cast(PullRequestSummary, update["pull_request_summary"]).status == "open"
