@@ -5,7 +5,7 @@ This file tracks the repository **as implemented today**, not the aspirational e
 | Area | Status | Notes |
 |------|--------|-------|
 | LangGraph + SQLite checkpoints | SHIPPED | Persisted runs and checkpoint reload are implemented. |
-| Typed schemas and remediation state | SHIPPED | Core workflow models and state exist, persisted remediation plans now carry more concrete complex-lane summary/rationale details, and complex scaffold execution can apply deterministic Java method-call and constructor rewrites for supported mappings. |
+| Typed schemas and remediation state | SHIPPED | Core workflow models and state exist, bootstrap now seeds a concrete initial remediation plan from ticket scope, persisted remediation plans carry more concrete complex-lane summary/rationale details, and complex scaffold execution can apply deterministic Java method-call and constructor rewrites for supported mappings. |
 | Fixture execution mode | SHIPPED | `EA_MODE=fixture` is the default and covered by tests. |
 | Live execution mode | PARTIAL | `EA_MODE=live` now covers credential probe, Jira intake, repository inventory/clone, OSV advisory lookup, Maven verification, OpenRewrite-backed POM mutation, live preflight, live validation, and basic live delivery. |
 | Jira intake | PARTIAL | Fixture-backed by default; live issue reads work with `config/jira.yaml` plus Jira credentials. |
