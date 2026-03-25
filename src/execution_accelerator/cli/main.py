@@ -294,6 +294,9 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
     if state.rollback_plan is not None:
         print(f"rollback_status={state.rollback_plan.status}")
         print(f"rollback_reason={state.rollback_plan.reason}")
+    print(f"total_attempts={state.total_attempts}")
+    if state.failure_classifications:
+        print(f"failure_classification={state.failure_classifications[-1]}")
     if state.errors:
         latest_error = state.errors[-1]
         print(f"error_count={len(state.errors)}")
