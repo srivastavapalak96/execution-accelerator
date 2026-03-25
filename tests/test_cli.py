@@ -235,6 +235,10 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "completed_repos=payments-service" in captured.out
     assert "route_strategy=simple_update" in captured.out
     assert "route_confidence=0.93" in captured.out
+    assert (
+        "route_reason=Verified target is direct, available, and low-risk, so the simple update lane is appropriate."
+        in captured.out
+    )
     assert "plan_strategy=simple_update" in captured.out
     assert "pom_change_kind=direct_version_bump" in captured.out
     assert "pom_change_target_section=project_dependencies" in captured.out
@@ -749,6 +753,10 @@ def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_pat
     assert "workflow_status=completed" in captured.out
     assert "approval_decision=approved" in captured.out
     assert "approval_reviewer=security-lead" in captured.out
+    assert (
+        "route_reason=Verified target introduces high compatibility risk and needs the complex remediation lane."
+        in captured.out
+    )
     assert "plan_summary=Analyze org.example:legacy-json from 1.2.3 to 2.0.0 before attempting code changes. Prepared deterministic scaffold edits for 2 files." in captured.out
     assert "plan_rationale=Removed APIs and constructor changes suggest insulating callers behind a compatibility adapter while parser and serializer internals migrate. Current scaffold covers 2 target files and 2 unresolved questions." in captured.out
     assert "complex_candidate_count=2" in captured.out

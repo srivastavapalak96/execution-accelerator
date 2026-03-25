@@ -154,6 +154,7 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
     assert adapter.comment is not None
     assert "Approval stage: delivery" in adapter.body
     assert "Approved by: release-manager" in adapter.body
+    assert "Route rationale: Breaking API changes." in adapter.body
     assert "Plan summary: Prepare adapter-backed parser migration before publication." in adapter.body
     assert "Plan rationale: Removed parser entry points require a compatibility seam while downstream callers migrate." in adapter.body
     assert "Primary validation check: compile (passed)" in adapter.body
@@ -165,6 +166,7 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
     assert "Total deletions: 0" in adapter.body
     assert "Primary target file: src/main/java/com/example/payments/LegacyJsonAdapter.java" in adapter.body
     assert "Approved by: release-manager" in adapter.comment
+    assert "Route rationale: Breaking API changes." in adapter.comment
     assert "Plan summary: Prepare adapter-backed parser migration before publication." in adapter.comment
     assert "Primary validation check: compile (passed)" in adapter.comment
     assert "Total additions: 12" in adapter.comment
