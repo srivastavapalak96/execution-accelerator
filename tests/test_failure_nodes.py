@@ -102,6 +102,7 @@ def test_escalate_node_writes_bundle(tmp_path: Path) -> None:
         initial_ticket_id="SEC-123",
         total_attempts=1,
         failure_classifications=[FailureClassification.COMPILE_ERROR],
+        route_decision={"strategy": RemediationStrategy.SIMPLE_UPDATE, "confidence": 0.93, "reason": "Direct fix."},
         modified_files=["/tmp/workspace/pom.xml"],
         errors=[{"code": "validation_failed", "message": "Compile failed.", "recoverable": False}],
         validation_results=[
@@ -127,8 +128,12 @@ def test_escalate_node_writes_bundle(tmp_path: Path) -> None:
     assert bundle_path.exists()
     assert update["audit_events"][-1].details["bundle_path"] == str(bundle_path)
     payload = json.loads(bundle_path.read_text())
+    assert update["escalation_bundle"].route_strategy == RemediationStrategy.SIMPLE_UPDATE
+    assert update["escalation_bundle"].route_reason == "Direct fix."
     assert update["escalation_bundle"].validation_status == ValidationStatus.FAILED
     assert update["escalation_bundle"].primary_validation_check == "compile"
+    assert payload["route_strategy"] == RemediationStrategy.SIMPLE_UPDATE
+    assert payload["route_reason"] == "Direct fix."
     assert payload["validation_summary"] == "Compile failed."
     assert payload["primary_validation_check_status"] == ValidationStatus.FAILED
 
@@ -140,6 +145,7 @@ def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
         initial_ticket_id="SEC-777",
         total_attempts=2,
         failure_classifications=[FailureClassification.TEST_FAILURE],
+        route_decision={"strategy": RemediationStrategy.COMPLEX_REFACTOR, "confidence": 0.78, "reason": "Breaking API changes."},
         errors=[{"code": "validation_failed", "message": "Tests failed.", "recoverable": False}],
         validation_results=[
             {
@@ -201,12 +207,16 @@ def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
 
     assert bundle.complex_migration_tactic == "adapter_shim"
     assert bundle.code_diff_summaries == ["Replace removed parser entry point with the builder-backed parser."]
+    assert bundle.route_strategy == RemediationStrategy.COMPLEX_REFACTOR
+    assert bundle.route_reason == "Breaking API changes."
     assert bundle.validation_status == ValidationStatus.FAILED
     assert bundle.primary_validation_check == "unit-tests"
     assert bundle.primary_validation_check_status == ValidationStatus.FAILED
     assert bundle.complex_target_files == ["src/main/java/com/example/payments/LegacyJsonAdapter.java"]
     assert bundle.complex_open_questions == ["Should adapter construction move behind a Spring bean factory?"]
     assert payload["code_diff_summaries"] == ["Replace removed parser entry point with the builder-backed parser."]
+    assert payload["route_strategy"] == RemediationStrategy.COMPLEX_REFACTOR
+    assert payload["route_reason"] == "Breaking API changes."
     assert payload["validation_summary"] == "Tests failed."
     assert payload["primary_validation_check"] == "unit-tests"
     assert payload["primary_validation_check_details"] == "2 tests failed."

@@ -521,6 +521,8 @@ class EscalationBundle(BaseSchemaModel):
     bundle_path: str = Field(min_length=1)
     failure_classification: FailureClassification = FailureClassification.UNKNOWN
     error_codes: list[str] = Field(default_factory=list)
+    route_strategy: RemediationStrategy | None = None
+    route_reason: str | None = None
     validation_status: ValidationStatus | None = None
     validation_summary: str | None = None
     primary_validation_check: str | None = None
