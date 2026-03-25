@@ -6,7 +6,7 @@ import json
 from collections.abc import Callable
 
 from execution_accelerator.config import RuntimeConfig
-from execution_accelerator.schemas import AuditEvent, EscalationBundle, FailureClassification, WorkflowStatus
+from execution_accelerator.schemas import ApprovalRecord, AuditEvent, EscalationBundle, FailureClassification, WorkflowStatus
 from execution_accelerator.state import RemediationState
 
 
@@ -68,6 +68,7 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
     failure_classification = (
         state.failure_classifications[-1] if state.failure_classifications else FailureClassification.UNKNOWN
     )
+    latest_approved_record = _find_latest_approved_record(state)
     latest_validation = state.validation_results[-1] if state.validation_results else None
     primary_validation_check = latest_validation.checks[0] if latest_validation and latest_validation.checks else None
     complex_plan = state.complex_remediation_plan
@@ -81,6 +82,9 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
         "error_codes": [error.code for error in state.errors],
         "route_strategy": state.route_decision.strategy if state.route_decision is not None else None,
         "route_reason": state.route_decision.reason if state.route_decision is not None else None,
+        "approval_stage": latest_approved_record.stage if latest_approved_record is not None else None,
+        "approval_reviewer": latest_approved_record.reviewer if latest_approved_record is not None else None,
+        "approval_comments": latest_approved_record.comments if latest_approved_record is not None else None,
         "errors": [error.model_dump(mode="python") for error in state.errors],
         "validation_status": latest_validation.status if latest_validation is not None else None,
         "validation_summary": latest_validation.summary if latest_validation is not None else None,
@@ -106,6 +110,9 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
         error_codes=[error.code for error in state.errors],
         route_strategy=state.route_decision.strategy if state.route_decision is not None else None,
         route_reason=state.route_decision.reason if state.route_decision is not None else None,
+        approval_stage=latest_approved_record.stage if latest_approved_record is not None else None,
+        approval_reviewer=latest_approved_record.reviewer if latest_approved_record is not None else None,
+        approval_comments=latest_approved_record.comments if latest_approved_record is not None else None,
         validation_status=latest_validation.status if latest_validation is not None else None,
         validation_summary=latest_validation.summary if latest_validation is not None else None,
         primary_validation_check=primary_validation_check.name if primary_validation_check is not None else None,
@@ -121,3 +128,10 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
         log_files=log_files,
         audit_event_count=len(state.audit_events),
     )
+
+
+def _find_latest_approved_record(state: RemediationState) -> ApprovalRecord | None:
+    for record in reversed(state.approval_history):
+        if record.decision == "approved":
+            return record
+    return None

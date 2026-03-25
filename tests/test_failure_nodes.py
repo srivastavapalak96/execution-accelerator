@@ -103,6 +103,14 @@ def test_escalate_node_writes_bundle(tmp_path: Path) -> None:
         total_attempts=1,
         failure_classifications=[FailureClassification.COMPILE_ERROR],
         route_decision={"strategy": RemediationStrategy.SIMPLE_UPDATE, "confidence": 0.93, "reason": "Direct fix."},
+        approval_history=[
+            {
+                "stage": "remediation",
+                "decision": "approved",
+                "reviewer": "security-lead",
+                "comments": "Approved after compile-risk review.",
+            }
+        ],
         modified_files=["/tmp/workspace/pom.xml"],
         errors=[{"code": "validation_failed", "message": "Compile failed.", "recoverable": False}],
         validation_results=[
@@ -130,10 +138,16 @@ def test_escalate_node_writes_bundle(tmp_path: Path) -> None:
     payload = json.loads(bundle_path.read_text())
     assert update["escalation_bundle"].route_strategy == RemediationStrategy.SIMPLE_UPDATE
     assert update["escalation_bundle"].route_reason == "Direct fix."
+    assert update["escalation_bundle"].approval_stage == "remediation"
+    assert update["escalation_bundle"].approval_reviewer == "security-lead"
+    assert update["escalation_bundle"].approval_comments == "Approved after compile-risk review."
     assert update["escalation_bundle"].validation_status == ValidationStatus.FAILED
     assert update["escalation_bundle"].primary_validation_check == "compile"
     assert payload["route_strategy"] == RemediationStrategy.SIMPLE_UPDATE
     assert payload["route_reason"] == "Direct fix."
+    assert payload["approval_stage"] == "remediation"
+    assert payload["approval_reviewer"] == "security-lead"
+    assert payload["approval_comments"] == "Approved after compile-risk review."
     assert payload["validation_summary"] == "Compile failed."
     assert payload["primary_validation_check_status"] == ValidationStatus.FAILED
 
@@ -146,6 +160,14 @@ def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
         total_attempts=2,
         failure_classifications=[FailureClassification.TEST_FAILURE],
         route_decision={"strategy": RemediationStrategy.COMPLEX_REFACTOR, "confidence": 0.78, "reason": "Breaking API changes."},
+        approval_history=[
+            {
+                "stage": "delivery",
+                "decision": "approved",
+                "reviewer": "release-manager",
+                "comments": "Approved for publication once validation is green.",
+            }
+        ],
         errors=[{"code": "validation_failed", "message": "Tests failed.", "recoverable": False}],
         validation_results=[
             {
@@ -209,6 +231,9 @@ def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
     assert bundle.code_diff_summaries == ["Replace removed parser entry point with the builder-backed parser."]
     assert bundle.route_strategy == RemediationStrategy.COMPLEX_REFACTOR
     assert bundle.route_reason == "Breaking API changes."
+    assert bundle.approval_stage == "delivery"
+    assert bundle.approval_reviewer == "release-manager"
+    assert bundle.approval_comments == "Approved for publication once validation is green."
     assert bundle.validation_status == ValidationStatus.FAILED
     assert bundle.primary_validation_check == "unit-tests"
     assert bundle.primary_validation_check_status == ValidationStatus.FAILED
@@ -217,6 +242,9 @@ def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
     assert payload["code_diff_summaries"] == ["Replace removed parser entry point with the builder-backed parser."]
     assert payload["route_strategy"] == RemediationStrategy.COMPLEX_REFACTOR
     assert payload["route_reason"] == "Breaking API changes."
+    assert payload["approval_stage"] == "delivery"
+    assert payload["approval_reviewer"] == "release-manager"
+    assert payload["approval_comments"] == "Approved for publication once validation is green."
     assert payload["validation_summary"] == "Tests failed."
     assert payload["primary_validation_check"] == "unit-tests"
     assert payload["primary_validation_check_details"] == "2 tests failed."

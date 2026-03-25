@@ -523,6 +523,9 @@ class EscalationBundle(BaseSchemaModel):
     error_codes: list[str] = Field(default_factory=list)
     route_strategy: RemediationStrategy | None = None
     route_reason: str | None = None
+    approval_stage: ApprovalStage | None = None
+    approval_reviewer: str | None = None
+    approval_comments: str | None = None
     validation_status: ValidationStatus | None = None
     validation_summary: str | None = None
     primary_validation_check: str | None = None
