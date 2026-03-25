@@ -57,7 +57,46 @@ def test_handle_validation_failure_node_records_rollback_plan() -> None:
 
     assert cast(RollbackPlan, update["rollback_plan"]).status == "applied"
     assert update["workflow_status"] == WorkflowStatus.FAILED
+    assert update["errors"][-1].recoverable is False
     assert cast(list[AuditEvent], update["audit_events"])[-1].event_type == "validation.rollback"
+
+
+def test_handle_validation_failure_node_marks_test_failures_recoverable() -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    failure_node = build_handle_validation_failure_node(
+        ValidationAdapter(
+            validation_result_fixture_path=fixture_dir / "validation_result_failure.json",
+            rollback_fixture_path=fixture_dir / "rollback_plan.json",
+        )
+    )
+    state = RemediationState(
+        initial_ticket_id="SEC-124",
+        current_working_repo="payments-service",
+        validation_results=[
+            RepositoryValidationResult(
+                repository="payments-service",
+                status=ValidationStatus.FAILED,
+                checks=[
+                    {
+                        "name": "compile",
+                        "status": ValidationStatus.PASSED,
+                        "details": "Compilation succeeded.",
+                    },
+                    {
+                        "name": "unit-tests",
+                        "status": ValidationStatus.FAILED,
+                        "details": "Two tests failed after remediation.",
+                    },
+                ],
+                summary="Unit tests failed after remediation execution.",
+            )
+        ],
+    )
+
+    update = failure_node(state)
+
+    assert cast(RollbackPlan, update["rollback_plan"]).status == "applied"
+    assert update["errors"][-1].recoverable is True
 
 
 def test_validate_remediation_node_runs_live_validation(tmp_path: Path) -> None:

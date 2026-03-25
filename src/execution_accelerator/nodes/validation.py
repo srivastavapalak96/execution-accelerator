@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from execution_accelerator.adapters import ValidationAdapter
-from execution_accelerator.schemas import AuditEvent, ValidationStatus, WorkflowStatus
+from execution_accelerator.schemas import AuditEvent, RepositoryValidationResult, ValidationStatus, WorkflowStatus
 from execution_accelerator.state import RemediationState, WorkflowError
 
 
@@ -77,7 +77,7 @@ def build_handle_validation_failure_node(
             WorkflowError(
                 code="validation_failed",
                 message=validation_result.summary or "Validation failed after remediation execution.",
-                recoverable=True,
+                recoverable=_is_recoverable_validation_failure(validation_result),
                 repository=state.current_working_repo,
             )
         )
@@ -103,3 +103,16 @@ def build_handle_validation_failure_node(
         }
 
     return handle_validation_failure
+
+
+def _is_recoverable_validation_failure(validation_result: RepositoryValidationResult) -> bool:
+    has_test_failure = False
+    for check in validation_result.checks:
+        if check.status != ValidationStatus.FAILED:
+            continue
+        normalized_name = check.name.lower()
+        if "compile" in normalized_name:
+            return False
+        if "test" in normalized_name:
+            has_test_failure = True
+    return has_test_failure
