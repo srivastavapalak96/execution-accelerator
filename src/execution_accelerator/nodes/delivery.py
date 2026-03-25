@@ -127,6 +127,8 @@ def _build_delivery_summary_lines(state: RemediationState) -> list[str]:
         lines.append(f"- Approval stage: {latest_approval.stage}")
         if latest_approval.reviewer is not None:
             lines.append(f"- Approved by: {latest_approval.reviewer}")
+        if latest_approval.comments is not None:
+            lines.append(f"- Approval comments: {latest_approval.comments}")
     if state.complex_remediation_plan is not None:
         lines.append(f"- Complex migration tactic: {state.complex_remediation_plan.migration_tactic}")
         if state.complex_remediation_plan.target_files:

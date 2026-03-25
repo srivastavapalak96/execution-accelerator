@@ -77,7 +77,14 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
         current_working_repo="payments-service",
         pending_repos=["payments-service"],
         requires_delivery_approval=True,
-        approval_history=[{"stage": "delivery", "decision": "approved", "reviewer": "release-manager"}],
+        approval_history=[
+            {
+                "stage": "delivery",
+                "decision": "approved",
+                "reviewer": "release-manager",
+                "comments": "Ready for publication after final validation review.",
+            }
+        ],
         vulnerability_details={
             "package_name": "org.example:legacy-json",
             "installed_version": "1.2.3",
@@ -154,6 +161,7 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
     assert adapter.comment is not None
     assert "Approval stage: delivery" in adapter.body
     assert "Approved by: release-manager" in adapter.body
+    assert "Approval comments: Ready for publication after final validation review." in adapter.body
     assert "Route rationale: Breaking API changes." in adapter.body
     assert "Plan summary: Prepare adapter-backed parser migration before publication." in adapter.body
     assert "Plan rationale: Removed parser entry points require a compatibility seam while downstream callers migrate." in adapter.body
@@ -166,6 +174,7 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
     assert "Total deletions: 0" in adapter.body
     assert "Primary target file: src/main/java/com/example/payments/LegacyJsonAdapter.java" in adapter.body
     assert "Approved by: release-manager" in adapter.comment
+    assert "Approval comments: Ready for publication after final validation review." in adapter.comment
     assert "Route rationale: Breaking API changes." in adapter.comment
     assert "Plan summary: Prepare adapter-backed parser migration before publication." in adapter.comment
     assert "Primary validation check: compile (passed)" in adapter.comment

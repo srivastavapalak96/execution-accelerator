@@ -753,6 +753,7 @@ def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_pat
     assert "workflow_status=completed" in captured.out
     assert "approval_decision=approved" in captured.out
     assert "approval_reviewer=security-lead" in captured.out
+    assert "approval_comments=Approved for automation." in captured.out
     assert (
         "route_reason=Verified target introduces high compatibility risk and needs the complex remediation lane."
         in captured.out

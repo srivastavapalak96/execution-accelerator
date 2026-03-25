@@ -7,7 +7,7 @@ import os
 
 from execution_accelerator.config import load_runtime_config
 from execution_accelerator.graph import bootstrap_ticket_run, load_remediation_state, resume_ticket_run
-from execution_accelerator.schemas import ApprovalDecision, HumanFeedback
+from execution_accelerator.schemas import ApprovalDecision, ApprovalRecord, HumanFeedback
 from execution_accelerator.state import RemediationState
 from execution_accelerator.observability import configure_logging
 from execution_accelerator.version import __version__
@@ -231,8 +231,11 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
         print(f"approval_decision={state.human_approval_decision}")
         if state.pending_approval_reason is not None:
             print(f"approval_reason={state.pending_approval_reason}")
-        if state.human_feedback is not None and state.human_feedback.reviewer is not None:
-            print(f"approval_reviewer={state.human_feedback.reviewer}")
+        latest_approved_record = _find_latest_approved_record(state)
+        if latest_approved_record is not None and latest_approved_record.reviewer is not None:
+            print(f"approval_reviewer={latest_approved_record.reviewer}")
+        if latest_approved_record is not None and latest_approved_record.comments is not None:
+            print(f"approval_comments={latest_approved_record.comments}")
     if state.remediation_plan is not None:
         print(f"plan_strategy={state.remediation_plan.strategy}")
         print(f"plan_summary={state.remediation_plan.summary}")
@@ -310,3 +313,10 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
         print(f"pull_request_url={state.pull_request_summary.url}")
     if state.jira_completion is not None:
         print(f"jira_ticket_status={state.jira_completion.status}")
+
+
+def _find_latest_approved_record(state: RemediationState) -> ApprovalRecord | None:
+    for record in reversed(state.approval_history):
+        if record.decision == "approved":
+            return record
+    return None
