@@ -82,6 +82,35 @@ def test_classify_failure_escalates_compile_failure_even_with_retry_budget(monke
     assert update["workflow_status"] == "failed"
 
 
+def test_classify_failure_identifies_unresolved_security_scan_as_recipe_noop() -> None:
+    state = RemediationState(
+        initial_ticket_id="SEC-125",
+        route_decision={"strategy": RemediationStrategy.SIMPLE_UPDATE, "confidence": 0.93, "reason": "Direct fix."},
+        errors=[{"code": "validation_failed", "message": "Security scan failed.", "recoverable": False}],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": ValidationStatus.FAILED,
+                "checks": [
+                    ValidationCheck(name="compile", status=ValidationStatus.PASSED, details="Compilation passed."),
+                    ValidationCheck(
+                        name="security",
+                        status=ValidationStatus.FAILED,
+                        details="org.example:legacy-json still resolves versions 1.2.3; expected only 1.2.4.",
+                    ),
+                ],
+                "summary": "Live validation detected an unresolved vulnerable dependency.",
+            }
+        ],
+    )
+
+    update = classify_failure(state)
+
+    assert update["failure_classifications"][-1] == FailureClassification.RECIPE_NOOP
+    assert update["retry_decision"].next_node == "escalate"
+    assert update["retry_decision"].reason == "recipe_noop failures are not automatically retried."
+
+
 def test_escalate_records_terminal_audit_event() -> None:
     state = RemediationState(
         initial_ticket_id="SEC-123",

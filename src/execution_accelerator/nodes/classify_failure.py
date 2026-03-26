@@ -78,13 +78,24 @@ def _classify_latest_failure(state: RemediationState) -> FailureClassification:
         return FailureClassification.UNKNOWN
 
     latest_result = state.validation_results[-1]
+    summary_text = (latest_result.summary or "").lower()
     for check in latest_result.checks:
         if check.status != "failed":
             continue
-        if "compile" in check.name:
+        check_name = check.name.lower()
+        check_details = (check.details or "").lower()
+        if "compile" in check_name:
             return FailureClassification.COMPILE_ERROR
-        if "test" in check.name:
+        if "test" in check_name:
             return FailureClassification.TEST_FAILURE
+        if "security" in check_name and (
+            "still resolves version" in check_details
+            or "expected only" in check_details
+            or "unresolved vulnerable dependency" in summary_text
+        ):
+            return FailureClassification.RECIPE_NOOP
+    if "unresolved vulnerable dependency" in summary_text:
+        return FailureClassification.RECIPE_NOOP
     return FailureClassification.UNKNOWN
 
 
