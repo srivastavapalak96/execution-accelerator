@@ -1,4 +1,4 @@
-"""Phase 0 failure classification stub."""
+"""Failure classification and retry routing helpers."""
 
 from __future__ import annotations
 

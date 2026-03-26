@@ -13,7 +13,7 @@ from execution_accelerator.state import RemediationState, WorkflowError
 def build_validate_remediation_node(
     validation_adapter: ValidationAdapter,
 ) -> Callable[[RemediationState], dict[str, object]]:
-    """Create a node that records placeholder validation results for one repository."""
+    """Create a node that records validation results for one repository."""
 
     def validate_remediation(state: RemediationState) -> dict[str, object]:
         assert state.current_working_repo is not None
@@ -33,7 +33,7 @@ def build_validate_remediation_node(
         audit_events.append(
             AuditEvent(
                 event_type="validation.run",
-                message=f"Completed validation placeholder checks for {state.current_working_repo}.",
+                message=f"Completed validation checks for {state.current_working_repo}.",
                 details={
                     "repository": state.current_working_repo,
                     "status": validation_result.status,

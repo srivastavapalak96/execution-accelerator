@@ -171,7 +171,7 @@ def build_preflight_validation_node(
 def build_prepare_complex_remediation_node(
     complex_adapter: ComplexRemediationAdapter,
 ) -> Callable[[RemediationState], dict[str, object]]:
-    """Create a node that records the Day 7 complex-lane analysis placeholders."""
+    """Create a node that records the prepared complex-lane analysis plan."""
 
     def prepare_complex_remediation(state: RemediationState) -> dict[str, object]:
         assert state.route_decision is not None
