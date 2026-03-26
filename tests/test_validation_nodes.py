@@ -57,6 +57,7 @@ def test_handle_validation_failure_node_records_rollback_plan() -> None:
 
     assert cast(RollbackPlan, update["rollback_plan"]).status == "applied"
     assert update["workflow_status"] == WorkflowStatus.FAILED
+    assert update["errors"][-1].code == "validation_compile_failed"
     assert update["errors"][-1].recoverable is False
     assert cast(list[AuditEvent], update["audit_events"])[-1].event_type == "validation.rollback"
 
@@ -96,6 +97,7 @@ def test_handle_validation_failure_node_marks_test_failures_recoverable() -> Non
     update = failure_node(state)
 
     assert cast(RollbackPlan, update["rollback_plan"]).status == "applied"
+    assert update["errors"][-1].code == "validation_test_failed"
     assert update["errors"][-1].recoverable is True
 
 

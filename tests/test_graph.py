@@ -489,7 +489,7 @@ def test_bootstrap_ticket_run_records_failure_and_rollback_state(tmp_path, monke
     assert result.state.retry_decision is not None
     assert result.state.retry_decision.next_node == "escalate"
     assert result.state.failure_classifications[-1] == "compile_error"
-    assert result.state.errors[-1].code == "validation_failed"
+    assert result.state.errors[-1].code == "validation_compile_failed"
     assert len(result.state.targets) == 1
     assert len(result.state.audit_events) == 15
     assert Path(result.state.escalation_bundle.bundle_path).exists()

@@ -75,7 +75,7 @@ def build_handle_validation_failure_node(
         errors = list(state.errors)
         errors.append(
             WorkflowError(
-                code="validation_failed",
+                code=_build_validation_error_code(validation_result),
                 message=validation_result.summary or "Validation failed after remediation execution.",
                 recoverable=_is_recoverable_validation_failure(validation_result),
                 repository=state.current_working_repo,
@@ -116,3 +116,17 @@ def _is_recoverable_validation_failure(validation_result: RepositoryValidationRe
         if "test" in normalized_name:
             has_test_failure = True
     return has_test_failure
+
+
+def _build_validation_error_code(validation_result: RepositoryValidationResult) -> str:
+    for check in validation_result.checks:
+        if check.status != ValidationStatus.FAILED:
+            continue
+        normalized_name = check.name.lower()
+        if "compile" in normalized_name:
+            return "validation_compile_failed"
+        if "test" in normalized_name:
+            return "validation_test_failed"
+        if "security" in normalized_name:
+            return "validation_security_failed"
+    return "validation_failed"

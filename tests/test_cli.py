@@ -310,7 +310,7 @@ def test_main_prints_escalation_bundle_for_failed_ticket(monkeypatch, capsys, tm
     assert "total_attempts=1" in captured.out
     assert "failure_classification=compile_error" in captured.out
     assert "error_count=1" in captured.out
-    assert "latest_error_code=validation_failed" in captured.out
+    assert "latest_error_code=validation_compile_failed" in captured.out
     assert "retry_count=0" in captured.out
     bundle_line = next(
         line for line in captured.out.splitlines() if line.startswith("escalation_bundle_path=")
