@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from execution_accelerator.cli.main import main
+from execution_accelerator.cli.main import _print_run_summary, main
 from execution_accelerator.config import load_runtime_config
 from execution_accelerator.graph import BootstrapRunResult
 from execution_accelerator.state import RemediationState
@@ -916,3 +916,36 @@ def test_main_resumes_persisted_thread(monkeypatch, capsys, tmp_path) -> None:
     assert "workflow_status=completed" in captured.out
     assert "target_count=1" in captured.out
     assert "completed_repos=payments-service" in captured.out
+
+
+def test_print_run_summary_uses_failed_validation_check_as_primary(capsys) -> None:
+    state = RemediationState(
+        initial_ticket_id="SEC-990",
+        workflow_status="failed",
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": "failed",
+                "summary": "Validation found a blocked license.",
+                "checks": [
+                    {
+                        "name": "compile",
+                        "status": "passed",
+                        "details": "Maven compile completed successfully.",
+                    },
+                    {
+                        "name": "license-scan",
+                        "status": "failed",
+                        "details": "Disallowed GPL dependency detected.",
+                    },
+                ],
+            }
+        ],
+    )
+
+    _print_run_summary(thread_id="sec-990", checkpoint_path=None, state=state)
+
+    captured = capsys.readouterr()
+    assert "primary_validation_check=license-scan" in captured.out
+    assert "primary_validation_check_status=failed" in captured.out
+    assert "primary_validation_check_details=Disallowed GPL dependency detected." in captured.out

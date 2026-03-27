@@ -181,3 +181,72 @@ def test_publish_remediation_node_creates_ready_pr_after_delivery_approval() -> 
     assert "Total additions: 12" in adapter.comment
     assert "Pull request: https://example.test/pr/42" in adapter.comment
     assert cast(PullRequestSummary, update["pull_request_summary"]).status == "open"
+
+
+def test_publish_remediation_node_uses_failed_validation_check_for_delivery_context() -> None:
+    class StubDeliveryAdapter:
+        def __init__(self) -> None:
+            self.body: str | None = None
+            self.comment: str | None = None
+
+        def load_branch_publication(self, **_: object) -> BranchPublicationResult:
+            return BranchPublicationResult(
+                repository="payments-service",
+                branch_name="sec-555-remediate-legacy-json",
+                commit_sha="abc123",
+                commit_message="chore: remediate legacy-json for SEC-555",
+                pushed=True,
+            )
+
+        def load_pull_request(self, **kwargs: object) -> PullRequestSummary:
+            self.body = kwargs.get("body")
+            return PullRequestSummary(
+                repository="payments-service",
+                number=55,
+                url="https://example.test/pr/55",
+                title="SEC-555: remediate legacy-json",
+                status="open",
+            )
+
+        def load_jira_completion(self, **kwargs: object) -> JiraCompletionResult:
+            self.comment = kwargs.get("comment")
+            return JiraCompletionResult(
+                ticket_id="SEC-555",
+                status="commented",
+                comment="done",
+            )
+
+    adapter = StubDeliveryAdapter()
+    node = build_publish_remediation_node(cast(DeliveryAdapter, adapter))
+    state = RemediationState(
+        initial_ticket_id="SEC-555",
+        current_working_repo="payments-service",
+        pending_repos=["payments-service"],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": "failed",
+                "summary": "Validation found a blocked license.",
+                "checks": [
+                    {
+                        "name": "compile",
+                        "status": "passed",
+                        "details": "Maven compile completed successfully.",
+                    },
+                    {
+                        "name": "license-scan",
+                        "status": "failed",
+                        "details": "Disallowed GPL dependency detected.",
+                    },
+                ],
+            }
+        ],
+    )
+
+    node(state)
+
+    assert adapter.body is not None
+    assert adapter.comment is not None
+    assert "Primary validation check: license-scan (failed)" in adapter.body
+    assert "Primary validation detail: Disallowed GPL dependency detected." in adapter.body
+    assert "Primary validation check: license-scan (failed)" in adapter.comment

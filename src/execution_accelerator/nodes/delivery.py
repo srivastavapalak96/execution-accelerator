@@ -10,6 +10,7 @@ from execution_accelerator.adapters import DeliveryAdapter
 from execution_accelerator.schemas import ApprovalRecord, ApprovalStage
 from execution_accelerator.schemas import AuditEvent, WorkflowStatus
 from execution_accelerator.state import RemediationState
+from execution_accelerator.validation_summary import select_primary_validation_check
 
 
 def build_publish_remediation_node(
@@ -112,8 +113,8 @@ def _build_delivery_summary_lines(state: RemediationState) -> list[str]:
         lines.append(f"- Validation status: {validation.status}")
         if validation.summary:
             lines.append(f"- Validation summary: {validation.summary}")
-        if validation.checks:
-            primary_check = validation.checks[0]
+        primary_check = select_primary_validation_check(validation)
+        if primary_check is not None:
             lines.append(f"- Primary validation check: {primary_check.name} ({primary_check.status})")
             if primary_check.details:
                 lines.append(f"- Primary validation detail: {primary_check.details}")

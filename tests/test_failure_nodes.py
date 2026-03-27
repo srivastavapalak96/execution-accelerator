@@ -309,3 +309,38 @@ def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
     assert payload["complex_migration_tactic"] == "adapter_shim"
     assert payload["complex_target_files"] == ["src/main/java/com/example/payments/LegacyJsonAdapter.java"]
     assert payload["complex_open_questions"] == ["Should adapter construction move behind a Spring bean factory?"]
+
+
+def test_escalate_node_uses_first_failed_validation_check_as_primary(tmp_path: Path) -> None:
+    config = load_runtime_config(repo_root=tmp_path)
+    node = __import__("execution_accelerator.nodes", fromlist=["build_escalate_node"]).build_escalate_node(config)
+    state = RemediationState(
+        initial_ticket_id="SEC-888",
+        total_attempts=1,
+        failure_classifications=[FailureClassification.LICENSE_VIOLATION],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": ValidationStatus.FAILED,
+                "checks": [
+                    {
+                        "name": "compile",
+                        "status": ValidationStatus.PASSED,
+                        "details": "Compilation passed.",
+                    },
+                    {
+                        "name": "license-scan",
+                        "status": ValidationStatus.FAILED,
+                        "details": "Disallowed GPL dependency detected.",
+                    },
+                ],
+                "summary": "Live validation detected a disallowed or unverifiable dependency license.",
+            }
+        ],
+    )
+
+    update = node(state)
+
+    assert update["escalation_bundle"].primary_validation_check == "license-scan"
+    assert update["escalation_bundle"].primary_validation_check_status == ValidationStatus.FAILED
+    assert update["escalation_bundle"].primary_validation_check_details == "Disallowed GPL dependency detected."

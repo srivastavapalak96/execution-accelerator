@@ -9,6 +9,7 @@ from execution_accelerator.config import load_runtime_config
 from execution_accelerator.graph import bootstrap_ticket_run, load_remediation_state, resume_ticket_run
 from execution_accelerator.schemas import ApprovalDecision, ApprovalRecord, HumanFeedback
 from execution_accelerator.state import RemediationState
+from execution_accelerator.validation_summary import select_primary_validation_check
 from execution_accelerator.observability import configure_logging
 from execution_accelerator.version import __version__
 
@@ -288,8 +289,8 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
         validation = state.validation_results[-1]
         print(f"validation_status={validation.status}")
         print(f"validation_check_count={len(validation.checks)}")
-        if validation.checks:
-            primary_check = validation.checks[0]
+        primary_check = select_primary_validation_check(validation)
+        if primary_check is not None:
             print(f"primary_validation_check={primary_check.name}")
             print(f"primary_validation_check_status={primary_check.status}")
             print(f"primary_validation_check_details={primary_check.details}")

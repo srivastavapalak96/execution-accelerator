@@ -8,6 +8,7 @@ from collections.abc import Callable
 from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.schemas import ApprovalRecord, AuditEvent, EscalationBundle, FailureClassification, WorkflowStatus
 from execution_accelerator.state import RemediationState
+from execution_accelerator.validation_summary import select_primary_validation_check
 
 
 def build_escalate_node(runtime_config: RuntimeConfig) -> Callable[[RemediationState], dict[str, object]]:
@@ -70,7 +71,7 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
     )
     latest_approved_record = _find_latest_approved_record(state)
     latest_validation = state.validation_results[-1] if state.validation_results else None
-    primary_validation_check = latest_validation.checks[0] if latest_validation and latest_validation.checks else None
+    primary_validation_check = select_primary_validation_check(latest_validation) if latest_validation is not None else None
     complex_plan = state.complex_remediation_plan
     complex_target_files = [target.file_path for target in complex_plan.target_files] if complex_plan is not None else []
     complex_open_questions = list(complex_plan.open_questions) if complex_plan is not None else []
