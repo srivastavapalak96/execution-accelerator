@@ -94,7 +94,7 @@ def test_classify_failure_identifies_unresolved_security_scan_as_recipe_noop() -
                 "checks": [
                     ValidationCheck(name="compile", status=ValidationStatus.PASSED, details="Compilation passed."),
                     ValidationCheck(
-                        name="security",
+                        name="security-scan",
                         status=ValidationStatus.FAILED,
                         details="org.example:legacy-json still resolves versions 1.2.3; expected only 1.2.4.",
                     ),

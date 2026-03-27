@@ -292,7 +292,7 @@ def _build_security_check(
 ) -> ValidationCheck:
     if vulnerability_details is None or maven_verification is None:
         return ValidationCheck(
-            name="security",
+            name="security-scan",
             status=ValidationStatus.PENDING,
             details="Live security rescan skipped; verified dependency context was unavailable.",
         )
@@ -306,7 +306,7 @@ def _build_security_check(
         )
     except MavenCommandError as exc:
         return ValidationCheck(
-            name="security",
+            name="security-scan",
             status=ValidationStatus.FAILED,
             details=(exc.result.stderr or exc.result.stdout or "Failed to rescan Maven dependency tree.").strip(),
         )
@@ -320,13 +320,13 @@ def _build_security_check(
     )
     if not matching_versions:
         return ValidationCheck(
-            name="security",
+            name="security-scan",
             status=ValidationStatus.PASSED,
             details=f"{vulnerability_details.package_name} no longer appears in the Maven dependency tree.",
         )
     if matching_versions == [maven_verification.target_version]:
         return ValidationCheck(
-            name="security",
+            name="security-scan",
             status=ValidationStatus.PASSED,
             details=(
                 f"{vulnerability_details.package_name} resolves only "
@@ -334,7 +334,7 @@ def _build_security_check(
             ),
         )
     return ValidationCheck(
-        name="security",
+        name="security-scan",
         status=ValidationStatus.FAILED,
         details=(
             f"{vulnerability_details.package_name} still resolves versions "

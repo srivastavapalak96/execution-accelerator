@@ -108,7 +108,7 @@ def test_validation_adapter_runs_live_verify_and_parses_surefire_reports(tmp_pat
     assert result.checks[0].name == "compile"
     assert result.checks[1].name == "unit-tests"
     assert "3 tests" in (result.checks[1].details or "")
-    assert result.checks[2].name == "security"
+    assert result.checks[2].name == "security-scan"
     assert "1.2.4" in (result.checks[2].details or "")
 
 
@@ -244,5 +244,5 @@ def test_validation_adapter_reports_live_security_rescan_failure(tmp_path: Path)
     )
 
     assert result.status == "failed"
-    assert result.checks[-1].name == "security"
+    assert result.checks[-1].name == "security-scan"
     assert result.checks[-1].status == "failed"
