@@ -26,6 +26,8 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
     monkeypatch.setenv("EA_LOGS_DIR", str(tmp_path / "logs"))
     monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "state" / "checkpoints.sqlite"))
+    monkeypatch.setenv("EA_MAVEN_METADATA_BASE", "https://mirror.example.test/maven2")
+    monkeypatch.setenv("EA_LICENSE_DENYLIST", "GPL, LGPL")
     monkeypatch.setenv("EA_JIRA_DONE_TRANSITION_ID", "31")
     monkeypatch.setenv("EA_JIRA_DONE_STATUS_NAME", "Done")
     monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(tmp_path / "fixtures" / "jira_issue.json"))
@@ -97,6 +99,8 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     assert f"workspace_dir={tmp_path / 'workspace'}" in captured.out
     assert f"logs_dir={tmp_path / 'logs'}" in captured.out
     assert f"checkpoints_path={tmp_path / 'state' / 'checkpoints.sqlite'}" in captured.out
+    assert "maven_metadata_base_url=https://mirror.example.test/maven2" in captured.out
+    assert "license_denylist=('GPL', 'LGPL')" in captured.out
     assert "jira_done_transition_id=31" in captured.out
     assert "jira_done_status_name=Done" in captured.out
     assert f"jira_fixture_path={tmp_path / 'fixtures' / 'jira_issue.json'}" in captured.out
@@ -249,7 +253,7 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "preflight_dependency_kind=direct" in captured.out
     assert "preflight_resolved_version=1.2.4" in captured.out
     assert "validation_status=passed" in captured.out
-    assert "validation_check_count=3" in captured.out
+    assert "validation_check_count=4" in captured.out
     assert "retry_count=0" in captured.out
     assert "branch_name=sec-123-remediate-legacy-json" in captured.out
     assert "pull_request_number=42" in captured.out
@@ -515,7 +519,7 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     assert "preflight_dependency_kind=direct" in captured.out
     assert "preflight_resolved_version=1.2.4" in captured.out
     assert "validation_status=passed" in captured.out
-    assert "validation_check_count=3" in captured.out
+    assert "validation_check_count=4" in captured.out
     assert "branch_name=sec-123-remediate-legacy-json" in captured.out
     assert "pull_request_number=42" in captured.out
     assert "jira_ticket_status=done" in captured.out
@@ -581,7 +585,7 @@ def test_main_bootstraps_transitive_ticket(monkeypatch, capsys, tmp_path) -> Non
     assert "preflight_dependency_kind=transitive" in captured.out
     assert "preflight_resolved_version=1.2.4" in captured.out
     assert "validation_status=passed" in captured.out
-    assert "validation_check_count=3" in captured.out
+    assert "validation_check_count=4" in captured.out
     assert "branch_name=sec-123-remediate-legacy-json" in captured.out
     assert "pull_request_number=42" in captured.out
     assert "jira_ticket_status=done" in captured.out

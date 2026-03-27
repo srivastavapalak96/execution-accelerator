@@ -101,6 +101,88 @@ def test_handle_validation_failure_node_marks_test_failures_recoverable() -> Non
     assert update["errors"][-1].recoverable is True
 
 
+def test_handle_validation_failure_node_marks_license_failures_non_recoverable() -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    failure_node = build_handle_validation_failure_node(
+        ValidationAdapter(
+            validation_result_fixture_path=fixture_dir / "validation_result_failure.json",
+            rollback_fixture_path=fixture_dir / "rollback_plan.json",
+        )
+    )
+    state = RemediationState(
+        initial_ticket_id="SEC-125",
+        current_working_repo="payments-service",
+        validation_results=[
+            RepositoryValidationResult(
+                repository="payments-service",
+                status=ValidationStatus.FAILED,
+                checks=[
+                    {
+                        "name": "compile",
+                        "status": ValidationStatus.PASSED,
+                        "details": "Compilation succeeded.",
+                    },
+                    {
+                        "name": "unit-tests",
+                        "status": ValidationStatus.PASSED,
+                        "details": "All tests passed.",
+                    },
+                    {
+                        "name": "license-scan",
+                        "status": ValidationStatus.FAILED,
+                        "details": "Disallowed GPL dependency detected.",
+                    },
+                ],
+                summary="Live validation detected a disallowed or unverifiable dependency license.",
+            )
+        ],
+    )
+
+    update = failure_node(state)
+
+    assert cast(RollbackPlan, update["rollback_plan"]).status == "applied"
+    assert update["errors"][-1].code == "validation_license_failed"
+    assert update["errors"][-1].recoverable is False
+
+
+def test_handle_validation_failure_node_does_not_mark_mixed_failures_recoverable() -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    failure_node = build_handle_validation_failure_node(
+        ValidationAdapter(
+            validation_result_fixture_path=fixture_dir / "validation_result_failure.json",
+            rollback_fixture_path=fixture_dir / "rollback_plan.json",
+        )
+    )
+    state = RemediationState(
+        initial_ticket_id="SEC-126",
+        current_working_repo="payments-service",
+        validation_results=[
+            RepositoryValidationResult(
+                repository="payments-service",
+                status=ValidationStatus.FAILED,
+                checks=[
+                    {
+                        "name": "unit-tests",
+                        "status": ValidationStatus.FAILED,
+                        "details": "Two tests failed after remediation.",
+                    },
+                    {
+                        "name": "license-scan",
+                        "status": ValidationStatus.FAILED,
+                        "details": "Disallowed GPL dependency detected.",
+                    },
+                ],
+                summary="Validation found test and license failures.",
+            )
+        ],
+    )
+
+    update = failure_node(state)
+
+    assert update["errors"][-1].code == "validation_test_failed"
+    assert update["errors"][-1].recoverable is False
+
+
 def test_validate_remediation_node_runs_live_validation(tmp_path: Path) -> None:
     workspace = tmp_path / "live-validation-workspace"
     workspace.mkdir(exist_ok=True)

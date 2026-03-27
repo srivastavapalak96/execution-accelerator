@@ -100,6 +100,7 @@ class FailureClassification(StrEnum):
     TEST_FAILURE = "test_failure"
     POLICY_BLOCK = "policy_block"
     RECIPE_NOOP = "recipe_noop"
+    LICENSE_VIOLATION = "license_violation"
     LLM_SCHEMA_INVALID = "llm_schema_invalid"
     LLM_PATCH_UNCOMPILABLE = "llm_patch_uncompilable"
     IDEMPOTENT_HIT = "idempotent_hit"

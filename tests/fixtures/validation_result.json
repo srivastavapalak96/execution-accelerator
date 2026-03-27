@@ -16,6 +16,11 @@
       "name": "security-scan",
       "status": "passed",
       "details": "Placeholder rescan no longer detects the vulnerable version."
+    },
+    {
+      "name": "license-scan",
+      "status": "passed",
+      "details": "Placeholder license scan found no disallowed dependency licenses."
     }
   ],
   "summary": "Validation placeholders succeeded for the pending remediation."

@@ -94,6 +94,8 @@ def _classify_latest_failure(state: RemediationState) -> FailureClassification:
             or "unresolved vulnerable dependency" in summary_text
         ):
             return FailureClassification.RECIPE_NOOP
+        if "license" in check_name:
+            return FailureClassification.LICENSE_VIOLATION
     if "unresolved vulnerable dependency" in summary_text:
         return FailureClassification.RECIPE_NOOP
     return FailureClassification.UNKNOWN

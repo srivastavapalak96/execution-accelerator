@@ -111,10 +111,10 @@ def _is_recoverable_validation_failure(validation_result: RepositoryValidationRe
         if check.status != ValidationStatus.FAILED:
             continue
         normalized_name = check.name.lower()
-        if "compile" in normalized_name:
-            return False
         if "test" in normalized_name:
             has_test_failure = True
+            continue
+        return False
     return has_test_failure
 
 
@@ -129,4 +129,6 @@ def _build_validation_error_code(validation_result: RepositoryValidationResult) 
             return "validation_test_failed"
         if "security" in normalized_name:
             return "validation_security_failed"
+        if "license" in normalized_name:
+            return "validation_license_failed"
     return "validation_failed"

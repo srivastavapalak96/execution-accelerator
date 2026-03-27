@@ -16,6 +16,11 @@
       "name": "security-scan",
       "status": "skipped",
       "details": "Security scan was blocked by the compile failure."
+    },
+    {
+      "name": "license-scan",
+      "status": "skipped",
+      "details": "License scan was blocked by the compile failure."
     }
   ],
   "summary": "Validation failed during compile checks after remediation execution."

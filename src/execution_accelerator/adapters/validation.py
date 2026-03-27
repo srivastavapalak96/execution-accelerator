@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import httpx
+
 from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig, load_credentials
 from execution_accelerator.execution import (
+    DependencyTreeEntry,
     GitRunner,
     MavenCommandError,
     MavenRunner,
@@ -15,6 +18,7 @@ from execution_accelerator.execution import (
     parse_surefire_reports,
 )
 from execution_accelerator.schemas import (
+    DependencyCoordinate,
     ExecutionMode,
     MavenExecutionPlan,
     MavenVerification,
@@ -46,12 +50,14 @@ class ValidationAdapter:
         mode: ExecutionMode = ExecutionMode.FIXTURE,
         maven_runner: MavenRunner | None = None,
         git_runner: GitRunner | None = None,
+        license_denylist: tuple[str, ...] = (),
     ) -> None:
         self.validation_result_fixture_path = validation_result_fixture_path
         self.rollback_fixture_path = rollback_fixture_path
         self.mode = mode
         self.maven_runner = maven_runner
         self.git_runner = git_runner
+        self.license_denylist = license_denylist
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "ValidationAdapter":
@@ -64,6 +70,7 @@ class ValidationAdapter:
             mode=config.execution_mode,
             maven_runner=MavenRunner(
                 log_dir=config.logs_dir / "maven",
+                metadata_base_url=config.maven_metadata_base_url,
                 settings_xml=credentials.maven_settings,
                 java_home=config.java_home,
             ),
@@ -71,6 +78,7 @@ class ValidationAdapter:
                 log_dir=config.logs_dir / "git",
                 secrets=tuple(secret for secret in (credentials.github_token,) if secret),
             ),
+            license_denylist=config.license_denylist,
         )
 
     def load_validation_result(
@@ -173,10 +181,14 @@ class ValidationAdapter:
                 )
             )
 
-        security_check = _build_security_check(
+        dependency_tree, dependency_tree_error = _load_dependency_tree_scan(
             maven_runner=self.maven_runner,
             workspace_path=workspace_path,
             execution_plan=execution_plan,
+        )
+        security_check = _build_security_check(
+            dependency_tree=dependency_tree,
+            dependency_tree_error=dependency_tree_error,
             vulnerability_details=vulnerability_details,
             maven_verification=maven_verification,
         )
@@ -184,6 +196,17 @@ class ValidationAdapter:
         if security_check.status == ValidationStatus.FAILED:
             status = ValidationStatus.FAILED
             summary = "Live validation detected an unresolved vulnerable dependency."
+
+        license_check = _build_license_check(
+            maven_runner=self.maven_runner,
+            dependency_tree=dependency_tree,
+            dependency_tree_error=dependency_tree_error,
+            denylisted_licenses=self.license_denylist,
+        )
+        checks.append(license_check)
+        if license_check.status == ValidationStatus.FAILED:
+            status = ValidationStatus.FAILED
+            summary = "Live validation detected a disallowed or unverifiable dependency license."
 
         return RepositoryValidationResult(
             repository=repository,
@@ -282,11 +305,29 @@ def _collect_test_reports(workspace_path: Path) -> SurefireReportSummary | None:
     )
 
 
-def _build_security_check(
+def _load_dependency_tree_scan(
     *,
     maven_runner: MavenRunner,
     workspace_path: Path,
     execution_plan: MavenExecutionPlan | None,
+) -> tuple[list[DependencyTreeEntry], str | None]:
+    try:
+        return (
+            maven_runner.dependency_tree(
+                workspace_path,
+                settings_xml=Path(execution_plan.settings_xml) if execution_plan and execution_plan.settings_xml else None,
+                jdk_home=Path(execution_plan.java_home) if execution_plan and execution_plan.java_home else None,
+            ),
+            None,
+        )
+    except MavenCommandError as exc:
+        return [], (exc.result.stderr or exc.result.stdout or "Failed to inspect the Maven dependency tree.").strip()
+
+
+def _build_security_check(
+    *,
+    dependency_tree: list[DependencyTreeEntry],
+    dependency_tree_error: str | None,
     vulnerability_details: VulnerabilityDetails | None,
     maven_verification: MavenVerification | None,
 ) -> ValidationCheck:
@@ -297,20 +338,14 @@ def _build_security_check(
             details="Live security rescan skipped; verified dependency context was unavailable.",
         )
 
-    group_id, artifact_id = vulnerability_details.package_name.split(":", maxsplit=1)
-    try:
-        dependency_tree = maven_runner.dependency_tree(
-            workspace_path,
-            settings_xml=Path(execution_plan.settings_xml) if execution_plan and execution_plan.settings_xml else None,
-            jdk_home=Path(execution_plan.java_home) if execution_plan and execution_plan.java_home else None,
-        )
-    except MavenCommandError as exc:
+    if dependency_tree_error is not None:
         return ValidationCheck(
             name="security-scan",
             status=ValidationStatus.FAILED,
-            details=(exc.result.stderr or exc.result.stdout or "Failed to rescan Maven dependency tree.").strip(),
+            details=dependency_tree_error,
         )
 
+    group_id, artifact_id = vulnerability_details.package_name.split(":", maxsplit=1)
     matching_versions = sorted(
         {
             entry.coordinate.version
@@ -341,6 +376,140 @@ def _build_security_check(
             f"{', '.join(matching_versions)}; expected only {maven_verification.target_version}."
         ),
     )
+
+
+def _build_license_check(
+    *,
+    maven_runner: MavenRunner,
+    dependency_tree: list[DependencyTreeEntry],
+    dependency_tree_error: str | None,
+    denylisted_licenses: tuple[str, ...],
+) -> ValidationCheck:
+    if dependency_tree_error is not None:
+        return ValidationCheck(
+            name="license-scan",
+            status=ValidationStatus.FAILED if denylisted_licenses else ValidationStatus.PENDING,
+            details=(
+                "Live license scan could not inspect the Maven dependency tree: "
+                f"{dependency_tree_error}"
+            ),
+        )
+
+    coordinates = _iter_license_scan_coordinates(dependency_tree)
+    if not coordinates:
+        return ValidationCheck(
+            name="license-scan",
+            status=ValidationStatus.PASSED,
+            details="No non-test dependencies were present for license scanning.",
+        )
+
+    denylist = tuple(entry.lower() for entry in denylisted_licenses)
+    unresolved: list[str] = []
+    disallowed: list[str] = []
+    discovered: list[str] = []
+    for coordinate in coordinates:
+        try:
+            licenses = maven_runner.fetch_pom_licenses(coordinate)
+        except (httpx.HTTPError, ValueError) as exc:
+            unresolved.append(f"{_format_coordinate(coordinate)} ({exc})")
+            continue
+        if not licenses:
+            unresolved.append(f"{_format_coordinate(coordinate)} (no license metadata)")
+            continue
+        for license_name in licenses:
+            if license_name not in discovered:
+                discovered.append(license_name)
+        if any(_license_matches_denylist(license_name, denylist) for license_name in licenses):
+            disallowed.append(f"{_format_coordinate(coordinate)} ({', '.join(licenses)})")
+
+    if disallowed:
+        return ValidationCheck(
+            name="license-scan",
+            status=ValidationStatus.FAILED,
+            details=(
+                "Disallowed dependency licenses detected for "
+                f"{len(disallowed)} dependencies against denylist [{', '.join(denylisted_licenses)}]: "
+                f"{'; '.join(disallowed[:3])}."
+            ),
+        )
+    if unresolved:
+        return ValidationCheck(
+            name="license-scan",
+            status=ValidationStatus.FAILED if denylisted_licenses else ValidationStatus.PENDING,
+            details=(
+                "Live license scan could not resolve license metadata for "
+                f"{len(unresolved)} dependencies"
+                + (
+                    f" while enforcing denylist [{', '.join(denylisted_licenses)}]"
+                    if denylisted_licenses
+                    else ""
+                )
+                + f": {'; '.join(unresolved[:3])}."
+            ),
+        )
+
+    return ValidationCheck(
+        name="license-scan",
+        status=ValidationStatus.PASSED,
+        details=(
+            f"Scanned {len(coordinates)} non-test dependencies; "
+            + (
+                f"no denylisted licenses found against [{', '.join(denylisted_licenses)}]. "
+                if denylisted_licenses
+                else ""
+            )
+            + (
+                f"Observed licenses: {', '.join(discovered[:5])}."
+                if discovered
+                else "No dependency licenses were reported."
+            )
+        ),
+    )
+
+
+def _iter_license_scan_coordinates(dependency_tree: list[DependencyTreeEntry]) -> list[DependencyCoordinate]:
+    seen: set[tuple[str, str, str]] = set()
+    coordinates: list[DependencyCoordinate] = []
+    for entry in dependency_tree:
+        if entry.scope == "test":
+            continue
+        coordinate_key = (
+            entry.coordinate.group_id,
+            entry.coordinate.artifact_id,
+            entry.coordinate.version,
+        )
+        if coordinate_key in seen:
+            continue
+        seen.add(coordinate_key)
+        coordinates.append(
+            DependencyCoordinate(
+                group_id=entry.coordinate.group_id,
+                artifact_id=entry.coordinate.artifact_id,
+                version=entry.coordinate.version,
+            )
+        )
+    return coordinates
+
+
+def _license_matches_denylist(license_name: str, denylist: tuple[str, ...]) -> bool:
+    normalized_name = license_name.lower()
+    return any(alias in normalized_name for pattern in denylist for alias in _expand_license_pattern(pattern))
+
+
+def _expand_license_pattern(pattern: str) -> tuple[str, ...]:
+    normalized_pattern = pattern.lower()
+    aliases = [normalized_pattern]
+    if normalized_pattern == "gpl":
+        aliases.extend(["gnu general public license", "general public license"])
+    elif normalized_pattern == "lgpl":
+        aliases.extend(["gnu lesser general public license", "lesser general public license"])
+    elif normalized_pattern == "agpl":
+        aliases.extend(["gnu affero general public license", "affero general public license"])
+    return tuple(aliases)
+
+
+def _format_coordinate(coordinate: DependencyCoordinate) -> str:
+    return f"{coordinate.group_id}:{coordinate.artifact_id}:{coordinate.version}"
 
 
 def _relative_restore_paths(workspace_path: Path, modified_files: list[str]) -> list[str]:

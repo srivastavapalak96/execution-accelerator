@@ -26,7 +26,7 @@ The current repo can run a persisted local flow for:
    - simple update
    - transitive override
    - complex refactor scaffold
-6. live or fixture-backed validation, including a post-remediation dependency-tree rescan in live mode
+6. live or fixture-backed validation, including a post-remediation dependency-tree rescan in live mode and a dependency license scan with optional denylist enforcement
 7. fixture-backed or live git-backed rollback-on-failure, including cleanup of untracked remediation files in live mode
 8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira completion comments and optional done transitions; delivery-approved complex runs can now publish ready PRs instead of remaining draft-only, GitHub PR-create conflicts can recover the existing open PR instead of failing delivery, Jira done-transition conflicts can recover when the issue is already in the target status, and both PR bodies and Jira comments now publish workflow, route, approval, approval-comment, and remediation-plan context instead of placeholder text
 9. fixture-backed or live failure escalation summaries, including persisted escalation bundle paths in run output, route rationale, approval provenance, code-diff summaries, validation context, and richer complex-plan context for tough-path failures
@@ -49,7 +49,7 @@ EA_MODE=fixture
 This repository does **not** yet perform:
 
 - full Jira completion workflow handling beyond a configured done transition
-- full compile/test/license validation coverage
+- richer license-policy handling beyond the current dependency license scan and optional denylist enforcement
 - richer retry policies beyond the current bounded test-failure remediation re-run
 - richer policy enforcement beyond the current route/tag and complex-delivery approval rules
 - real tough-path/EOL migrations beyond the current tactic-and-checklist complex scaffold

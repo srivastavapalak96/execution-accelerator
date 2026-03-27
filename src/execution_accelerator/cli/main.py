@@ -96,6 +96,8 @@ def main() -> int:
             print(f"workspace_dir={config.workspace_dir}")
             print(f"logs_dir={config.logs_dir}")
             print(f"checkpoints_path={config.checkpoints_path}")
+            print(f"maven_metadata_base_url={config.maven_metadata_base_url}")
+            print(f"license_denylist={config.license_denylist}")
             print(f"jira_done_transition_id={config.jira_done_transition_id}")
             print(f"jira_done_status_name={config.jira_done_status_name}")
             print(f"jira_fixture_path={config.jira_fixture_path}")

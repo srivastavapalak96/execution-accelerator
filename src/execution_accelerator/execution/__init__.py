@@ -8,6 +8,7 @@ from .maven_runner import (
     MavenRunner,
     parse_dependency_tree,
     parse_maven_metadata,
+    parse_pom_licenses,
 )
 from .openrewrite_runner import OpenRewriteRunner
 from .sandbox import CommandResult, CommandTimeoutError, redact, run_command
@@ -25,6 +26,7 @@ __all__ = [
     "OpenRewriteRunner",
     "parse_dependency_tree",
     "parse_maven_metadata",
+    "parse_pom_licenses",
     "parse_surefire_report",
     "parse_surefire_reports",
     "redact",

@@ -140,6 +140,17 @@ class MavenRunner:
         response.raise_for_status()
         return parse_maven_metadata(response.text, coordinate=coordinate)
 
+    def fetch_pom_licenses(
+        self,
+        coordinate: DependencyCoordinate,
+        *,
+        base_url: str | None = None,
+    ) -> tuple[str, ...]:
+        pom_url = build_artifact_pom_url(coordinate, base_url=base_url or self.metadata_base_url)
+        response = httpx.get(pom_url, timeout=30.0)
+        response.raise_for_status()
+        return parse_pom_licenses(response.text)
+
     def _resolve_maven_executable(self, cwd: Path) -> str:
         wrapper = Path(cwd).resolve() / "mvnw"
         if wrapper.exists():
@@ -165,6 +176,14 @@ def build_metadata_url(coordinate: DependencyCoordinate, *, base_url: str) -> st
     group_path = coordinate.group_id.replace(".", "/")
     return (
         f"{base_url.rstrip('/')}/{group_path}/{coordinate.artifact_id}/maven-metadata.xml"
+    )
+
+
+def build_artifact_pom_url(coordinate: DependencyCoordinate, *, base_url: str) -> str:
+    group_path = coordinate.group_id.replace(".", "/")
+    return (
+        f"{base_url.rstrip('/')}/{group_path}/{coordinate.artifact_id}/{coordinate.version}/"
+        f"{coordinate.artifact_id}-{coordinate.version}.pom"
     )
 
 
@@ -209,9 +228,34 @@ def parse_maven_metadata(xml_text: str, *, coordinate: DependencyCoordinate) -> 
     )
 
 
+def parse_pom_licenses(xml_text: str) -> tuple[str, ...]:
+    root = DefusedET.fromstring(xml_text)
+    discovered: list[str] = []
+    for element in root.iter():
+        if _local_name(element.tag) != "license":
+            continue
+        name = next(
+            (
+                child.text.strip()
+                for child in element
+                if _local_name(child.tag) == "name" and child.text and child.text.strip()
+            ),
+            None,
+        )
+        if name is not None and name not in discovered:
+            discovered.append(name)
+    return tuple(discovered)
+
+
 def _find_optional_text(root: Any, path: str) -> str | None:
     element = root.find(path)
     if element is None or element.text is None:
         return None
     stripped = element.text.strip()
     return stripped or None
+
+
+def _local_name(tag: str) -> str:
+    if "}" in tag:
+        return tag.rsplit("}", maxsplit=1)[-1]
+    return tag

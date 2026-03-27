@@ -8,7 +8,7 @@ import socketserver
 import threading
 from collections.abc import Iterator
 
-from execution_accelerator.execution import MavenRunner, parse_dependency_tree, parse_maven_metadata
+from execution_accelerator.execution import MavenRunner, parse_dependency_tree, parse_maven_metadata, parse_pom_licenses
 from execution_accelerator.schemas import DependencyCoordinate
 
 
@@ -55,6 +55,25 @@ def test_parse_maven_metadata_extracts_versions() -> None:
     assert metadata.latest == "1.2.5"
     assert metadata.release == "1.2.4"
     assert metadata.versions == ("1.2.3", "1.2.4", "1.2.5")
+
+
+def test_parse_pom_licenses_extracts_names_from_namespaced_pom() -> None:
+    licenses = parse_pom_licenses(
+        """
+        <project xmlns="http://maven.apache.org/POM/4.0.0">
+          <licenses>
+            <license>
+              <name>Apache License, Version 2.0</name>
+            </license>
+            <license>
+              <name>MIT License</name>
+            </license>
+          </licenses>
+        </project>
+        """
+    )
+
+    assert licenses == ("Apache License, Version 2.0", "MIT License")
 
 
 def test_maven_runner_uses_wrapper_for_dependency_tree_and_verify(tmp_path: Path) -> None:
@@ -124,6 +143,29 @@ def test_maven_runner_fetches_metadata_from_http_server(tmp_path: Path) -> None:
     assert metadata.coordinate.artifact_id == "legacy-json"
     assert metadata.release == "1.2.4"
     assert metadata.versions[-1] == "1.2.5"
+
+
+def test_maven_runner_fetches_pom_licenses_from_http_server(tmp_path: Path) -> None:
+    pom_root = tmp_path / "repo"
+    pom_file = pom_root / "org" / "example" / "legacy-json" / "1.2.3" / "legacy-json-1.2.3.pom"
+    pom_file.parent.mkdir(parents=True, exist_ok=True)
+    pom_file.write_text(
+        """
+        <project xmlns="http://maven.apache.org/POM/4.0.0">
+          <licenses>
+            <license>
+              <name>Apache License, Version 2.0</name>
+            </license>
+          </licenses>
+        </project>
+        """
+    )
+    coordinate = DependencyCoordinate(group_id="org.example", artifact_id="legacy-json", version="1.2.3")
+
+    with serve_directory(pom_root) as base_url:
+        licenses = MavenRunner(log_dir=tmp_path / "logs", metadata_base_url=base_url).fetch_pom_licenses(coordinate)
+
+    assert licenses == ("Apache License, Version 2.0",)
 
 
 @contextmanager

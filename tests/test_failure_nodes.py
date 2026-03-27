@@ -111,6 +111,35 @@ def test_classify_failure_identifies_unresolved_security_scan_as_recipe_noop() -
     assert update["retry_decision"].reason == "recipe_noop failures are not automatically retried."
 
 
+def test_classify_failure_identifies_license_scan_failure_as_license_violation() -> None:
+    state = RemediationState(
+        initial_ticket_id="SEC-126",
+        route_decision={"strategy": RemediationStrategy.SIMPLE_UPDATE, "confidence": 0.93, "reason": "Direct fix."},
+        errors=[{"code": "validation_license_failed", "message": "License scan failed.", "recoverable": False}],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": ValidationStatus.FAILED,
+                "checks": [
+                    ValidationCheck(name="compile", status=ValidationStatus.PASSED, details="Compilation passed."),
+                    ValidationCheck(
+                        name="license-scan",
+                        status=ValidationStatus.FAILED,
+                        details="Disallowed dependency licenses detected for 1 dependencies against denylist [GPL].",
+                    ),
+                ],
+                "summary": "Live validation detected a disallowed or unverifiable dependency license.",
+            }
+        ],
+    )
+
+    update = classify_failure(state)
+
+    assert update["failure_classifications"][-1] == FailureClassification.LICENSE_VIOLATION
+    assert update["retry_decision"].next_node == "escalate"
+    assert update["retry_decision"].reason == "license_violation failures are not automatically retried."
+
+
 def test_escalate_records_terminal_audit_event() -> None:
     state = RemediationState(
         initial_ticket_id="SEC-123",
