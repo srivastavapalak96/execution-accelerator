@@ -193,8 +193,22 @@ def build_remediation_graph(
             END: END,
         },
     )
-    builder.add_edge("publish_remediation", END)
-    builder.add_edge("skip_publish_for_dry_run", END)
+    builder.add_conditional_edges(
+        "publish_remediation",
+        _select_post_delivery_node,
+        {
+            "detect_maven_profile": "detect_maven_profile",
+            END: END,
+        },
+    )
+    builder.add_conditional_edges(
+        "skip_publish_for_dry_run",
+        _select_post_delivery_node,
+        {
+            "detect_maven_profile": "detect_maven_profile",
+            END: END,
+        },
+    )
     builder.add_edge("handle_validation_failure", "classify_failure")
     builder.add_conditional_edges(
         "classify_failure",
@@ -428,6 +442,12 @@ def _select_post_delivery_approval_node(state: RemediationState) -> str:
         return "publish_remediation"
     if state.human_approval_decision == "rejected":
         return "classify_failure"
+    return END
+
+
+def _select_post_delivery_node(state: RemediationState) -> str:
+    if state.pending_repos:
+        return "detect_maven_profile"
     return END
 
 

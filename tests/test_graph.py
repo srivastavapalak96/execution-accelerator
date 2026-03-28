@@ -18,7 +18,7 @@ from execution_accelerator.adapters import (
 from execution_accelerator.config import load_runtime_config
 from execution_accelerator.graph import bootstrap_ticket_run, compile_remediation_graph, load_remediation_state, resume_ticket_run
 from execution_accelerator.persistence import build_thread_config
-from execution_accelerator.schemas import ApprovalDecision, HumanFeedback, WorkflowStatus
+from execution_accelerator.schemas import ApprovalDecision, HumanFeedback, PreflightResolutionResult, ValidationStatus, WorkflowStatus
 from tests.conftest import seed_bootstrap_workspace_pom
 from tests.live_support import ResponseSpec, create_live_remote_repo, create_live_repo, serve_routes
 
@@ -185,6 +185,89 @@ def test_bootstrap_ticket_run_persists_transitive_override_state(tmp_path, monke
     assert loaded_state.validation_results[-1].status == "passed"
     assert loaded_state.workflow_status == WorkflowStatus.COMPLETED
     assert loaded_state.completed_repos == ["payments-service"]
+
+
+def test_bootstrap_ticket_run_processes_multiple_repositories(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path)
+    multi_repo_jira_path = tmp_path / "fixtures" / "jira_issue_multi.json"
+    multi_repo_jira_path.parent.mkdir(parents=True, exist_ok=True)
+    multi_repo_jira_path.write_text(
+        json.dumps(
+            {
+                "ticket_id": "SEC-222",
+                "summary": "Upgrade vulnerable JSON dependency",
+                "description": "Two repositories require the same remediation.",
+                "package_name": "org.example:legacy-json",
+                "installed_version": "1.2.3",
+                "fixed_version": "1.2.4",
+                "severity": "high",
+                "affected_repositories": [
+                    {
+                        "name": "payments-service",
+                        "clone_url": "https://github.com/example/payments-service.git",
+                        "default_branch": "main",
+                        "build_system": "maven",
+                        "manifest_path": "pom.xml",
+                    },
+                    {
+                        "name": "ledger-service",
+                        "clone_url": "https://github.com/example/ledger-service.git",
+                        "default_branch": "main",
+                        "build_system": "maven",
+                        "manifest_path": "ledger-app/pom.xml",
+                    },
+                ],
+                "references": [
+                    {
+                        "source": "cve",
+                        "identifier": "CVE-2026-12345",
+                        "url": "https://example.com/advisories/CVE-2026-12345",
+                    }
+                ],
+            }
+        )
+    )
+    monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(multi_repo_jira_path))
+    monkeypatch.setattr(
+        "execution_accelerator.adapters.pom.PreflightResolutionAdapter.load_result",
+        lambda self, **kwargs: PreflightResolutionResult(
+            repository=kwargs["repository"],
+            status=ValidationStatus.PASSED,
+            resolved_version="1.2.4",
+            dependency_kind="direct",
+            message="Preflight passed.",
+        ),
+    )
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-222",
+        repository_name="payments-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_before.xml",
+    )
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-222",
+        repository_name="ledger-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_before.xml",
+        manifest_path="ledger-app/pom.xml",
+    )
+    config = load_runtime_config(repo_root=tmp_path)
+
+    result = bootstrap_ticket_run(
+        "SEC-222",
+        runtime_config=config,
+        thread_id="sec-222-thread",
+    )
+
+    assert result.state.workflow_status == WorkflowStatus.COMPLETED
+    assert result.state.pending_repos == []
+    assert result.state.completed_repos == ["payments-service", "ledger-service"]
+    assert result.state.current_target_index == 1
+    assert result.state.current_working_repo == "ledger-service"
+    assert result.state.branch_publication is not None
+    assert result.state.pull_request_summary is not None
+    assert result.state.jira_completion is not None
+    assert result.state.modified_files[0].endswith("ledger-service/ledger-app/pom.xml")
 
 
 def test_bootstrap_ticket_run_pauses_transitive_override_when_policy_requires_approval(tmp_path, monkeypatch) -> None:

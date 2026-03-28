@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import cast
 
 from execution_accelerator.adapters import DeliveryAdapter
+from execution_accelerator.config import load_runtime_config
 from execution_accelerator.schemas import AuditEvent, BranchPublicationResult, JiraCompletionResult, PullRequestSummary
-from execution_accelerator.nodes import build_publish_remediation_node
+from execution_accelerator.nodes import build_publish_remediation_node, build_skip_publish_for_dry_run_node
 from execution_accelerator.schemas import WorkflowStatus
 from execution_accelerator.state import RemediationState
 
@@ -250,3 +251,133 @@ def test_publish_remediation_node_uses_failed_validation_check_for_delivery_cont
     assert "Primary validation check: license-scan (failed)" in adapter.body
     assert "Primary validation detail: Disallowed GPL dependency detected." in adapter.body
     assert "Primary validation check: license-scan (failed)" in adapter.comment
+
+
+def test_publish_remediation_node_prepares_next_pending_repository() -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    node = build_publish_remediation_node(
+        DeliveryAdapter(
+            branch_publication_fixture_path=fixture_dir / "branch_publication.json",
+            pull_request_fixture_path=fixture_dir / "pull_request.json",
+            jira_completion_fixture_path=fixture_dir / "jira_completion.json",
+        )
+    )
+    state = RemediationState(
+        initial_ticket_id="SEC-777",
+        current_working_repo="payments-service",
+        current_target_index=0,
+        pending_repos=["payments-service", "ledger-service"],
+        targets=[
+            {
+                "ticket_id": "SEC-777",
+                "repository_name": "payments-service",
+                "package_name": "org.example:legacy-json",
+                "installed_version": "1.2.3",
+                "target_version": "1.2.4",
+                "clone_url": "https://example.test/payments-service.git",
+                "manifest_path": "pom.xml",
+                "tags": ["tier-1"],
+            },
+            {
+                "ticket_id": "SEC-777",
+                "repository_name": "ledger-service",
+                "package_name": "org.example:legacy-json",
+                "installed_version": "1.2.3",
+                "target_version": "1.2.4",
+                "clone_url": "https://example.test/ledger-service.git",
+                "manifest_path": "ledger-app/pom.xml",
+                "tags": ["tier-2"],
+            },
+        ],
+        repo_map={
+            "payments-service": {
+                "name": "payments-service",
+                "local_path": str(Path("/tmp/payments-service")),
+                "clone_url": "https://example.test/payments-service.git",
+                "default_branch": "main",
+                "build_system": "maven",
+                "manifest_path": "pom.xml",
+                "owner": "payments-platform",
+            }
+        },
+        modified_files=["/tmp/payments-service/pom.xml"],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": "passed",
+                "checks": [{"name": "compile", "status": "passed", "details": "Compile passed."}],
+                "summary": "Validation passed.",
+            }
+        ],
+        retry_count=1,
+        total_attempts=2,
+        approval_history=[
+            {
+                "stage": "delivery",
+                "decision": "approved",
+                "reviewer": "release-manager",
+            }
+        ],
+    )
+
+    update = node(state)
+
+    assert update["workflow_status"] == WorkflowStatus.IN_PROGRESS
+    assert update["completed_repos"] == ["payments-service"]
+    assert update["pending_repos"] == ["ledger-service"]
+    assert update["current_working_repo"] is None
+    assert update["current_target_index"] == 1
+    assert update["modified_files"] == []
+    assert update["validation_results"] == []
+    assert update["approval_history"] == []
+    assert update["retry_count"] == 0
+    assert update["total_attempts"] == 0
+
+
+def test_skip_publish_for_dry_run_prepares_next_pending_repository(tmp_path: Path) -> None:
+    node = build_skip_publish_for_dry_run_node(load_runtime_config(repo_root=tmp_path))
+    state = RemediationState(
+        initial_ticket_id="SEC-778",
+        current_working_repo="payments-service",
+        current_target_index=0,
+        pending_repos=["payments-service", "ledger-service"],
+        targets=[
+            {
+                "ticket_id": "SEC-778",
+                "repository_name": "payments-service",
+                "package_name": "org.example:legacy-json",
+                "installed_version": "1.2.3",
+                "target_version": "1.2.4",
+                "clone_url": "https://example.test/payments-service.git",
+                "manifest_path": "pom.xml",
+            },
+            {
+                "ticket_id": "SEC-778",
+                "repository_name": "ledger-service",
+                "package_name": "org.example:legacy-json",
+                "installed_version": "1.2.3",
+                "target_version": "1.2.4",
+                "clone_url": "https://example.test/ledger-service.git",
+                "manifest_path": "ledger-app/pom.xml",
+            },
+        ],
+        modified_files=["/tmp/payments-service/pom.xml"],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": "passed",
+                "checks": [{"name": "compile", "status": "passed", "details": "Compile passed."}],
+                "summary": "Validation passed.",
+            }
+        ],
+    )
+
+    update = node(state)
+
+    assert update["workflow_status"] == WorkflowStatus.IN_PROGRESS
+    assert update["completed_repos"] == ["payments-service"]
+    assert update["pending_repos"] == ["ledger-service"]
+    assert update["current_working_repo"] is None
+    assert update["current_target_index"] == 1
+    assert update["modified_files"] == []
+    assert update["validation_results"] == []

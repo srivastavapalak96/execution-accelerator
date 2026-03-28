@@ -49,6 +49,11 @@ def build_publish_remediation_node(
         if state.current_working_repo not in completed_repos:
             completed_repos.append(state.current_working_repo)
         pending_repos = [repo for repo in state.pending_repos if repo != state.current_working_repo]
+        continuation_update = _build_repo_continuation_update(
+            state,
+            pending_repos=pending_repos,
+            completed_repos=completed_repos,
+        )
 
         audit_events = list(state.audit_events)
         audit_events.append(
@@ -68,11 +73,7 @@ def build_publish_remediation_node(
             "branch_publication": branch_publication,
             "pull_request_summary": pull_request_summary,
             "jira_completion": jira_completion,
-            "completed_repos": completed_repos,
-            "pending_repos": pending_repos,
-            "pending_approval_stage": None,
-            "pending_approval_reason": None,
-            "workflow_status": WorkflowStatus.COMPLETED,
+            **continuation_update,
             "audit_events": audit_events,
         }
 
@@ -158,6 +159,11 @@ def build_skip_publish_for_dry_run_node(
         if state.current_working_repo not in completed_repos:
             completed_repos.append(state.current_working_repo)
         pending_repos = [repo for repo in state.pending_repos if repo != state.current_working_repo]
+        continuation_update = _build_repo_continuation_update(
+            state,
+            pending_repos=pending_repos,
+            completed_repos=completed_repos,
+        )
 
         audit_events = list(state.audit_events)
         audit_events.append(
@@ -172,10 +178,70 @@ def build_skip_publish_for_dry_run_node(
         )
 
         return {
-            "completed_repos": completed_repos,
-            "pending_repos": pending_repos,
-            "workflow_status": WorkflowStatus.COMPLETED,
+            **continuation_update,
             "audit_events": audit_events,
         }
 
     return skip_publish_for_dry_run
+
+
+def _build_repo_continuation_update(
+    state: RemediationState,
+    *,
+    pending_repos: list[str],
+    completed_repos: list[str],
+) -> dict[str, object]:
+    if not pending_repos:
+        return {
+            "completed_repos": completed_repos,
+            "pending_repos": pending_repos,
+            "pending_approval_stage": None,
+            "pending_approval_reason": None,
+            "workflow_status": WorkflowStatus.COMPLETED,
+        }
+
+    return {
+        "completed_repos": completed_repos,
+        "pending_repos": pending_repos,
+        "current_working_repo": None,
+        "current_target_index": _find_target_index(state, pending_repos[0]),
+        "workflow_status": WorkflowStatus.IN_PROGRESS,
+        "route_decision": None,
+        "pom_mutation_plan": None,
+        "preflight_resolution": None,
+        "artifact_candidates": [],
+        "compatibility_diff": None,
+        "complex_remediation_plan": None,
+        "decompiled_artifacts": [],
+        "symbol_mappings": [],
+        "code_change_plan": None,
+        "maven_plan": None,
+        "maven_verification": None,
+        "remediation_plan": None,
+        "modified_files": [],
+        "code_diffs": [],
+        "validation_results": [],
+        "rollback_plan": None,
+        "branch_publication": None,
+        "pull_request_summary": None,
+        "jira_completion": None,
+        "total_attempts": 0,
+        "failure_classifications": [],
+        "policy_decisions": [],
+        "errors": [],
+        "retry_count": 0,
+        "retry_decision": None,
+        "requires_human_approval": False,
+        "requires_delivery_approval": False,
+        "pending_approval_stage": None,
+        "pending_approval_reason": None,
+        "human_feedback": None,
+        "approval_history": [],
+    }
+
+
+def _find_target_index(state: RemediationState, repository_name: str) -> int:
+    for index, target in enumerate(state.targets):
+        if target.repository_name == repository_name:
+            return index
+    return state.current_target_index
