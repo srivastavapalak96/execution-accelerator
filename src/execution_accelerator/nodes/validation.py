@@ -50,6 +50,8 @@ def build_validate_remediation_node(
         return {
             "validation_results": validation_results,
             "workflow_status": workflow_status,
+            "rollback_plan": None if validation_result.status != ValidationStatus.FAILED else state.rollback_plan,
+            "retry_decision": None if validation_result.status != ValidationStatus.FAILED else state.retry_decision,
             "audit_events": audit_events,
         }
 

@@ -65,6 +65,10 @@ def classify_failure(state: RemediationState) -> dict[str, object]:
         "retry_count": retry_count,
         "retry_decision": retry_decision,
         "workflow_status": WorkflowStatus.IN_PROGRESS if retry_decision.next_node != "escalate" else WorkflowStatus.FAILED,
+        "rollback_plan": None if can_retry else state.rollback_plan,
+        "modified_files": [] if can_retry else state.modified_files,
+        "code_diffs": [] if can_retry else state.code_diffs,
+        "preflight_resolution": None if can_retry else state.preflight_resolution,
         "audit_events": audit_events,
     }
 

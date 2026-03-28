@@ -12,6 +12,7 @@ from execution_accelerator.schemas import (
     ExecutionMode,
     MavenExecutionPlan,
     RepositoryValidationResult,
+    RetryDecision,
     RollbackPlan,
     ValidationStatus,
     WorkflowStatus,
@@ -232,6 +233,38 @@ def test_validate_remediation_node_runs_live_validation(tmp_path: Path) -> None:
 
     assert cast(list[RepositoryValidationResult], update["validation_results"])[-1].status == ValidationStatus.PASSED
     assert update["workflow_status"] == WorkflowStatus.IN_PROGRESS
+
+
+def test_validate_remediation_node_clears_retry_state_after_success() -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    node = build_validate_remediation_node(
+        ValidationAdapter(
+            validation_result_fixture_path=fixture_dir / "validation_result.json",
+            rollback_fixture_path=fixture_dir / "rollback_plan.json",
+        )
+    )
+    state = RemediationState(
+        initial_ticket_id="SEC-127",
+        current_working_repo="payments-service",
+        rollback_plan={
+            "repository": "payments-service",
+            "status": "applied",
+            "reason": "Restored pom.xml",
+            "files_to_restore": ["pom.xml"],
+        },
+        retry_decision=RetryDecision(
+            classification="test_failure",
+            next_node="remediate_simple",
+            max_attempts=10,
+            reason="Retrying the simple remediation lane after test failures.",
+        ),
+    )
+
+    update = node(state)
+
+    assert cast(list[RepositoryValidationResult], update["validation_results"])[-1].status == ValidationStatus.PASSED
+    assert update["rollback_plan"] is None
+    assert update["retry_decision"] is None
 
 
 def test_handle_validation_failure_node_runs_live_rollback(tmp_path: Path) -> None:

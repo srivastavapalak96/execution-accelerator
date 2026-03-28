@@ -33,8 +33,9 @@ The current repo can run a persisted local flow for:
 10. persisted approval pauses for complex refactors, transitive overrides, and approval-tagged repositories, plus an optional second delivery approval gate for complex publication
 11. complex-refactor planning and scaffold execution that now persist a primary migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions derived from compatibility analysis, and materialize deterministic scaffolded file changes before validation
 12. CLI summaries that surface skipped repositories and raw skip reasons such as existing open remediation PRs, plus route rationale, changed-file counts, aggregate diff totals, the first failing validation check when validation breaks, and primary change summaries
-13. CLI summaries that surface the latest terminal workflow error for failed or blocked runs and now show remediation plan summary/rationale directly
-14. Complex scaffold execution that can deterministically rewrite supported Java method-call and constructor migration sites in existing files before appending operator-facing scaffold notes
+13. retry scheduling that now clears stale rollback/preflight/diff state before rerunning a remediation lane, and successful validation clears stale rollback/retry directives from the current run snapshot
+14. CLI summaries that surface the latest terminal workflow error for failed or blocked runs and now show remediation plan summary/rationale directly
+15. Complex scaffold execution that can deterministically rewrite supported Java method-call and constructor migration sites in existing files before appending operator-facing scaffold notes
 
 The default mode is:
 

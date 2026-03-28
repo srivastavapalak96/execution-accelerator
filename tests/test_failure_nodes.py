@@ -57,6 +57,56 @@ def test_classify_failure_schedules_retry_for_recoverable_simple_update(monkeypa
     assert update["workflow_status"] == "in_progress"
 
 
+def test_classify_failure_clears_attempt_scoped_state_before_retry(monkeypatch) -> None:
+    monkeypatch.setenv("EA_MAX_RETRY_ATTEMPTS", "1")
+    state = RemediationState(
+        initial_ticket_id="SEC-123",
+        route_decision={"strategy": RemediationStrategy.SIMPLE_UPDATE, "confidence": 0.93, "reason": "Direct fix."},
+        errors=[{"code": "validation_test_failed", "message": "Tests failed.", "recoverable": True}],
+        modified_files=["/tmp/workspace/pom.xml"],
+        code_diffs=[
+            {
+                "file_path": "pom.xml",
+                "change_summary": "Bump legacy-json to 1.2.4.",
+                "additions": 1,
+                "deletions": 1,
+            }
+        ],
+        preflight_resolution={
+            "repository": "payments-service",
+            "status": "passed",
+            "resolved_version": "1.2.4",
+            "dependency_kind": "direct",
+            "message": "Preflight passed.",
+        },
+        rollback_plan={
+            "repository": "payments-service",
+            "status": "applied",
+            "reason": "Restored pom.xml",
+            "files_to_restore": ["pom.xml"],
+        },
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": ValidationStatus.FAILED,
+                "checks": [
+                    ValidationCheck(name="compile", status=ValidationStatus.PASSED, details="Compile passed."),
+                    ValidationCheck(name="unit-tests", status=ValidationStatus.FAILED, details="Tests failed."),
+                ],
+                "summary": "Tests failed.",
+            }
+        ],
+    )
+
+    update = classify_failure(state)
+
+    assert update["retry_decision"].next_node == "remediate_simple"
+    assert update["rollback_plan"] is None
+    assert update["modified_files"] == []
+    assert update["code_diffs"] == []
+    assert update["preflight_resolution"] is None
+
+
 def test_classify_failure_escalates_compile_failure_even_with_retry_budget(monkeypatch) -> None:
     monkeypatch.setenv("EA_MAX_RETRY_ATTEMPTS", "2")
     state = RemediationState(
