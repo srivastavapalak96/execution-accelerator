@@ -334,6 +334,69 @@ def test_publish_remediation_node_prepares_next_pending_repository() -> None:
     assert update["total_attempts"] == 0
 
 
+def test_publish_remediation_node_includes_multi_repo_progress_in_delivery_context() -> None:
+    class StubDeliveryAdapter:
+        def __init__(self) -> None:
+            self.body: str | None = None
+            self.comment: str | None = None
+
+        def load_branch_publication(self, **_: object) -> BranchPublicationResult:
+            return BranchPublicationResult(
+                repository="payments-service",
+                branch_name="sec-888-remediate-legacy-json",
+                commit_sha="abc123",
+                commit_message="chore: remediate legacy-json for SEC-888",
+                pushed=True,
+            )
+
+        def load_pull_request(self, **kwargs: object) -> PullRequestSummary:
+            self.body = kwargs.get("body")
+            return PullRequestSummary(
+                repository="payments-service",
+                number=88,
+                url="https://example.test/pr/88",
+                title="SEC-888: remediate legacy-json",
+                status="open",
+            )
+
+        def load_jira_completion(self, **kwargs: object) -> JiraCompletionResult:
+            self.comment = kwargs.get("comment")
+            return JiraCompletionResult(
+                ticket_id="SEC-888",
+                status="commented",
+                comment="done",
+            )
+
+    adapter = StubDeliveryAdapter()
+    node = build_publish_remediation_node(cast(DeliveryAdapter, adapter))
+    state = RemediationState(
+        initial_ticket_id="SEC-888",
+        current_working_repo="payments-service",
+        pending_repos=["payments-service", "ledger-service"],
+        completed_repos=["catalog-service"],
+        skipped_repos=[
+            {
+                "name": "reporting-service",
+                "reason": "existing_pr:https://example.test/pr/7",
+            }
+        ],
+    )
+
+    node(state)
+
+    assert adapter.body is not None
+    assert adapter.comment is not None
+    assert "Current repository: payments-service" in adapter.body
+    assert "Repository progress: 3/4 addressed" in adapter.body
+    assert "Completed repositories: catalog-service, payments-service" in adapter.body
+    assert "Remaining repositories: ledger-service" in adapter.body
+    assert "Skipped repositories: reporting-service (existing_pr:https://example.test/pr/7)" in adapter.body
+    assert "Repository progress: 3/4 addressed" in adapter.comment
+    assert "Remaining repositories: ledger-service" in adapter.comment
+    assert "Skipped repositories: reporting-service (existing_pr:https://example.test/pr/7)" in adapter.comment
+    assert "Pull request: https://example.test/pr/88" in adapter.comment
+
+
 def test_skip_publish_for_dry_run_prepares_next_pending_repository(tmp_path: Path) -> None:
     node = build_skip_publish_for_dry_run_node(load_runtime_config(repo_root=tmp_path))
     state = RemediationState(

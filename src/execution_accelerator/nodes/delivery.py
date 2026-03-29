@@ -100,6 +100,7 @@ def _build_delivery_summary_lines(state: RemediationState) -> list[str]:
         lines.append("")
         lines.append(f"- Package: {state.vulnerability_details.package_name}")
         lines.append(f"- Installed version: {state.vulnerability_details.installed_version}")
+    lines.extend(_build_repo_progress_lines(state))
     if state.maven_verification is not None:
         lines.append(f"- Target version: {state.maven_verification.target_version}")
         lines.append(f"- Dependency kind: {state.maven_verification.dependency_kind}")
@@ -137,6 +138,32 @@ def _build_delivery_summary_lines(state: RemediationState) -> list[str]:
             lines.append(f"- Primary target file: {state.complex_remediation_plan.target_files[0].file_path}")
         if state.complex_remediation_plan.open_questions:
             lines.append(f"- Open question: {state.complex_remediation_plan.open_questions[0]}")
+    return lines
+
+
+def _build_repo_progress_lines(state: RemediationState) -> list[str]:
+    current_repo = state.current_working_repo
+    if current_repo is None:
+        return []
+
+    completed_repos = list(state.completed_repos)
+    if current_repo not in completed_repos:
+        completed_repos.append(current_repo)
+    remaining_repos = [repo for repo in state.pending_repos if repo != current_repo]
+    skipped_repos = [f"{repo.name} ({repo.reason})" for repo in state.skipped_repos]
+    total_repos = len(completed_repos) + len(remaining_repos) + len(skipped_repos)
+    if total_repos <= 1:
+        return []
+
+    lines = [
+        f"- Current repository: {current_repo}",
+        f"- Repository progress: {len(completed_repos) + len(skipped_repos)}/{total_repos} addressed",
+        f"- Completed repositories: {', '.join(completed_repos)}",
+    ]
+    if remaining_repos:
+        lines.append(f"- Remaining repositories: {', '.join(remaining_repos)}")
+    if skipped_repos:
+        lines.append(f"- Skipped repositories: {'; '.join(skipped_repos)}")
     return lines
 
 
