@@ -102,6 +102,25 @@ def test_handle_validation_failure_node_marks_test_failures_recoverable() -> Non
     assert update["errors"][-1].recoverable is True
 
 
+def test_handle_validation_failure_node_records_failing_repository() -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    adapter = ValidationAdapter(
+        validation_result_fixture_path=fixture_dir / "validation_result_failure.json",
+        rollback_fixture_path=fixture_dir / "rollback_plan.json",
+    )
+    validate_node = build_validate_remediation_node(adapter)
+    failure_node = build_handle_validation_failure_node(adapter)
+    base_state = RemediationState(
+        initial_ticket_id="SEC-128",
+        current_working_repo="payments-service",
+    )
+    failed_state = base_state.model_copy(update=validate_node(base_state))
+
+    update = failure_node(failed_state)
+
+    assert update["errors"][-1].repository == "payments-service"
+
+
 def test_handle_validation_failure_node_marks_license_failures_non_recoverable() -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
     failure_node = build_handle_validation_failure_node(

@@ -251,6 +251,10 @@ def test_escalate_node_writes_bundle(tmp_path: Path) -> None:
     assert update["escalation_bundle"].approval_comments == "Approved after compile-risk review."
     assert update["escalation_bundle"].validation_status == ValidationStatus.FAILED
     assert update["escalation_bundle"].primary_validation_check == "compile"
+    assert update["escalation_bundle"].failed_repository is None
+    assert update["escalation_bundle"].pending_repos == []
+    assert update["escalation_bundle"].completed_repos == []
+    assert update["escalation_bundle"].skipped_repos == []
     assert payload["route_strategy"] == RemediationStrategy.SIMPLE_UPDATE
     assert payload["route_reason"] == "Direct fix."
     assert payload["approval_stage"] == "remediation"
@@ -258,6 +262,10 @@ def test_escalate_node_writes_bundle(tmp_path: Path) -> None:
     assert payload["approval_comments"] == "Approved after compile-risk review."
     assert payload["validation_summary"] == "Compile failed."
     assert payload["primary_validation_check_status"] == ValidationStatus.FAILED
+    assert payload["failed_repository"] is None
+    assert payload["pending_repos"] == []
+    assert payload["completed_repos"] == []
+    assert payload["skipped_repos"] == []
 
 
 def test_escalate_node_persists_complex_plan_context(tmp_path: Path) -> None:
@@ -394,3 +402,46 @@ def test_escalate_node_uses_first_failed_validation_check_as_primary(tmp_path: P
     assert update["escalation_bundle"].primary_validation_check == "license-scan"
     assert update["escalation_bundle"].primary_validation_check_status == ValidationStatus.FAILED
     assert update["escalation_bundle"].primary_validation_check_details == "Disallowed GPL dependency detected."
+
+
+def test_escalate_node_captures_multi_repo_progress(tmp_path: Path) -> None:
+    config = load_runtime_config(repo_root=tmp_path)
+    node = __import__("execution_accelerator.nodes", fromlist=["build_escalate_node"]).build_escalate_node(config)
+    state = RemediationState(
+        initial_ticket_id="SEC-999",
+        current_working_repo="ledger-service",
+        total_attempts=1,
+        failure_classifications=[FailureClassification.TEST_FAILURE],
+        completed_repos=["payments-service"],
+        pending_repos=["ledger-service"],
+        skipped_repos=[{"name": "reporting-service", "reason": "existing_pr:https://example.test/pr/7"}],
+        errors=[{"code": "validation_test_failed", "message": "Tests failed.", "recoverable": False, "repository": "ledger-service"}],
+        validation_results=[
+            {
+                "repository": "ledger-service",
+                "status": ValidationStatus.FAILED,
+                "checks": [
+                    {
+                        "name": "unit-tests",
+                        "status": ValidationStatus.FAILED,
+                        "details": "2 tests failed.",
+                    }
+                ],
+                "summary": "Tests failed.",
+            }
+        ],
+    )
+
+    update = node(state)
+    bundle = update["escalation_bundle"]
+    payload = json.loads(Path(bundle.bundle_path).read_text())
+
+    assert bundle.failed_repository == "ledger-service"
+    assert bundle.completed_repos == ["payments-service"]
+    assert bundle.pending_repos == ["ledger-service"]
+    assert bundle.skipped_repos[0]["name"] == "reporting-service"
+    assert bundle.skipped_repos[0]["reason"] == "existing_pr:https://example.test/pr/7"
+    assert payload["failed_repository"] == "ledger-service"
+    assert payload["completed_repos"] == ["payments-service"]
+    assert payload["pending_repos"] == ["ledger-service"]
+    assert payload["skipped_repos"] == [{"name": "reporting-service", "reason": "existing_pr:https://example.test/pr/7"}]

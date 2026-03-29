@@ -18,7 +18,15 @@ from execution_accelerator.adapters import (
 from execution_accelerator.config import load_runtime_config
 from execution_accelerator.graph import bootstrap_ticket_run, compile_remediation_graph, load_remediation_state, resume_ticket_run
 from execution_accelerator.persistence import build_thread_config
-from execution_accelerator.schemas import ApprovalDecision, HumanFeedback, PreflightResolutionResult, ValidationStatus, WorkflowStatus
+from execution_accelerator.schemas import (
+    ApprovalDecision,
+    HumanFeedback,
+    PreflightResolutionResult,
+    RepositoryValidationResult,
+    RollbackPlan,
+    ValidationStatus,
+    WorkflowStatus,
+)
 from tests.conftest import seed_bootstrap_workspace_pom
 from tests.live_support import ResponseSpec, create_live_remote_repo, create_live_repo, serve_routes
 
@@ -268,6 +276,114 @@ def test_bootstrap_ticket_run_processes_multiple_repositories(tmp_path, monkeypa
     assert result.state.pull_request_summary is not None
     assert result.state.jira_completion is not None
     assert result.state.modified_files[0].endswith("ledger-service/ledger-app/pom.xml")
+
+
+def test_bootstrap_ticket_run_captures_multi_repo_failure_context(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path)
+    multi_repo_jira_path = tmp_path / "fixtures" / "jira_issue_multi.json"
+    multi_repo_jira_path.parent.mkdir(parents=True, exist_ok=True)
+    multi_repo_jira_path.write_text(
+        json.dumps(
+            {
+                "ticket_id": "SEC-223",
+                "summary": "Upgrade vulnerable JSON dependency",
+                "description": "Second repository fails validation.",
+                "package_name": "org.example:legacy-json",
+                "installed_version": "1.2.3",
+                "fixed_version": "1.2.4",
+                "severity": "high",
+                "affected_repositories": [
+                    {
+                        "name": "payments-service",
+                        "clone_url": "https://github.com/example/payments-service.git",
+                        "default_branch": "main",
+                        "build_system": "maven",
+                        "manifest_path": "pom.xml",
+                    },
+                    {
+                        "name": "ledger-service",
+                        "clone_url": "https://github.com/example/ledger-service.git",
+                        "default_branch": "main",
+                        "build_system": "maven",
+                        "manifest_path": "ledger-app/pom.xml",
+                    },
+                ],
+                "references": [
+                    {
+                        "source": "cve",
+                        "identifier": "CVE-2026-12345",
+                        "url": "https://example.com/advisories/CVE-2026-12345",
+                    }
+                ],
+            }
+        )
+    )
+    monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(multi_repo_jira_path))
+    monkeypatch.setattr(
+        "execution_accelerator.adapters.pom.PreflightResolutionAdapter.load_result",
+        lambda self, **kwargs: PreflightResolutionResult(
+            repository=kwargs["repository"],
+            status=ValidationStatus.PASSED,
+            resolved_version="1.2.4",
+            dependency_kind="direct",
+            message="Preflight passed.",
+        ),
+    )
+
+    def fake_validation_result(self, **kwargs):
+        repository = kwargs["repository"]
+        if repository == "payments-service":
+            return RepositoryValidationResult(
+                repository=repository,
+                status=ValidationStatus.PASSED,
+                checks=[{"name": "compile", "status": ValidationStatus.PASSED, "details": "Compile passed."}],
+                summary="Validation passed.",
+            )
+        return RepositoryValidationResult(
+            repository=repository,
+            status=ValidationStatus.FAILED,
+            checks=[{"name": "unit-tests", "status": ValidationStatus.FAILED, "details": "2 tests failed."}],
+            summary="Tests failed.",
+        )
+
+    def fake_rollback_plan(self, **kwargs):
+        return RollbackPlan(
+            repository=kwargs["repository"],
+            status="applied",
+            reason="Restored workspace after validation failure.",
+            files_to_restore=["ledger-app/pom.xml"],
+        )
+
+    monkeypatch.setattr("execution_accelerator.adapters.validation.ValidationAdapter.load_validation_result", fake_validation_result)
+    monkeypatch.setattr("execution_accelerator.adapters.validation.ValidationAdapter.load_rollback_plan", fake_rollback_plan)
+
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-223",
+        repository_name="payments-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_before.xml",
+    )
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-223",
+        repository_name="ledger-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_before.xml",
+        manifest_path="ledger-app/pom.xml",
+    )
+    config = load_runtime_config(repo_root=tmp_path)
+
+    result = bootstrap_ticket_run(
+        "SEC-223",
+        runtime_config=config,
+        thread_id="sec-223-thread",
+    )
+
+    assert result.state.workflow_status == WorkflowStatus.FAILED
+    assert result.state.escalation_bundle is not None
+    assert result.state.escalation_bundle.failed_repository == "ledger-service"
+    assert result.state.escalation_bundle.completed_repos == ["payments-service"]
+    assert result.state.escalation_bundle.pending_repos == ["ledger-service"]
+    assert result.state.errors[-1].repository == "ledger-service"
 
 
 def test_bootstrap_ticket_run_pauses_transitive_override_when_policy_requires_approval(tmp_path, monkeypatch) -> None:

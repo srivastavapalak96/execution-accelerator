@@ -521,7 +521,11 @@ class EscalationBundle(BaseSchemaModel):
 
     bundle_path: str = Field(min_length=1)
     failure_classification: FailureClassification = FailureClassification.UNKNOWN
+    failed_repository: str | None = None
     error_codes: list[str] = Field(default_factory=list)
+    pending_repos: list[str] = Field(default_factory=list)
+    completed_repos: list[str] = Field(default_factory=list)
+    skipped_repos: list[dict[str, str]] = Field(default_factory=list)
     route_strategy: RemediationStrategy | None = None
     route_reason: str | None = None
     approval_stage: ApprovalStage | None = None
