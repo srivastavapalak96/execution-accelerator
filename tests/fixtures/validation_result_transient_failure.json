@@ -1,0 +1,27 @@
+{
+  "repository": "payments-service",
+  "status": "failed",
+  "checks": [
+    {
+      "name": "compile",
+      "status": "passed",
+      "details": "Compilation completed successfully."
+    },
+    {
+      "name": "unit-tests",
+      "status": "passed",
+      "details": "All tests passed."
+    },
+    {
+      "name": "security-scan",
+      "status": "failed",
+      "details": "Live security rescan could not inspect the Maven dependency tree: Timed out fetching dependency metadata from the repository mirror."
+    },
+    {
+      "name": "license-scan",
+      "status": "pending",
+      "details": "Live license scan could not inspect the Maven dependency tree: Timed out fetching dependency metadata from the repository mirror."
+    }
+  ],
+  "summary": "Live validation could not inspect the remediated dependency tree."
+}

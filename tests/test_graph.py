@@ -727,6 +727,37 @@ def test_bootstrap_ticket_run_retries_once_before_escalating(tmp_path, monkeypat
     assert result.state.escalation_bundle is not None
 
 
+def test_bootstrap_ticket_run_retries_transient_validation_failure_before_escalating(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path)
+    monkeypatch.setenv("EA_MAX_RETRY_ATTEMPTS", "1")
+    monkeypatch.setenv(
+        "EA_VALIDATION_RESULT_FIXTURE_PATH",
+        str(Path(__file__).parent / "fixtures" / "validation_result_transient_failure.json"),
+    )
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-502",
+        repository_name="payments-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_before.xml",
+    )
+    config = load_runtime_config(repo_root=tmp_path)
+
+    result = bootstrap_ticket_run(
+        "SEC-502",
+        runtime_config=config,
+        thread_id="sec-502-thread",
+    )
+
+    assert result.state.workflow_status == WorkflowStatus.FAILED
+    assert result.state.retry_count == 1
+    assert result.state.retry_decision is not None
+    assert result.state.retry_decision.next_node == "escalate"
+    assert result.state.total_attempts == 2
+    assert len(result.state.validation_results) == 2
+    assert result.state.failure_classifications == ["network_transient", "network_transient"]
+    assert result.state.escalation_bundle is not None
+
+
 def test_live_flow_runs_through_delivery_with_live_integrations(tmp_path, monkeypatch) -> None:
     fixtures_dir = Path(__file__).parent / "fixtures"
     config_dir = tmp_path / "config"

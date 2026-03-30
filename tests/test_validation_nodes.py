@@ -204,6 +204,48 @@ def test_handle_validation_failure_node_marks_allowlist_license_failures_non_rec
     assert update["errors"][-1].recoverable is False
 
 
+def test_handle_validation_failure_node_marks_transient_dependency_scan_failures_recoverable() -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    failure_node = build_handle_validation_failure_node(
+        ValidationAdapter(
+            validation_result_fixture_path=fixture_dir / "validation_result_failure.json",
+            rollback_fixture_path=fixture_dir / "rollback_plan.json",
+        )
+    )
+    state = RemediationState(
+        initial_ticket_id="SEC-125B",
+        current_working_repo="payments-service",
+        validation_results=[
+            RepositoryValidationResult(
+                repository="payments-service",
+                status=ValidationStatus.FAILED,
+                checks=[
+                    {
+                        "name": "compile",
+                        "status": ValidationStatus.PASSED,
+                        "details": "Compilation succeeded.",
+                    },
+                    {
+                        "name": "security-scan",
+                        "status": ValidationStatus.FAILED,
+                        "details": (
+                            "Live security rescan could not inspect the Maven dependency tree: "
+                            "Timed out fetching dependency metadata from the repository mirror."
+                        ),
+                    },
+                ],
+                summary="Live validation could not inspect the remediated dependency tree.",
+            )
+        ],
+    )
+
+    update = failure_node(state)
+
+    assert cast(RollbackPlan, update["rollback_plan"]).status == "applied"
+    assert update["errors"][-1].code == "validation_transient_failed"
+    assert update["errors"][-1].recoverable is True
+
+
 def test_handle_validation_failure_node_does_not_mark_mixed_failures_recoverable() -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
     failure_node = build_handle_validation_failure_node(

@@ -198,7 +198,11 @@ class ValidationAdapter:
         checks.append(security_check)
         if security_check.status == ValidationStatus.FAILED:
             status = ValidationStatus.FAILED
-            summary = "Live validation detected an unresolved vulnerable dependency."
+            summary = (
+                "Live validation could not inspect the remediated dependency tree."
+                if _is_transient_validation_check(security_check)
+                else "Live validation detected an unresolved vulnerable dependency."
+            )
 
         license_check = _build_license_check(
             maven_runner=self.maven_runner,
@@ -210,7 +214,11 @@ class ValidationAdapter:
         checks.append(license_check)
         if license_check.status == ValidationStatus.FAILED:
             status = ValidationStatus.FAILED
-            summary = "Live validation detected a disallowed or unverifiable dependency license."
+            summary = (
+                "Live validation encountered transient dependency license inspection failures."
+                if _is_transient_validation_check(license_check)
+                else "Live validation detected a disallowed or unverifiable dependency license."
+            )
 
         return RepositoryValidationResult(
             repository=repository,
@@ -346,7 +354,7 @@ def _build_security_check(
         return ValidationCheck(
             name="security-scan",
             status=ValidationStatus.FAILED,
-            details=dependency_tree_error,
+            details=f"Live security rescan could not inspect the Maven dependency tree: {dependency_tree_error}",
         )
 
     group_id, artifact_id = vulnerability_details.package_name.split(":", maxsplit=1)
@@ -411,13 +419,17 @@ def _build_license_check(
     denylist = tuple(entry.lower() for entry in denylisted_licenses)
     allowlist = tuple(entry.lower() for entry in allowlisted_licenses)
     unresolved: list[str] = []
+    fetch_failures: list[str] = []
     disallowed: list[str] = []
     outside_allowlist: list[str] = []
     discovered: list[str] = []
     for coordinate in coordinates:
         try:
             licenses = maven_runner.fetch_pom_licenses(coordinate)
-        except (httpx.HTTPError, ValueError) as exc:
+        except httpx.HTTPError as exc:
+            fetch_failures.append(f"{_format_coordinate(coordinate)} ({exc})")
+            continue
+        except ValueError as exc:
             unresolved.append(f"{_format_coordinate(coordinate)} ({exc})")
             continue
         if not licenses:
@@ -450,6 +462,30 @@ def _build_license_check(
                 "Dependency licenses outside allowlist detected for "
                 f"{len(outside_allowlist)} dependencies against allowlist [{', '.join(allowlisted_licenses)}]: "
                 f"{'; '.join(outside_allowlist[:3])}."
+            ),
+        )
+    if fetch_failures:
+        return ValidationCheck(
+            name="license-scan",
+            status=ValidationStatus.FAILED if denylisted_licenses or allowlisted_licenses else ValidationStatus.PENDING,
+            details=(
+                "Live license scan encountered transient metadata fetch failures for "
+                f"{len(fetch_failures)} dependencies"
+                + (
+                    " while enforcing "
+                    + " and ".join(
+                        filter(
+                            None,
+                            [
+                                f"denylist [{', '.join(denylisted_licenses)}]" if denylisted_licenses else "",
+                                f"allowlist [{', '.join(allowlisted_licenses)}]" if allowlisted_licenses else "",
+                            ],
+                        )
+                    )
+                    if denylisted_licenses or allowlisted_licenses
+                    else ""
+                )
+                + f": {'; '.join(fetch_failures[:3])}."
             ),
         )
     if unresolved:
@@ -552,6 +588,16 @@ def _expand_license_pattern(pattern: str) -> tuple[str, ...]:
 
 def _format_coordinate(coordinate: DependencyCoordinate) -> str:
     return f"{coordinate.group_id}:{coordinate.artifact_id}:{coordinate.version}"
+
+
+def _is_transient_validation_check(check: ValidationCheck) -> bool:
+    if check.status != ValidationStatus.FAILED:
+        return False
+    details = (check.details or "").lower()
+    return (
+        "could not inspect the maven dependency tree" in details
+        or "transient metadata fetch failures" in details
+    )
 
 
 def _relative_restore_paths(workspace_path: Path, modified_files: list[str]) -> list[str]:

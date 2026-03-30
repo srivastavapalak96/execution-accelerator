@@ -190,6 +190,49 @@ def test_classify_failure_identifies_license_scan_failure_as_license_violation()
     assert update["retry_decision"].reason == "license_violation failures are not automatically retried."
 
 
+def test_classify_failure_retries_transient_validation_failures(monkeypatch) -> None:
+    monkeypatch.setenv("EA_MAX_RETRY_ATTEMPTS", "1")
+    state = RemediationState(
+        initial_ticket_id="SEC-126A",
+        route_decision={"strategy": RemediationStrategy.SIMPLE_UPDATE, "confidence": 0.93, "reason": "Direct fix."},
+        errors=[
+            {
+                "code": "validation_transient_failed",
+                "message": "Live validation could not inspect the remediated dependency tree.",
+                "recoverable": True,
+            }
+        ],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": ValidationStatus.FAILED,
+                "checks": [
+                    ValidationCheck(name="compile", status=ValidationStatus.PASSED, details="Compilation passed."),
+                    ValidationCheck(
+                        name="security-scan",
+                        status=ValidationStatus.FAILED,
+                        details=(
+                            "Live security rescan could not inspect the Maven dependency tree: "
+                            "Timed out fetching dependency metadata from the repository mirror."
+                        ),
+                    ),
+                ],
+                "summary": "Live validation could not inspect the remediated dependency tree.",
+            }
+        ],
+    )
+
+    update = classify_failure(state)
+
+    assert update["failure_classifications"][-1] == FailureClassification.NETWORK_TRANSIENT
+    assert update["retry_count"] == 1
+    assert update["retry_decision"].next_node == "remediate_simple"
+    assert (
+        update["retry_decision"].reason
+        == "Retryable transient validation failure will rerun the active remediation lane."
+    )
+
+
 def test_escalate_records_terminal_audit_event() -> None:
     state = RemediationState(
         initial_ticket_id="SEC-123",

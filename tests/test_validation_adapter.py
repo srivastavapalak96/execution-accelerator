@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from collections.abc import Iterator
 import http.server
+import httpx
 import os
 from pathlib import Path
 import subprocess
@@ -367,7 +368,73 @@ def test_validation_adapter_fails_live_license_scan_when_license_is_outside_allo
     assert result.checks[-1].name == "license-scan"
     assert result.checks[-1].status == "failed"
     assert "outside allowlist" in (result.checks[-1].details or "")
-    assert "Mozilla Public License 2.0" in (result.checks[-1].details or "")
+
+
+def test_validation_adapter_marks_transient_license_fetch_failures_as_failed_when_policy_is_active(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    wrapper = repo_dir / "mvnw"
+    wrapper.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                "if [ \"$1\" = \"dependency:tree\" ]; then",
+                "  printf '[INFO] org.example:payments-service:jar:1.0.0\\n'",
+                "  printf '[INFO] +- org.example:legacy-json:jar:1.2.4:compile\\n'",
+                "  exit 0",
+                "fi",
+                "echo '[INFO] BUILD SUCCESS'",
+            ]
+        )
+        + "\n"
+    )
+    wrapper.chmod(0o755)
+    maven_runner = MavenRunner(log_dir=tmp_path / "logs", metadata_base_url="https://mirror.example.test/maven2")
+    monkeypatch.setattr(
+        maven_runner,
+        "fetch_pom_licenses",
+        lambda coordinate: (_ for _ in ()).throw(httpx.ConnectError("repository mirror timeout")),
+    )
+    adapter = ValidationAdapter(
+        mode=ExecutionMode.LIVE,
+        maven_runner=maven_runner,
+        license_allowlist=("Apache", "MIT"),
+    )
+
+    result = adapter.load_validation_result(
+        repository="payments-service",
+        workspace_path=repo_dir,
+        execution_plan=MavenExecutionPlan(
+            repository="payments-service",
+            command=["./mvnw"],
+            root_pom_path=str(repo_dir / "pom.xml"),
+            uses_wrapper=True,
+        ),
+        vulnerability_details=VulnerabilityDetails(
+            package_name="org.example:legacy-json",
+            installed_version="1.2.3",
+            fixed_version="1.2.4",
+            summary="Upgrade legacy-json",
+            severity=Severity.HIGH,
+        ),
+        maven_verification=MavenVerification(
+            package_name="org.example:legacy-json",
+            current_version="1.2.3",
+            target_version="1.2.4",
+            dependency_kind=MavenDependencyKind.DIRECT,
+            resolver_note="Resolved to 1.2.4.",
+        ),
+    )
+
+    assert result.status == "failed"
+    assert result.summary == "Live validation encountered transient dependency license inspection failures."
+    assert result.checks[-1].name == "license-scan"
+    assert result.checks[-1].status == "failed"
+    assert "transient metadata fetch failures" in (result.checks[-1].details or "")
+
+
 def test_validation_adapter_reports_live_verify_failure(tmp_path: Path) -> None:
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()

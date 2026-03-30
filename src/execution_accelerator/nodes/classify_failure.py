@@ -78,6 +78,8 @@ def _classify_latest_failure(state: RemediationState) -> FailureClassification:
         latest_error = state.errors[-1]
         if latest_error.code in {"policy_blocked", "approval_rejected"}:
             return FailureClassification.POLICY_BLOCK
+        if latest_error.code == "validation_transient_failed":
+            return FailureClassification.NETWORK_TRANSIENT
     if not state.validation_results:
         return FailureClassification.UNKNOWN
 
@@ -118,7 +120,7 @@ def _select_retry_node(state: RemediationState) -> str | None:
 
 
 def _is_retryable_classification(classification: FailureClassification) -> bool:
-    return classification == FailureClassification.TEST_FAILURE
+    return classification in {FailureClassification.TEST_FAILURE, FailureClassification.NETWORK_TRANSIENT}
 
 
 def _build_retry_reason(
@@ -132,6 +134,8 @@ def _build_retry_reason(
     latest_error_recoverable: bool,
 ) -> str:
     if can_retry:
+        if classification == FailureClassification.NETWORK_TRANSIENT:
+            return "Retryable transient validation failure will rerun the active remediation lane."
         return "Retryable test failure will rerun the active remediation lane."
     if total_attempts >= max_total_attempts:
         return "Total attempt budget reached; escalation is required."

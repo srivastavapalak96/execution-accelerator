@@ -108,16 +108,16 @@ def build_handle_validation_failure_node(
 
 
 def _is_recoverable_validation_failure(validation_result: RepositoryValidationResult) -> bool:
-    has_test_failure = False
+    has_retryable_failure = False
     for check in validation_result.checks:
         if check.status != ValidationStatus.FAILED:
             continue
         normalized_name = check.name.lower()
-        if "test" in normalized_name:
-            has_test_failure = True
+        if "test" in normalized_name or _is_transient_validation_check(check.name, check.details):
+            has_retryable_failure = True
             continue
         return False
-    return has_test_failure
+    return has_retryable_failure
 
 
 def _build_validation_error_code(validation_result: RepositoryValidationResult) -> str:
@@ -125,6 +125,8 @@ def _build_validation_error_code(validation_result: RepositoryValidationResult) 
         if check.status != ValidationStatus.FAILED:
             continue
         normalized_name = check.name.lower()
+        if _is_transient_validation_check(check.name, check.details):
+            return "validation_transient_failed"
         if "compile" in normalized_name:
             return "validation_compile_failed"
         if "test" in normalized_name:
@@ -134,3 +136,14 @@ def _build_validation_error_code(validation_result: RepositoryValidationResult) 
         if "license" in normalized_name:
             return "validation_license_failed"
     return "validation_failed"
+
+
+def _is_transient_validation_check(check_name: str, check_details: str | None) -> bool:
+    normalized_name = check_name.lower()
+    normalized_details = (check_details or "").lower()
+    if "security" not in normalized_name and "license" not in normalized_name:
+        return False
+    return (
+        "could not inspect the maven dependency tree" in normalized_details
+        or "transient metadata fetch failures" in normalized_details
+    )
