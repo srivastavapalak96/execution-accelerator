@@ -546,6 +546,15 @@ def _apply_complex_symbol_rewrites(
         complex_plan=complex_plan,
     ):
         rewritten_text = rewritten_text.replace(legacy_call, replacement_call)
+    for legacy_field, replacement_field in _iter_complex_field_rewrites(
+        target=target,
+        complex_plan=complex_plan,
+    ):
+        rewritten_text = _rewrite_java_field_references(
+            rewritten_text,
+            legacy_field=legacy_field,
+            replacement_field=replacement_field,
+        )
     for legacy_class, method_name, replacement_call in _iter_complex_static_import_rewrites(
         target=target,
         complex_plan=complex_plan,
@@ -555,6 +564,16 @@ def _apply_complex_symbol_rewrites(
             legacy_class=legacy_class,
             method_name=method_name,
             replacement_call=replacement_call,
+        )
+    for legacy_class, field_name, replacement_field in _iter_complex_static_import_field_rewrites(
+        target=target,
+        complex_plan=complex_plan,
+    ):
+        rewritten_text = _rewrite_java_static_import_fields(
+            rewritten_text,
+            legacy_class=legacy_class,
+            field_name=field_name,
+            replacement_field=replacement_field,
         )
     for legacy_reference, replacement_reference in _iter_complex_method_reference_rewrites(
         target=target,
@@ -616,6 +635,50 @@ def _iter_complex_static_import_rewrites(
         if legacy_class is None or method_name is None or replacement_call is None:
             continue
         rewrite = (legacy_class, method_name, replacement_call)
+        if rewrite not in rewrites:
+            rewrites.append(rewrite)
+    return rewrites
+
+
+def _iter_complex_field_rewrites(
+    *,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> list[tuple[str, str]]:
+    rewrites: list[tuple[str, str]] = []
+    related_symbols = set(target.related_symbols)
+    for mapping in complex_plan.symbol_mappings:
+        if mapping.legacy_symbol not in related_symbols and mapping.replacement_symbol not in related_symbols:
+            continue
+        replacement_field = _render_java_field_reference(mapping.replacement_symbol, qualified=True)
+        if replacement_field is None:
+            continue
+        for qualified in (False, True):
+            legacy_field = _render_java_field_reference(mapping.legacy_symbol, qualified=qualified)
+            if legacy_field is None:
+                continue
+            rewrite = (legacy_field, replacement_field)
+            if rewrite not in rewrites:
+                rewrites.append(rewrite)
+    return rewrites
+
+
+def _iter_complex_static_import_field_rewrites(
+    *,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> list[tuple[str, str, str]]:
+    rewrites: list[tuple[str, str, str]] = []
+    related_symbols = set(target.related_symbols)
+    for mapping in complex_plan.symbol_mappings:
+        if mapping.legacy_symbol not in related_symbols and mapping.replacement_symbol not in related_symbols:
+            continue
+        legacy_class = _parse_java_symbol_class(mapping.legacy_symbol)
+        field_name = _parse_java_field_name(mapping.legacy_symbol)
+        replacement_field = _render_java_field_reference(mapping.replacement_symbol, qualified=True)
+        if legacy_class is None or field_name is None or replacement_field is None:
+            continue
+        rewrite = (legacy_class, field_name, replacement_field)
         if rewrite not in rewrites:
             rewrites.append(rewrite)
     return rewrites
@@ -809,6 +872,16 @@ def _render_java_method_reference(symbol: str, *, qualified: bool) -> str | None
     return f"{rendered_class}::{member_expression}"
 
 
+def _render_java_field_reference(symbol: str, *, qualified: bool) -> str | None:
+    if "#" not in symbol:
+        return None
+    class_name, member_expression = symbol.split("#", maxsplit=1)
+    if not class_name or not member_expression or "(" in member_expression or "<init>" in member_expression:
+        return None
+    rendered_class = class_name if qualified else class_name.rsplit(".", maxsplit=1)[-1]
+    return f"{rendered_class}.{member_expression}"
+
+
 def _parse_java_symbol_class(symbol: str) -> str | None:
     if "#" not in symbol:
         return None
@@ -824,6 +897,16 @@ def _parse_java_method_name(symbol: str) -> str | None:
         return None
     method_name = member_expression.rsplit(".", maxsplit=1)[-1].split("(", maxsplit=1)[0]
     return method_name or None
+
+
+def _parse_java_field_name(symbol: str) -> str | None:
+    if "#" not in symbol:
+        return None
+    _, member_expression = symbol.split("#", maxsplit=1)
+    if not member_expression or "(" in member_expression or "<init>" in member_expression:
+        return None
+    field_name = member_expression.rsplit(".", maxsplit=1)[-1]
+    return field_name or None
 
 
 def _parse_java_constructor_class(symbol: str) -> str | None:
@@ -1057,6 +1140,65 @@ def _rewrite_java_static_import_calls(
     return rewritten_text
 
 
+def _rewrite_java_static_import_fields(
+    text: str,
+    *,
+    legacy_class: str,
+    field_name: str,
+    replacement_field: str,
+) -> str:
+    exact_import_pattern = re.compile(
+        rf"(?m)^[ \t]*import\s+static\s+{re.escape(legacy_class)}\.{re.escape(field_name)}\s*;\s*\n?"
+    )
+    wildcard_import_pattern = re.compile(
+        rf"(?m)^[ \t]*import\s+static\s+{re.escape(legacy_class)}\.\*\s*;\s*$"
+    )
+    has_exact_import = exact_import_pattern.search(text) is not None
+    has_wildcard_import = wildcard_import_pattern.search(text) is not None
+    if not has_exact_import and not has_wildcard_import:
+        return text
+
+    rewritten_lines: list[str] = []
+    changed = False
+    for line in text.splitlines(keepends=True):
+        if line.strip().startswith(("package ", "import ", "@", "/*", "*", "//")):
+            rewritten_lines.append(line)
+            continue
+        if _looks_like_java_field_declaration(line, field_name):
+            rewritten_lines.append(line)
+            continue
+        updated_line = re.sub(
+            rf"(?<![\w.]){re.escape(field_name)}\b",
+            replacement_field,
+            line,
+        )
+        if updated_line != line:
+            changed = True
+        rewritten_lines.append(updated_line)
+
+    rewritten_text = "".join(rewritten_lines)
+    if changed and has_exact_import:
+        rewritten_text = exact_import_pattern.sub("", rewritten_text)
+        rewritten_text = re.sub(r"\n{3,}", "\n\n", rewritten_text)
+    return rewritten_text
+
+
+def _rewrite_java_field_references(text: str, *, legacy_field: str, replacement_field: str) -> str:
+    rewritten_lines: list[str] = []
+    for line in text.splitlines(keepends=True):
+        if line.strip().startswith(("package ", "import ", "@", "/*", "*", "//")):
+            rewritten_lines.append(line)
+            continue
+        rewritten_lines.append(
+            re.sub(
+                rf"(?<![\w.]){re.escape(legacy_field)}\b",
+                replacement_field,
+                line,
+            )
+        )
+    return "".join(rewritten_lines)
+
+
 def _looks_like_java_method_declaration(line: str, method_name: str) -> bool:
     stripped = line.strip()
     if not stripped or stripped.startswith(("package ", "import ", "@", "/*", "*", "//")):
@@ -1076,6 +1218,31 @@ def _looks_like_java_method_declaration(line: str, method_name: str) -> bool:
     return (
         re.match(
             rf"^\s*(?:public|private|protected|static|final|abstract|synchronized|native|default|\w[\w<>\[\],.?]*)[\w\s<>\[\],.?]*\b{re.escape(method_name)}\s*\(",
+            line,
+        )
+        is not None
+    )
+
+
+def _looks_like_java_field_declaration(line: str, field_name: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped.startswith(("package ", "import ", "@", "/*", "*", "//")):
+        return False
+    first_token_match = re.match(r"^\s*([A-Za-z_]\w*)", line)
+    if first_token_match is not None and first_token_match.group(1) in {
+        "return",
+        "if",
+        "for",
+        "while",
+        "switch",
+        "catch",
+        "throw",
+        "new",
+    }:
+        return False
+    return (
+        re.match(
+            rf"^\s*(?:public|private|protected|static|final|abstract|transient|volatile|\w[\w<>\[\],.?]*)[\w\s<>\[\],.?]*\b{re.escape(field_name)}\b\s*(?:=|;)",
             line,
         )
         is not None

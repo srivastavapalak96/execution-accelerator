@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -764,6 +765,120 @@ def test_execute_complex_scaffold_node_rewrites_wildcard_static_imported_calls_i
     assert "import static org.example.LegacyParser.*;" in rendered_text
     assert "return parse(payload);" not in rendered_text
     assert "return org.example.JsonParserBuilder.create().parse(payload);" in rendered_text
+    assert "Execution Accelerator complex scaffold." not in rendered_text
+    extra_diff = next(diff for diff in update["code_diffs"] if diff.file_path.endswith("LegacyJsonConsumer.java"))
+    assert extra_diff.change_summary == "Apply supported complex migration rewrites for detected legacy API usage."
+
+
+def test_execute_complex_scaffold_node_rewrites_detected_java_static_fields_and_cleans_imports(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    symbol_mappings = json.loads((fixture_dir / "symbol_mappings.json").read_text())
+    symbol_mappings["symbol_mappings"].append(
+        {
+            "legacy_symbol": "org.example.LegacyParser#DEFAULT_MODE",
+            "replacement_symbol": "org.example.JsonParserDefaults#STRICT_MODE",
+            "confidence": 0.88,
+            "rationale": "The legacy default parser mode constant moved to JsonParserDefaults.",
+        }
+    )
+    symbol_mapping_path = tmp_path / "symbol_mappings_with_field.json"
+    symbol_mapping_path.write_text(json.dumps(symbol_mappings))
+    adapter = ComplexRemediationAdapter(
+        artifact_fixture_path=fixture_dir / "complex_artifacts.json",
+        compatibility_diff_fixture_path=fixture_dir / "compatibility_diff.json",
+        decompiled_artifact_fixture_path=fixture_dir / "decompiled_artifacts.json",
+        symbol_mapping_fixture_path=symbol_mapping_path,
+        code_change_plan_fixture_path=fixture_dir / "code_change_plan.json",
+    )
+    prepare_node = build_prepare_complex_remediation_node(adapter)
+    scaffold_node = build_execute_complex_scaffold_node(adapter)
+    base_state = build_state(tmp_path, complex_refactor=True)
+    prepared_state = base_state.model_copy(update=prepare_node(base_state))
+    existing_target = (
+        Path(prepared_state.repo_map["payments-service"].local_path)
+        / "src/main/java/com/example/payments/LegacyJsonConsumer.java"
+    )
+    existing_target.parent.mkdir(parents=True, exist_ok=True)
+    existing_target.write_text(
+        "\n".join(
+            [
+                "package com.example.payments;",
+                "",
+                "import org.example.LegacyParser;",
+                "",
+                "public final class LegacyJsonConsumer {",
+                "    Object defaultMode() {",
+                "        return LegacyParser.DEFAULT_MODE;",
+                "    }",
+                "}",
+                "",
+            ]
+        )
+    )
+
+    update = scaffold_node(prepared_state)
+
+    rendered_text = existing_target.read_text()
+    assert "import org.example.LegacyParser;" not in rendered_text
+    assert "LegacyParser.DEFAULT_MODE" not in rendered_text
+    assert "org.example.JsonParserDefaults.STRICT_MODE" in rendered_text
+    assert "Execution Accelerator complex scaffold." not in rendered_text
+    extra_diff = next(diff for diff in update["code_diffs"] if diff.file_path.endswith("LegacyJsonConsumer.java"))
+    assert extra_diff.change_summary == "Apply supported complex migration rewrites for detected legacy API usage."
+
+
+def test_execute_complex_scaffold_node_rewrites_exact_static_imported_java_fields(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    symbol_mappings = json.loads((fixture_dir / "symbol_mappings.json").read_text())
+    symbol_mappings["symbol_mappings"].append(
+        {
+            "legacy_symbol": "org.example.LegacyParser#DEFAULT_MODE",
+            "replacement_symbol": "org.example.JsonParserDefaults#STRICT_MODE",
+            "confidence": 0.88,
+            "rationale": "The legacy default parser mode constant moved to JsonParserDefaults.",
+        }
+    )
+    symbol_mapping_path = tmp_path / "symbol_mappings_with_static_field.json"
+    symbol_mapping_path.write_text(json.dumps(symbol_mappings))
+    adapter = ComplexRemediationAdapter(
+        artifact_fixture_path=fixture_dir / "complex_artifacts.json",
+        compatibility_diff_fixture_path=fixture_dir / "compatibility_diff.json",
+        decompiled_artifact_fixture_path=fixture_dir / "decompiled_artifacts.json",
+        symbol_mapping_fixture_path=symbol_mapping_path,
+        code_change_plan_fixture_path=fixture_dir / "code_change_plan.json",
+    )
+    prepare_node = build_prepare_complex_remediation_node(adapter)
+    scaffold_node = build_execute_complex_scaffold_node(adapter)
+    base_state = build_state(tmp_path, complex_refactor=True)
+    prepared_state = base_state.model_copy(update=prepare_node(base_state))
+    existing_target = (
+        Path(prepared_state.repo_map["payments-service"].local_path)
+        / "src/main/java/com/example/payments/LegacyJsonConsumer.java"
+    )
+    existing_target.parent.mkdir(parents=True, exist_ok=True)
+    existing_target.write_text(
+        "\n".join(
+            [
+                "package com.example.payments;",
+                "",
+                "import static org.example.LegacyParser.DEFAULT_MODE;",
+                "",
+                "public final class LegacyJsonConsumer {",
+                "    Object defaultMode() {",
+                "        return DEFAULT_MODE;",
+                "    }",
+                "}",
+                "",
+            ]
+        )
+    )
+
+    update = scaffold_node(prepared_state)
+
+    rendered_text = existing_target.read_text()
+    assert "import static org.example.LegacyParser.DEFAULT_MODE;" not in rendered_text
+    assert "return DEFAULT_MODE;" not in rendered_text
+    assert "return org.example.JsonParserDefaults.STRICT_MODE;" in rendered_text
     assert "Execution Accelerator complex scaffold." not in rendered_text
     extra_diff = next(diff for diff in update["code_diffs"] if diff.file_path.endswith("LegacyJsonConsumer.java"))
     assert extra_diff.change_summary == "Apply supported complex migration rewrites for detected legacy API usage."
