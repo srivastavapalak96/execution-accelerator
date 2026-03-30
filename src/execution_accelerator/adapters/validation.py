@@ -51,6 +51,7 @@ class ValidationAdapter:
         maven_runner: MavenRunner | None = None,
         git_runner: GitRunner | None = None,
         license_denylist: tuple[str, ...] = (),
+        license_allowlist: tuple[str, ...] = (),
     ) -> None:
         self.validation_result_fixture_path = validation_result_fixture_path
         self.rollback_fixture_path = rollback_fixture_path
@@ -58,6 +59,7 @@ class ValidationAdapter:
         self.maven_runner = maven_runner
         self.git_runner = git_runner
         self.license_denylist = license_denylist
+        self.license_allowlist = license_allowlist
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "ValidationAdapter":
@@ -79,6 +81,7 @@ class ValidationAdapter:
                 secrets=tuple(secret for secret in (credentials.github_token,) if secret),
             ),
             license_denylist=config.license_denylist,
+            license_allowlist=config.license_allowlist,
         )
 
     def load_validation_result(
@@ -202,6 +205,7 @@ class ValidationAdapter:
             dependency_tree=dependency_tree,
             dependency_tree_error=dependency_tree_error,
             denylisted_licenses=self.license_denylist,
+            allowlisted_licenses=self.license_allowlist,
         )
         checks.append(license_check)
         if license_check.status == ValidationStatus.FAILED:
@@ -384,11 +388,12 @@ def _build_license_check(
     dependency_tree: list[DependencyTreeEntry],
     dependency_tree_error: str | None,
     denylisted_licenses: tuple[str, ...],
+    allowlisted_licenses: tuple[str, ...],
 ) -> ValidationCheck:
     if dependency_tree_error is not None:
         return ValidationCheck(
             name="license-scan",
-            status=ValidationStatus.FAILED if denylisted_licenses else ValidationStatus.PENDING,
+            status=ValidationStatus.FAILED if denylisted_licenses or allowlisted_licenses else ValidationStatus.PENDING,
             details=(
                 "Live license scan could not inspect the Maven dependency tree: "
                 f"{dependency_tree_error}"
@@ -404,8 +409,10 @@ def _build_license_check(
         )
 
     denylist = tuple(entry.lower() for entry in denylisted_licenses)
+    allowlist = tuple(entry.lower() for entry in allowlisted_licenses)
     unresolved: list[str] = []
     disallowed: list[str] = []
+    outside_allowlist: list[str] = []
     discovered: list[str] = []
     for coordinate in coordinates:
         try:
@@ -421,6 +428,9 @@ def _build_license_check(
                 discovered.append(license_name)
         if any(_license_matches_denylist(license_name, denylist) for license_name in licenses):
             disallowed.append(f"{_format_coordinate(coordinate)} ({', '.join(licenses)})")
+            continue
+        if allowlist and not any(_license_matches_allowlist(license_name, allowlist) for license_name in licenses):
+            outside_allowlist.append(f"{_format_coordinate(coordinate)} ({', '.join(licenses)})")
 
     if disallowed:
         return ValidationCheck(
@@ -432,16 +442,35 @@ def _build_license_check(
                 f"{'; '.join(disallowed[:3])}."
             ),
         )
+    if outside_allowlist:
+        return ValidationCheck(
+            name="license-scan",
+            status=ValidationStatus.FAILED,
+            details=(
+                "Dependency licenses outside allowlist detected for "
+                f"{len(outside_allowlist)} dependencies against allowlist [{', '.join(allowlisted_licenses)}]: "
+                f"{'; '.join(outside_allowlist[:3])}."
+            ),
+        )
     if unresolved:
         return ValidationCheck(
             name="license-scan",
-            status=ValidationStatus.FAILED if denylisted_licenses else ValidationStatus.PENDING,
+            status=ValidationStatus.FAILED if denylisted_licenses or allowlisted_licenses else ValidationStatus.PENDING,
             details=(
                 "Live license scan could not resolve license metadata for "
                 f"{len(unresolved)} dependencies"
                 + (
-                    f" while enforcing denylist [{', '.join(denylisted_licenses)}]"
-                    if denylisted_licenses
+                    " while enforcing "
+                    + " and ".join(
+                        filter(
+                            None,
+                            [
+                                f"denylist [{', '.join(denylisted_licenses)}]" if denylisted_licenses else "",
+                                f"allowlist [{', '.join(allowlisted_licenses)}]" if allowlisted_licenses else "",
+                            ],
+                        )
+                    )
+                    if denylisted_licenses or allowlisted_licenses
                     else ""
                 )
                 + f": {'; '.join(unresolved[:3])}."
@@ -456,6 +485,11 @@ def _build_license_check(
             + (
                 f"no denylisted licenses found against [{', '.join(denylisted_licenses)}]. "
                 if denylisted_licenses
+                else ""
+            )
+            + (
+                f"all dependency licenses matched allowlist [{', '.join(allowlisted_licenses)}]. "
+                if allowlisted_licenses
                 else ""
             )
             + (
@@ -492,8 +526,16 @@ def _iter_license_scan_coordinates(dependency_tree: list[DependencyTreeEntry]) -
 
 
 def _license_matches_denylist(license_name: str, denylist: tuple[str, ...]) -> bool:
+    return _license_matches_policy(license_name, denylist)
+
+
+def _license_matches_allowlist(license_name: str, allowlist: tuple[str, ...]) -> bool:
+    return _license_matches_policy(license_name, allowlist)
+
+
+def _license_matches_policy(license_name: str, patterns: tuple[str, ...]) -> bool:
     normalized_name = license_name.lower()
-    return any(alias in normalized_name for pattern in denylist for alias in _expand_license_pattern(pattern))
+    return any(alias in normalized_name for pattern in patterns for alias in _expand_license_pattern(pattern))
 
 
 def _expand_license_pattern(pattern: str) -> tuple[str, ...]:

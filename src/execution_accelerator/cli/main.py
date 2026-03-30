@@ -99,6 +99,7 @@ def main() -> int:
             print(f"checkpoints_path={config.checkpoints_path}")
             print(f"maven_metadata_base_url={config.maven_metadata_base_url}")
             print(f"license_denylist={config.license_denylist}")
+            print(f"license_allowlist={config.license_allowlist}")
             print(f"jira_done_transition_id={config.jira_done_transition_id}")
             print(f"jira_done_status_name={config.jira_done_status_name}")
             print(f"jira_fixture_path={config.jira_fixture_path}")

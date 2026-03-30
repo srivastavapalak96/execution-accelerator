@@ -42,6 +42,7 @@ class RuntimeConfig:
     advisory_api_base_url: str
     maven_metadata_base_url: str
     license_denylist: tuple[str, ...]
+    license_allowlist: tuple[str, ...]
     java_home: Path | None
     jira_base_url: str | None
     jira_project_key: str | None
@@ -177,6 +178,7 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         advisory_api_base_url=os.getenv("EA_OSV_API_BASE", "https://api.osv.dev"),
         maven_metadata_base_url=os.getenv("EA_MAVEN_METADATA_BASE", "https://repo1.maven.org/maven2"),
         license_denylist=_split_csv_setting(os.getenv("EA_LICENSE_DENYLIST")),
+        license_allowlist=_split_csv_setting(os.getenv("EA_LICENSE_ALLOWLIST")),
         java_home=(
             _resolve_path_setting(java_home_value, repo_root=resolved_root)
             if java_home_value

@@ -26,7 +26,7 @@ The current repo can run a persisted local flow for:
    - simple update
    - transitive override
    - complex refactor scaffold
-6. live or fixture-backed validation, including a post-remediation dependency-tree rescan in live mode and a dependency license scan with optional denylist enforcement
+6. live or fixture-backed validation, including a post-remediation dependency-tree rescan in live mode and a dependency license scan with optional denylist or allowlist enforcement
 7. fixture-backed or live git-backed rollback-on-failure, including cleanup of untracked remediation files in live mode
 8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira completion comments and optional done transitions; delivery-approved complex runs can now publish ready PRs instead of remaining draft-only, GitHub PR-create conflicts can recover the existing open PR instead of failing delivery, Jira done-transition conflicts can recover when the issue is already in the target status, Jira done transitions can now also be resolved live by target status name when a transition ID is not preconfigured, both PR bodies and Jira comments now publish workflow, route, approval, approval-comment, remediation-plan context, and multi-repo progress instead of placeholder text, and successful runs now continue across all pending affected repositories instead of stopping after the first one
 9. fixture-backed or live failure escalation summaries, including persisted escalation bundle paths in run output, route rationale, approval provenance, code-diff summaries, validation context, richer complex-plan context for tough-path failures, and multi-repo progress context such as the failed repository plus completed/pending/skipped repositories
@@ -50,7 +50,7 @@ EA_MODE=fixture
 This repository does **not** yet perform:
 
 - fuller Jira completion workflow handling beyond the current done-transition-by-id or done-transition-by-status support
-- richer license-policy handling beyond the current dependency license scan and optional denylist enforcement
+- richer license-policy handling beyond the current dependency license scan and optional denylist/allowlist enforcement
 - richer retry policies beyond the current bounded test-failure remediation re-run
 - richer policy enforcement beyond the current route/tag and complex-delivery approval rules
 - broad tough-path/EOL migrations beyond the current bounded Java rewrite/helper generation support

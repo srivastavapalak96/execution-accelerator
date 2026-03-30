@@ -165,6 +165,45 @@ def test_handle_validation_failure_node_marks_license_failures_non_recoverable()
     assert update["errors"][-1].recoverable is False
 
 
+def test_handle_validation_failure_node_marks_allowlist_license_failures_non_recoverable() -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    failure_node = build_handle_validation_failure_node(
+        ValidationAdapter(
+            validation_result_fixture_path=fixture_dir / "validation_result_failure.json",
+            rollback_fixture_path=fixture_dir / "rollback_plan.json",
+        )
+    )
+    state = RemediationState(
+        initial_ticket_id="SEC-125A",
+        current_working_repo="payments-service",
+        validation_results=[
+            RepositoryValidationResult(
+                repository="payments-service",
+                status=ValidationStatus.FAILED,
+                checks=[
+                    {
+                        "name": "compile",
+                        "status": ValidationStatus.PASSED,
+                        "details": "Compilation succeeded.",
+                    },
+                    {
+                        "name": "license-scan",
+                        "status": ValidationStatus.FAILED,
+                        "details": "Dependency licenses outside allowlist detected against allowlist [Apache, MIT].",
+                    },
+                ],
+                summary="Live validation detected a disallowed or unverifiable dependency license.",
+            )
+        ],
+    )
+
+    update = failure_node(state)
+
+    assert cast(RollbackPlan, update["rollback_plan"]).status == "applied"
+    assert update["errors"][-1].code == "validation_license_failed"
+    assert update["errors"][-1].recoverable is False
+
+
 def test_handle_validation_failure_node_does_not_mark_mixed_failures_recoverable() -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
     failure_node = build_handle_validation_failure_node(

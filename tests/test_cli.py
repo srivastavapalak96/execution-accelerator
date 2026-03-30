@@ -28,6 +28,7 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "state" / "checkpoints.sqlite"))
     monkeypatch.setenv("EA_MAVEN_METADATA_BASE", "https://mirror.example.test/maven2")
     monkeypatch.setenv("EA_LICENSE_DENYLIST", "GPL, LGPL")
+    monkeypatch.setenv("EA_LICENSE_ALLOWLIST", "Apache, MIT")
     monkeypatch.setenv("EA_JIRA_DONE_TRANSITION_ID", "31")
     monkeypatch.setenv("EA_JIRA_DONE_STATUS_NAME", "Done")
     monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(tmp_path / "fixtures" / "jira_issue.json"))
@@ -101,6 +102,7 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     assert f"checkpoints_path={tmp_path / 'state' / 'checkpoints.sqlite'}" in captured.out
     assert "maven_metadata_base_url=https://mirror.example.test/maven2" in captured.out
     assert "license_denylist=('GPL', 'LGPL')" in captured.out
+    assert "license_allowlist=('Apache', 'MIT')" in captured.out
     assert "jira_done_transition_id=31" in captured.out
     assert "jira_done_status_name=Done" in captured.out
     assert f"jira_fixture_path={tmp_path / 'fixtures' / 'jira_issue.json'}" in captured.out

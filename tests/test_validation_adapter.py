@@ -66,6 +66,7 @@ def test_validation_adapter_from_runtime_config_uses_metadata_base_and_license_d
     monkeypatch.setenv("EA_ROLLBACK_FIXTURE_PATH", str(fixture_dir / "rollback_plan.json"))
     monkeypatch.setenv("EA_MAVEN_METADATA_BASE", "https://mirror.example.test/maven2")
     monkeypatch.setenv("EA_LICENSE_DENYLIST", "GPL, LGPL")
+    monkeypatch.setenv("EA_LICENSE_ALLOWLIST", "Apache, MIT")
     config = load_runtime_config(repo_root=tmp_path)
 
     adapter = ValidationAdapter.from_runtime_config(config)
@@ -73,6 +74,7 @@ def test_validation_adapter_from_runtime_config_uses_metadata_base_and_license_d
     assert adapter.maven_runner is not None
     assert adapter.maven_runner.metadata_base_url == "https://mirror.example.test/maven2"
     assert adapter.license_denylist == ("GPL", "LGPL")
+    assert adapter.license_allowlist == ("Apache", "MIT")
 
 
 def test_validation_adapter_runs_live_verify_and_parses_surefire_reports(tmp_path: Path) -> None:
@@ -225,6 +227,147 @@ def test_validation_adapter_fails_live_license_scan_when_denylisted_license_is_d
     assert "GNU General Public License v3.0" in (result.checks[-1].details or "")
 
 
+def test_validation_adapter_passes_live_license_scan_when_license_is_allowlisted(tmp_path: Path) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    pom_root = tmp_path / "pom-repo"
+    pom_file = pom_root / "org" / "example" / "legacy-json" / "1.2.4" / "legacy-json-1.2.4.pom"
+    pom_file.parent.mkdir(parents=True, exist_ok=True)
+    pom_file.write_text(
+        """
+        <project xmlns="http://maven.apache.org/POM/4.0.0">
+          <licenses>
+            <license>
+              <name>Apache License, Version 2.0</name>
+            </license>
+          </licenses>
+        </project>
+        """
+    )
+    wrapper = repo_dir / "mvnw"
+    wrapper.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                "if [ \"$1\" = \"dependency:tree\" ]; then",
+                "  printf '[INFO] org.example:payments-service:jar:1.0.0\\n'",
+                "  printf '[INFO] +- org.example:legacy-json:jar:1.2.4:compile\\n'",
+                "  exit 0",
+                "fi",
+                "echo '[INFO] BUILD SUCCESS'",
+            ]
+        )
+        + "\n"
+    )
+    wrapper.chmod(0o755)
+    with serve_directory(pom_root) as base_url:
+        adapter = ValidationAdapter(
+            mode=ExecutionMode.LIVE,
+            maven_runner=MavenRunner(log_dir=tmp_path / "logs", metadata_base_url=base_url),
+            license_allowlist=("Apache", "MIT"),
+        )
+
+        result = adapter.load_validation_result(
+            repository="payments-service",
+            workspace_path=repo_dir,
+            execution_plan=MavenExecutionPlan(
+                repository="payments-service",
+                command=["./mvnw"],
+                root_pom_path=str(repo_dir / "pom.xml"),
+                uses_wrapper=True,
+            ),
+            vulnerability_details=VulnerabilityDetails(
+                package_name="org.example:legacy-json",
+                installed_version="1.2.3",
+                fixed_version="1.2.4",
+                summary="Upgrade legacy-json",
+                severity=Severity.HIGH,
+            ),
+            maven_verification=MavenVerification(
+                package_name="org.example:legacy-json",
+                current_version="1.2.3",
+                target_version="1.2.4",
+                dependency_kind=MavenDependencyKind.DIRECT,
+                resolver_note="Resolved to 1.2.4.",
+            ),
+        )
+
+    assert result.status == "passed"
+    assert result.checks[-1].name == "license-scan"
+    assert result.checks[-1].status == "passed"
+    assert "allowlist [Apache, MIT]" in (result.checks[-1].details or "")
+
+
+def test_validation_adapter_fails_live_license_scan_when_license_is_outside_allowlist(tmp_path: Path) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    pom_root = tmp_path / "pom-repo"
+    pom_file = pom_root / "org" / "example" / "legacy-json" / "1.2.4" / "legacy-json-1.2.4.pom"
+    pom_file.parent.mkdir(parents=True, exist_ok=True)
+    pom_file.write_text(
+        """
+        <project xmlns="http://maven.apache.org/POM/4.0.0">
+          <licenses>
+            <license>
+              <name>Mozilla Public License 2.0</name>
+            </license>
+          </licenses>
+        </project>
+        """
+    )
+    wrapper = repo_dir / "mvnw"
+    wrapper.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                "if [ \"$1\" = \"dependency:tree\" ]; then",
+                "  printf '[INFO] org.example:payments-service:jar:1.0.0\\n'",
+                "  printf '[INFO] +- org.example:legacy-json:jar:1.2.4:compile\\n'",
+                "  exit 0",
+                "fi",
+                "echo '[INFO] BUILD SUCCESS'",
+            ]
+        )
+        + "\n"
+    )
+    wrapper.chmod(0o755)
+    with serve_directory(pom_root) as base_url:
+        adapter = ValidationAdapter(
+            mode=ExecutionMode.LIVE,
+            maven_runner=MavenRunner(log_dir=tmp_path / "logs", metadata_base_url=base_url),
+            license_allowlist=("Apache", "MIT"),
+        )
+
+        result = adapter.load_validation_result(
+            repository="payments-service",
+            workspace_path=repo_dir,
+            execution_plan=MavenExecutionPlan(
+                repository="payments-service",
+                command=["./mvnw"],
+                root_pom_path=str(repo_dir / "pom.xml"),
+                uses_wrapper=True,
+            ),
+            vulnerability_details=VulnerabilityDetails(
+                package_name="org.example:legacy-json",
+                installed_version="1.2.3",
+                fixed_version="1.2.4",
+                summary="Upgrade legacy-json",
+                severity=Severity.HIGH,
+            ),
+            maven_verification=MavenVerification(
+                package_name="org.example:legacy-json",
+                current_version="1.2.3",
+                target_version="1.2.4",
+                dependency_kind=MavenDependencyKind.DIRECT,
+                resolver_note="Resolved to 1.2.4.",
+            ),
+        )
+
+    assert result.status == "failed"
+    assert result.checks[-1].name == "license-scan"
+    assert result.checks[-1].status == "failed"
+    assert "outside allowlist" in (result.checks[-1].details or "")
+    assert "Mozilla Public License 2.0" in (result.checks[-1].details or "")
 def test_validation_adapter_reports_live_verify_failure(tmp_path: Path) -> None:
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
