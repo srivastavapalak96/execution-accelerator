@@ -536,7 +536,7 @@ def test_resume_ticket_run_advances_complex_refactor_after_approval(tmp_path, mo
     assert len(result.state.validation_results) == 1
     assert result.state.validation_results[-1].status == "passed"
     assert result.state.remediation_plan is not None
-    assert result.state.remediation_plan.summary.endswith("Prepared deterministic scaffold edits for 2 files.")
+    assert result.state.remediation_plan.summary.endswith("Executed bounded complex migration edits for 2 files.")
     assert result.state.workflow_status == WorkflowStatus.COMPLETED
     assert result.state.completed_repos == ["payments-service"]
     assert result.state.pending_repos == []
@@ -550,7 +550,7 @@ def test_resume_ticket_run_advances_complex_refactor_after_approval(tmp_path, mo
     assert loaded_state.complex_remediation_plan.open_questions[0].startswith("Should adapter construction")
     assert len(loaded_state.modified_files) == 2
     assert loaded_state.remediation_plan is not None
-    assert loaded_state.remediation_plan.summary.endswith("Prepared deterministic scaffold edits for 2 files.")
+    assert loaded_state.remediation_plan.summary.endswith("Executed bounded complex migration edits for 2 files.")
     assert loaded_state.code_change_plan is not None
     assert loaded_state.code_change_plan.target_files[0].file_path.endswith("LegacyJsonAdapter.java")
     assert loaded_state.workflow_status == WorkflowStatus.COMPLETED

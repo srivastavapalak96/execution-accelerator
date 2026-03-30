@@ -24,6 +24,7 @@ from execution_accelerator.schemas import (
     PomSectionTarget,
     RemediationPlan,
     RemediationStrategy,
+    SymbolMappingEntry,
 )
 from execution_accelerator.state import CodeDiffSummary, RemediationState
 
@@ -253,15 +254,16 @@ def build_execute_complex_scaffold_node(
                 "open_questions": code_change_plan.open_questions,
             }
         )
-        remediation_plan = _refine_complex_execution_plan(
-            state=state,
-            complex_plan=complex_plan,
-            code_change_plan=code_change_plan,
-        )
         modified_files, code_diffs = _materialize_complex_scaffold(
             workspace_path=Path(workspace.local_path),
             complex_plan=complex_plan,
             code_change_plan=code_change_plan,
+        )
+        remediation_plan = _refine_complex_execution_plan(
+            state=state,
+            complex_plan=complex_plan,
+            code_change_plan=code_change_plan,
+            executed_file_count=len(code_diffs),
         )
 
         audit_events = list(state.audit_events)
@@ -274,6 +276,7 @@ def build_execute_complex_scaffold_node(
                     "decompiled_artifact_count": len(decompiled_artifacts),
                     "symbol_mapping_count": len(symbol_mappings),
                     "planned_file_count": len(code_change_plan.target_files),
+                    "executed_file_count": len(code_diffs),
                     "open_question_count": len(code_change_plan.open_questions),
                 },
             )
@@ -407,17 +410,20 @@ def _refine_complex_execution_plan(
     state: RemediationState,
     complex_plan: ComplexRemediationPlan,
     code_change_plan: ComplexCodeChangePlan,
+    executed_file_count: int,
 ) -> RemediationPlan:
     base_plan = _refine_complex_remediation_plan(state=state, complex_plan=complex_plan)
+    extra_file_count = max(0, executed_file_count - len(code_change_plan.target_files))
     return base_plan.model_copy(
         update={
             "summary": (
-                f"{complex_plan.summary} Prepared deterministic scaffold edits for "
-                f"{len(code_change_plan.target_files)} files."
+                f"{complex_plan.summary} Executed bounded complex migration edits for "
+                f"{executed_file_count} files."
             ),
             "rationale": (
                 f"{complex_plan.tactic_rationale} "
-                f"Current scaffold covers {len(code_change_plan.target_files)} target files and "
+                f"Current bounded execution covers {len(code_change_plan.target_files)} planned target files, "
+                f"{extra_file_count} detected existing source files, and "
                 f"{len(code_change_plan.open_questions)} unresolved questions."
             ),
         }
@@ -432,6 +438,7 @@ def _materialize_complex_scaffold(
 ) -> tuple[list[str], list[CodeDiffSummary]]:
     modified_files: list[str] = []
     code_diffs: list[CodeDiffSummary] = []
+    planned_targets = {target.file_path: target for target in code_change_plan.target_files}
     for target in code_change_plan.target_files:
         target_path = _resolve_workspace_file(workspace_path, target.file_path)
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -457,6 +464,35 @@ def _materialize_complex_scaffold(
             CodeDiffSummary(
                 file_path=target.file_path,
                 change_summary=target.change_summary,
+                additions=additions,
+                deletions=deletions,
+            )
+        )
+    related_symbols = _collect_complex_related_symbols(complex_plan)
+    for source_path in _iter_workspace_java_files(workspace_path):
+        relative_path = str(source_path.relative_to(workspace_path))
+        if relative_path in planned_targets:
+            continue
+        existing_text = source_path.read_text()
+        synthetic_target = CodeChangeTarget(
+            file_path=relative_path,
+            change_summary="Apply supported complex migration rewrites for detected legacy API usage.",
+            related_symbols=related_symbols,
+        )
+        rendered_text = _apply_complex_symbol_rewrites(
+            existing_text=existing_text,
+            target=synthetic_target,
+            complex_plan=complex_plan,
+        )
+        if rendered_text == existing_text:
+            continue
+        additions, deletions = _summarize_text_diff(existing_text, rendered_text)
+        source_path.write_text(rendered_text)
+        modified_files.append(str(source_path))
+        code_diffs.append(
+            CodeDiffSummary(
+                file_path=relative_path,
+                change_summary=synthetic_target.change_summary,
                 additions=additions,
                 deletions=deletions,
             )
@@ -510,6 +546,16 @@ def _apply_complex_symbol_rewrites(
         complex_plan=complex_plan,
     ):
         rewritten_text = rewritten_text.replace(legacy_call, replacement_call)
+    for legacy_reference, replacement_reference in _iter_complex_method_reference_rewrites(
+        target=target,
+        complex_plan=complex_plan,
+    ):
+        rewritten_text = rewritten_text.replace(legacy_reference, replacement_reference)
+    for legacy_reference, replacement_lambda in _iter_complex_constructor_reference_rewrites(
+        target=target,
+        complex_plan=complex_plan,
+    ):
+        rewritten_text = rewritten_text.replace(legacy_reference, replacement_lambda)
     return rewritten_text
 
 
@@ -531,6 +577,29 @@ def _iter_complex_symbol_rewrites(
             if legacy_call is None:
                 continue
             rewrite = (legacy_call, replacement_call)
+            if rewrite not in rewrites:
+                rewrites.append(rewrite)
+    return rewrites
+
+
+def _iter_complex_method_reference_rewrites(
+    *,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> list[tuple[str, str]]:
+    rewrites: list[tuple[str, str]] = []
+    related_symbols = set(target.related_symbols)
+    for mapping in complex_plan.symbol_mappings:
+        if mapping.legacy_symbol not in related_symbols and mapping.replacement_symbol not in related_symbols:
+            continue
+        replacement_reference = _render_java_method_reference(mapping.replacement_symbol, qualified=True)
+        if replacement_reference is None:
+            continue
+        for qualified in (False, True):
+            legacy_reference = _render_java_method_reference(mapping.legacy_symbol, qualified=qualified)
+            if legacy_reference is None:
+                continue
+            rewrite = (legacy_reference, replacement_reference)
             if rewrite not in rewrites:
                 rewrites.append(rewrite)
     return rewrites
@@ -558,6 +627,36 @@ def _iter_complex_constructor_rewrites(
     return rewrites
 
 
+def _iter_complex_constructor_reference_rewrites(
+    *,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> list[tuple[str, str]]:
+    rewrites: list[tuple[str, str]] = []
+    related_symbols = set(target.related_symbols)
+    for mapping in complex_plan.symbol_mappings:
+        if mapping.legacy_symbol not in related_symbols and mapping.replacement_symbol not in related_symbols:
+            continue
+        constructor_class = _parse_java_constructor_class(mapping.legacy_symbol)
+        if constructor_class is None:
+            continue
+        factory_call = _render_java_factory_call(mapping.replacement_symbol, qualified=True)
+        if factory_call is None:
+            continue
+        parameter_types = _parse_java_symbol_parameter_types(mapping.legacy_symbol)
+        replacement_lambda = _render_java_constructor_reference_lambda(
+            constructor_class=constructor_class,
+            factory_call=factory_call,
+            parameter_types=parameter_types,
+        )
+        for qualified in (False, True):
+            rendered_class = constructor_class if qualified else constructor_class.rsplit(".", maxsplit=1)[-1]
+            rewrite = (f"{rendered_class}::new", replacement_lambda)
+            if rewrite not in rewrites:
+                rewrites.append(rewrite)
+    return rewrites
+
+
 def _render_complex_scaffold_file(
     *,
     target: CodeChangeTarget,
@@ -572,6 +671,12 @@ def _render_complex_scaffold_file(
             lines.append(package_line)
             lines.append("")
         lines.append(f"public final class {class_name} {{")
+        generated_methods = _render_generated_complex_java_methods(target=target, complex_plan=complex_plan)
+        if generated_methods:
+            for generated_method in generated_methods:
+                for method_line in generated_method.splitlines():
+                    lines.append(f"    {method_line}" if method_line else "")
+                lines.append("")
         for note_line in _render_complex_scaffold_note(
             target=target,
             complex_plan=complex_plan,
@@ -633,6 +738,22 @@ def _render_java_method_call(symbol: str, *, qualified: bool) -> str | None:
     return f"{rendered_class}.{member_expression}("
 
 
+def _render_java_method_reference(symbol: str, *, qualified: bool) -> str | None:
+    if "#" not in symbol:
+        return None
+    class_name, member_expression = symbol.split("#", maxsplit=1)
+    if not class_name or not member_expression or "<init>" in member_expression:
+        return None
+    if "." in member_expression:
+        qualifier_expression, _, method_name = member_expression.rpartition(".")
+        if not qualifier_expression or not method_name:
+            return None
+        rendered_class = class_name if qualified else class_name.rsplit(".", maxsplit=1)[-1]
+        return f"{rendered_class}.{qualifier_expression}::{method_name}"
+    rendered_class = class_name if qualified else class_name.rsplit(".", maxsplit=1)[-1]
+    return f"{rendered_class}::{member_expression}"
+
+
 def _parse_java_constructor_class(symbol: str) -> str | None:
     if "#<init>" in symbol:
         class_name, _, _ = symbol.partition("#<init>")
@@ -652,6 +773,130 @@ def _render_java_factory_call(symbol: str, *, qualified: bool) -> str | None:
     method_name = member_expression.split("(", maxsplit=1)[0]
     rendered_class = class_name if qualified else class_name.rsplit(".", maxsplit=1)[-1]
     return f"{rendered_class}.{method_name}"
+
+
+def _render_java_invocation_expression(symbol: str, *, arguments: list[str], qualified: bool) -> str | None:
+    if "#" not in symbol:
+        return None
+    class_name, member_expression = symbol.split("#", maxsplit=1)
+    if not class_name or not member_expression:
+        return None
+    rendered_class = class_name if qualified else class_name.rsplit(".", maxsplit=1)[-1]
+    return f"{rendered_class}.{member_expression}({', '.join(arguments)})"
+
+
+def _parse_java_symbol_parameter_types(symbol: str) -> list[str]:
+    open_paren = symbol.find("(")
+    close_paren = symbol.rfind(")")
+    if open_paren == -1 or close_paren == -1 or close_paren < open_paren:
+        return []
+    parameter_text = symbol[open_paren + 1 : close_paren].strip()
+    if not parameter_text:
+        return []
+    return [parameter.strip() for parameter in parameter_text.split(",") if parameter.strip()]
+
+
+def _render_generated_complex_java_methods(
+    *,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> list[str]:
+    methods: list[str] = []
+    for mapping in complex_plan.symbol_mappings:
+        if mapping.legacy_symbol not in target.related_symbols and mapping.replacement_symbol not in target.related_symbols:
+            continue
+        generated_method = _render_generated_complex_java_method(mapping)
+        if generated_method is not None and generated_method not in methods:
+            methods.append(generated_method)
+    return methods
+
+
+def _render_generated_complex_java_method(mapping: SymbolMappingEntry) -> str | None:
+    constructor_class = _parse_java_constructor_class(mapping.legacy_symbol)
+    if constructor_class is not None:
+        return _render_generated_constructor_bridge(mapping.legacy_symbol, constructor_class, mapping.replacement_symbol)
+    return _render_generated_method_bridge(mapping.legacy_symbol, mapping.replacement_symbol)
+
+
+def _render_generated_method_bridge(legacy_symbol: str, replacement_symbol: str) -> str | None:
+    if "#" not in legacy_symbol:
+        return None
+    _, member_expression = legacy_symbol.split("#", maxsplit=1)
+    method_name = member_expression.split("(", maxsplit=1)[0]
+    if not method_name or "<init>" in method_name:
+        return None
+    parameter_type = "String" if method_name.startswith("parse") else "Object"
+    parameter_name = "payload" if parameter_type == "String" else "input"
+    replacement_call = _render_java_invocation_expression(
+        replacement_symbol,
+        arguments=[parameter_name],
+        qualified=True,
+    )
+    if replacement_call is None:
+        return None
+    return "\n".join(
+        [
+            f"public Object {method_name}({parameter_type} {parameter_name}) {{",
+            f"    return {replacement_call};",
+            "}",
+        ]
+    )
+
+
+def _render_generated_constructor_bridge(
+    legacy_symbol: str,
+    constructor_class: str,
+    replacement_symbol: str,
+) -> str | None:
+    factory_call = _render_java_factory_call(replacement_symbol, qualified=True)
+    if factory_call is None:
+        return None
+    parameter_types = _parse_java_symbol_parameter_types(legacy_symbol)
+    parameter_names = [_default_java_parameter_name(parameter_type, index) for index, parameter_type in enumerate(parameter_types)]
+    signature = ", ".join(
+        f"{parameter_type} {parameter_name}" for parameter_type, parameter_name in zip(parameter_types, parameter_names, strict=False)
+    )
+    wrapped_argument = (
+        f"{factory_call}({', '.join(parameter_names)})" if parameter_names else f"{factory_call}()"
+    )
+    simple_class = constructor_class.rsplit(".", maxsplit=1)[-1]
+    return "\n".join(
+        [
+            f"public {constructor_class} create{simple_class}({signature}) {{",
+            f"    return new {constructor_class}({wrapped_argument});",
+            "}",
+        ]
+    )
+
+
+def _default_java_parameter_name(parameter_type: str, index: int) -> str:
+    normalized = parameter_type.strip()
+    if normalized == "boolean":
+        return "enabled" if index == 0 else f"flag{index}"
+    if normalized in {"String", "java.lang.String"}:
+        return "value" if index == 0 else f"value{index}"
+    return f"arg{index}"
+
+
+def _collect_complex_related_symbols(complex_plan: ComplexRemediationPlan) -> list[str]:
+    symbols: list[str] = []
+    for mapping in complex_plan.symbol_mappings:
+        if mapping.legacy_symbol not in symbols:
+            symbols.append(mapping.legacy_symbol)
+        if mapping.replacement_symbol not in symbols:
+            symbols.append(mapping.replacement_symbol)
+    return symbols
+
+
+def _iter_workspace_java_files(workspace_path: Path) -> list[Path]:
+    ignored_directories = {".git", ".venv", ".mvn", "build", "out", "target"}
+    java_files: list[Path] = []
+    for source_path in sorted(workspace_path.rglob("*.java")):
+        relative_parts = source_path.relative_to(workspace_path).parts
+        if any(part in ignored_directories for part in relative_parts):
+            continue
+        java_files.append(source_path)
+    return java_files
 
 
 def _rewrite_java_constructor_calls(
@@ -684,6 +929,20 @@ def _rewrite_java_constructor_calls(
         segments.append(rewritten_text[cursor:])
         rewritten_text = "".join(segments)
     return rewritten_text
+
+
+def _render_java_constructor_reference_lambda(
+    *,
+    constructor_class: str,
+    factory_call: str,
+    parameter_types: list[str],
+) -> str:
+    parameter_names = [_default_java_parameter_name(parameter_type, index) for index, parameter_type in enumerate(parameter_types)]
+    if not parameter_names:
+        return f"() -> new {constructor_class}({factory_call}())"
+    parameter_list = parameter_names[0] if len(parameter_names) == 1 else f"({', '.join(parameter_names)})"
+    wrapped_argument = f"{factory_call}({', '.join(parameter_names)})"
+    return f"{parameter_list} -> new {constructor_class}({wrapped_argument})"
 
 
 def _find_matching_parenthesis(text: str, open_paren_index: int) -> int | None:

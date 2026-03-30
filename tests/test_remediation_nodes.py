@@ -348,10 +348,19 @@ def test_execute_complex_scaffold_node_records_decompile_and_change_plan(tmp_pat
     assert update["complex_remediation_plan"].symbol_mappings[0].legacy_symbol == "org.example.LegacyParser#parse"
     assert update["complex_remediation_plan"].open_questions[0].startswith("Should adapter construction")
     assert len(update["modified_files"]) == 2
-    assert Path(update["modified_files"][0]).read_text().startswith("package com.example.payments;")
+    adapter_path = Path(update["modified_files"][0])
+    serializer_path = Path(update["modified_files"][1])
+    assert adapter_path.read_text().startswith("package com.example.payments;")
+    assert "public Object parse(String payload) {" in adapter_path.read_text()
+    assert "return org.example.JsonParserBuilder.create().parse(payload);" in adapter_path.read_text()
+    assert "public org.example.LegacySerializer createLegacySerializer(boolean enabled) {" in serializer_path.read_text()
+    assert (
+        "return new org.example.LegacySerializer(org.example.SerializationConfigFactory.create(enabled));"
+        in serializer_path.read_text()
+    )
     assert update["code_diffs"][0].file_path.endswith("LegacyJsonAdapter.java")
-    assert update["remediation_plan"].summary.endswith("Prepared deterministic scaffold edits for 2 files.")
-    assert "2 target files and 2 unresolved questions" in update["remediation_plan"].rationale
+    assert update["remediation_plan"].summary.endswith("Executed bounded complex migration edits for 2 files.")
+    assert "2 planned target files, 0 detected existing source files, and 2 unresolved questions" in update["remediation_plan"].rationale
     assert update["audit_events"][-1].event_type == "remediation.complex_scaffold"
 
 
@@ -398,6 +407,50 @@ def test_execute_complex_scaffold_node_rewrites_existing_java_symbols(tmp_path) 
     assert update["code_diffs"][0].deletions >= 1
 
 
+def test_execute_complex_scaffold_node_rewrites_java_method_references(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    adapter = ComplexRemediationAdapter(
+        artifact_fixture_path=fixture_dir / "complex_artifacts.json",
+        compatibility_diff_fixture_path=fixture_dir / "compatibility_diff.json",
+        decompiled_artifact_fixture_path=fixture_dir / "decompiled_artifacts.json",
+        symbol_mapping_fixture_path=fixture_dir / "symbol_mappings.json",
+        code_change_plan_fixture_path=fixture_dir / "code_change_plan.json",
+    )
+    prepare_node = build_prepare_complex_remediation_node(adapter)
+    scaffold_node = build_execute_complex_scaffold_node(adapter)
+    base_state = build_state(tmp_path, complex_refactor=True)
+    prepared_state = base_state.model_copy(update=prepare_node(base_state))
+    existing_target = (
+        Path(prepared_state.repo_map["payments-service"].local_path)
+        / "src/main/java/com/example/payments/LegacyJsonAdapter.java"
+    )
+    existing_target.parent.mkdir(parents=True, exist_ok=True)
+    existing_target.write_text(
+        "\n".join(
+            [
+                "package com.example.payments;",
+                "",
+                "public final class LegacyJsonAdapter {",
+                "    Object parser() {",
+                "        return LegacyParser::parse;",
+                "    }",
+                "}",
+                "",
+            ]
+        )
+    )
+
+    update = scaffold_node(prepared_state)
+
+    rendered_text = existing_target.read_text()
+    assert "LegacyParser::parse" not in rendered_text
+    assert "org.example.JsonParserBuilder.create()::parse" in rendered_text
+    assert "Execution Accelerator complex scaffold." in rendered_text
+    adapter_diff = next(diff for diff in update["code_diffs"] if diff.file_path.endswith("LegacyJsonAdapter.java"))
+    assert adapter_diff.additions >= 1
+    assert adapter_diff.deletions >= 1
+
+
 def test_execute_complex_scaffold_node_rewrites_existing_java_constructor_symbols(tmp_path) -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
     adapter = ComplexRemediationAdapter(
@@ -440,3 +493,91 @@ def test_execute_complex_scaffold_node_rewrites_existing_java_constructor_symbol
     serializer_diff = next(diff for diff in update["code_diffs"] if diff.file_path.endswith("LegacySerializerConfig.java"))
     assert serializer_diff.additions >= 1
     assert serializer_diff.deletions >= 1
+
+
+def test_execute_complex_scaffold_node_rewrites_java_constructor_references(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    adapter = ComplexRemediationAdapter(
+        artifact_fixture_path=fixture_dir / "complex_artifacts.json",
+        compatibility_diff_fixture_path=fixture_dir / "compatibility_diff.json",
+        decompiled_artifact_fixture_path=fixture_dir / "decompiled_artifacts.json",
+        symbol_mapping_fixture_path=fixture_dir / "symbol_mappings.json",
+        code_change_plan_fixture_path=fixture_dir / "code_change_plan.json",
+    )
+    prepare_node = build_prepare_complex_remediation_node(adapter)
+    scaffold_node = build_execute_complex_scaffold_node(adapter)
+    base_state = build_state(tmp_path, complex_refactor=True)
+    prepared_state = base_state.model_copy(update=prepare_node(base_state))
+    existing_target = (
+        Path(prepared_state.repo_map["payments-service"].local_path)
+        / "src/main/java/com/example/payments/LegacySerializerConfig.java"
+    )
+    existing_target.parent.mkdir(parents=True, exist_ok=True)
+    existing_target.write_text(
+        "\n".join(
+            [
+                "package com.example.payments;",
+                "",
+                "public final class LegacySerializerConfig {",
+                "    Object serializerFactory() {",
+                "        return LegacySerializer::new;",
+                "    }",
+                "}",
+                "",
+            ]
+        )
+    )
+
+    update = scaffold_node(prepared_state)
+
+    rendered_text = existing_target.read_text()
+    assert "LegacySerializer::new" not in rendered_text
+    assert "enabled -> new org.example.LegacySerializer(org.example.SerializationConfigFactory.create(enabled))" in rendered_text
+    assert "Execution Accelerator complex scaffold." in rendered_text
+    serializer_diff = next(diff for diff in update["code_diffs"] if diff.file_path.endswith("LegacySerializerConfig.java"))
+    assert serializer_diff.additions >= 1
+    assert serializer_diff.deletions >= 1
+
+
+def test_execute_complex_scaffold_node_rewrites_detected_unplanned_java_sources(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    adapter = ComplexRemediationAdapter(
+        artifact_fixture_path=fixture_dir / "complex_artifacts.json",
+        compatibility_diff_fixture_path=fixture_dir / "compatibility_diff.json",
+        decompiled_artifact_fixture_path=fixture_dir / "decompiled_artifacts.json",
+        symbol_mapping_fixture_path=fixture_dir / "symbol_mappings.json",
+        code_change_plan_fixture_path=fixture_dir / "code_change_plan.json",
+    )
+    prepare_node = build_prepare_complex_remediation_node(adapter)
+    scaffold_node = build_execute_complex_scaffold_node(adapter)
+    base_state = build_state(tmp_path, complex_refactor=True)
+    prepared_state = base_state.model_copy(update=prepare_node(base_state))
+    existing_target = (
+        Path(prepared_state.repo_map["payments-service"].local_path)
+        / "src/main/java/com/example/payments/LegacyJsonConsumer.java"
+    )
+    existing_target.parent.mkdir(parents=True, exist_ok=True)
+    existing_target.write_text(
+        "\n".join(
+            [
+                "package com.example.payments;",
+                "",
+                "public final class LegacyJsonConsumer {",
+                "    String parse(String payload) {",
+                "        return LegacyParser.parse(payload);",
+                "    }",
+                "}",
+                "",
+            ]
+        )
+    )
+
+    update = scaffold_node(prepared_state)
+
+    rendered_text = existing_target.read_text()
+    assert "LegacyParser.parse(payload)" not in rendered_text
+    assert "org.example.JsonParserBuilder.create().parse(payload)" in rendered_text
+    assert "Execution Accelerator complex scaffold." not in rendered_text
+    extra_diff = next(diff for diff in update["code_diffs"] if diff.file_path.endswith("LegacyJsonConsumer.java"))
+    assert extra_diff.change_summary == "Apply supported complex migration rewrites for detected legacy API usage."
+    assert update["remediation_plan"].summary.endswith("Executed bounded complex migration edits for 3 files.")

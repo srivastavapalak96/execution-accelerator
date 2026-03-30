@@ -764,8 +764,8 @@ def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_pat
         "route_reason=Verified target introduces high compatibility risk and needs the complex remediation lane."
         in captured.out
     )
-    assert "plan_summary=Analyze org.example:legacy-json from 1.2.3 to 2.0.0 before attempting code changes. Prepared deterministic scaffold edits for 2 files." in captured.out
-    assert "plan_rationale=Removed APIs and constructor changes suggest insulating callers behind a compatibility adapter while parser and serializer internals migrate. Current scaffold covers 2 target files and 2 unresolved questions." in captured.out
+    assert "plan_summary=Analyze org.example:legacy-json from 1.2.3 to 2.0.0 before attempting code changes. Executed bounded complex migration edits for 2 files." in captured.out
+    assert "plan_rationale=Removed APIs and constructor changes suggest insulating callers behind a compatibility adapter while parser and serializer internals migrate. Current bounded execution covers 2 planned target files, 0 detected existing source files, and 2 unresolved questions." in captured.out
     assert "complex_candidate_count=2" in captured.out
     assert "complex_migration_tactic=adapter_shim" in captured.out
     assert "complex_migration_step_count=2" in captured.out
@@ -789,7 +789,7 @@ def test_main_resumes_complex_ticket_after_approval(monkeypatch, capsys, tmp_pat
     assert (
         "primary_code_diff_summary=Replace removed parser entry point with the builder-backed parser."
     ) in captured.out
-    assert "code_diff_total_additions=22" in captured.out
+    assert "code_diff_total_additions=30" in captured.out
     assert "code_diff_total_deletions=0" in captured.out
     assert "validation_status=passed" in captured.out
     assert "pull_request_number=42" in captured.out
