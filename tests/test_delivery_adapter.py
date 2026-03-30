@@ -8,6 +8,7 @@ import pytest
 from execution_accelerator.adapters import (
     DeliveryAdapter,
     DeliveryConfigurationError,
+    DeliveryAdapterError,
 )
 from execution_accelerator.config import load_runtime_config
 from execution_accelerator.execution import GitRunner
@@ -167,6 +168,87 @@ def test_delivery_adapter_transitions_jira_ticket_when_configured() -> None:
         "/rest/api/3/issue/SEC-123/comment",
         "/rest/api/3/issue/SEC-123/transitions",
     ]
+
+
+def test_delivery_adapter_resolves_jira_transition_by_status_name() -> None:
+    requests_log: list[tuple[str, str, bytes]] = []
+    with serve_routes(
+        {
+            ("POST", "/rest/api/3/issue/SEC-123/comment"): ResponseSpec(status=201, body=b'{"id":"10001"}'),
+            (
+                "GET",
+                "/rest/api/3/issue/SEC-123/transitions",
+            ): ResponseSpec(
+                status=200,
+                body=(
+                    b'{"transitions":['
+                    b'{"id":"11","name":"Start Progress","to":{"name":"In Progress"}},'
+                    b'{"id":"31","name":"Resolve","to":{"name":"Done"}}'
+                    b']}'
+                ),
+            ),
+            ("POST", "/rest/api/3/issue/SEC-123/transitions"): ResponseSpec(status=204, body=b""),
+        },
+        requests_log=requests_log,
+    ) as base_url:
+        adapter = DeliveryAdapter(
+            mode=ExecutionMode.LIVE,
+            jira_base_url=base_url,
+            jira_email="jira@example.com",
+            jira_token="jira-token",
+            jira_done_status_name="Done",
+        )
+
+        jira_completion = adapter.load_jira_completion(
+            ticket_id="SEC-123",
+            repository="payments-service",
+            pull_request_url="https://example.test/pr/42",
+        )
+
+    assert jira_completion.status == "Done"
+    assert [method for method, _, _ in requests_log] == ["POST", "GET", "POST"]
+    assert [path for _, path, _ in requests_log] == [
+        "/rest/api/3/issue/SEC-123/comment",
+        "/rest/api/3/issue/SEC-123/transitions",
+        "/rest/api/3/issue/SEC-123/transitions",
+    ]
+    assert b'"transition":{"id":"31"}' in requests_log[2][2]
+
+
+def test_delivery_adapter_raises_when_named_jira_transition_is_missing() -> None:
+    with serve_routes(
+        {
+            ("POST", "/rest/api/3/issue/SEC-123/comment"): ResponseSpec(status=201, body=b'{"id":"10001"}'),
+            (
+                "GET",
+                "/rest/api/3/issue/SEC-123/transitions",
+            ): ResponseSpec(
+                status=200,
+                body=(
+                    b'{"transitions":['
+                    b'{"id":"11","name":"Start Progress","to":{"name":"In Progress"}}'
+                    b']}'
+                ),
+            ),
+        },
+    ) as base_url:
+        adapter = DeliveryAdapter(
+            mode=ExecutionMode.LIVE,
+            jira_base_url=base_url,
+            jira_email="jira@example.com",
+            jira_token="jira-token",
+            jira_done_status_name="Done",
+        )
+
+        with pytest.raises(
+            DeliveryAdapterError,
+            match="did not include target status 'Done'",
+        ):
+            adapter.load_jira_completion(
+                ticket_id="SEC-123",
+                repository="payments-service",
+                pull_request_url="https://example.test/pr/42",
+            )
 
 
 def test_delivery_adapter_accepts_already_done_jira_transition() -> None:

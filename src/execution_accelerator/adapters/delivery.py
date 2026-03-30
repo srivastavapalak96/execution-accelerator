@@ -346,11 +346,12 @@ class DeliveryAdapter:
         )
         response.raise_for_status()
         status = "commented"
-        if self.jira_done_transition_id:
+        transition_id = self._resolve_live_jira_transition_id(ticket_id=ticket_id)
+        if transition_id is not None:
             transition_response = httpx.post(
                 f"{self.jira_base_url.rstrip('/')}/rest/api/3/issue/{ticket_id}/transitions",
                 auth=(self.jira_email, self.jira_token),
-                json={"transition": {"id": self.jira_done_transition_id}},
+                json={"transition": {"id": transition_id}},
                 timeout=30.0,
             )
             if transition_response.is_success:
@@ -368,6 +369,48 @@ class DeliveryAdapter:
             status=status,
             comment=resolved_comment,
         )
+
+    def _resolve_live_jira_transition_id(self, *, ticket_id: str) -> str | None:
+        if self.jira_done_transition_id:
+            return self.jira_done_transition_id
+        if not self.jira_done_status_name:
+            return None
+
+        transitions = self._load_live_jira_transitions(ticket_id=ticket_id)
+        target_status_name = self.jira_done_status_name.casefold()
+        for transition in transitions:
+            to_payload = transition.get("to")
+            if not isinstance(to_payload, dict):
+                continue
+            status_name = to_payload.get("name")
+            transition_id = transition.get("id")
+            if isinstance(status_name, str) and isinstance(transition_id, str) and status_name.casefold() == target_status_name:
+                return transition_id
+        raise DeliveryAdapterError(
+            f"Live Jira transitions for '{ticket_id}' did not include target status '{self.jira_done_status_name}'."
+        )
+
+    def _load_live_jira_transitions(self, *, ticket_id: str) -> list[dict[str, object]]:
+        assert self.jira_base_url is not None
+        assert self.jira_email is not None
+        assert self.jira_token is not None
+        response = httpx.get(
+            f"{self.jira_base_url.rstrip('/')}/rest/api/3/issue/{ticket_id}/transitions",
+            auth=(self.jira_email, self.jira_token),
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise DeliveryAdapterError(f"Live Jira transitions payload for '{ticket_id}' was not an object.")
+        transitions = payload.get("transitions")
+        if not isinstance(transitions, list):
+            raise DeliveryAdapterError(f"Live Jira transitions payload for '{ticket_id}' is missing transitions.")
+        normalized: list[dict[str, object]] = []
+        for transition in transitions:
+            if isinstance(transition, dict):
+                normalized.append(transition)
+        return normalized
 
     def _load_live_jira_status(self, *, ticket_id: str) -> str:
         assert self.jira_base_url is not None
