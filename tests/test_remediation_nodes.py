@@ -407,6 +407,99 @@ def test_execute_complex_scaffold_node_rewrites_existing_java_symbols(tmp_path) 
     assert update["code_diffs"][0].deletions >= 1
 
 
+def test_execute_complex_scaffold_node_removes_obsolete_exact_java_imports(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    adapter = ComplexRemediationAdapter(
+        artifact_fixture_path=fixture_dir / "complex_artifacts.json",
+        compatibility_diff_fixture_path=fixture_dir / "compatibility_diff.json",
+        decompiled_artifact_fixture_path=fixture_dir / "decompiled_artifacts.json",
+        symbol_mapping_fixture_path=fixture_dir / "symbol_mappings.json",
+        code_change_plan_fixture_path=fixture_dir / "code_change_plan.json",
+    )
+    prepare_node = build_prepare_complex_remediation_node(adapter)
+    scaffold_node = build_execute_complex_scaffold_node(adapter)
+    base_state = build_state(tmp_path, complex_refactor=True)
+    prepared_state = base_state.model_copy(update=prepare_node(base_state))
+    existing_target = (
+        Path(prepared_state.repo_map["payments-service"].local_path)
+        / "src/main/java/com/example/payments/LegacyJsonAdapter.java"
+    )
+    existing_target.parent.mkdir(parents=True, exist_ok=True)
+    existing_target.write_text(
+        "\n".join(
+            [
+                "package com.example.payments;",
+                "",
+                "import org.example.LegacyParser;",
+                "",
+                "public final class LegacyJsonAdapter {",
+                "    String parsePayload(String payload) {",
+                "        return LegacyParser.parse(payload);",
+                "    }",
+                "}",
+                "",
+            ]
+        )
+    )
+
+    update = scaffold_node(prepared_state)
+
+    rendered_text = existing_target.read_text()
+    assert "import org.example.LegacyParser;" not in rendered_text
+    assert "LegacyParser.parse(payload)" not in rendered_text
+    assert "org.example.JsonParserBuilder.create().parse(payload)" in rendered_text
+    adapter_diff = next(diff for diff in update["code_diffs"] if diff.file_path.endswith("LegacyJsonAdapter.java"))
+    assert adapter_diff.additions >= 1
+    assert adapter_diff.deletions >= 1
+
+
+def test_execute_complex_scaffold_node_preserves_still_used_exact_java_imports(tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    adapter = ComplexRemediationAdapter(
+        artifact_fixture_path=fixture_dir / "complex_artifacts.json",
+        compatibility_diff_fixture_path=fixture_dir / "compatibility_diff.json",
+        decompiled_artifact_fixture_path=fixture_dir / "decompiled_artifacts.json",
+        symbol_mapping_fixture_path=fixture_dir / "symbol_mappings.json",
+        code_change_plan_fixture_path=fixture_dir / "code_change_plan.json",
+    )
+    prepare_node = build_prepare_complex_remediation_node(adapter)
+    scaffold_node = build_execute_complex_scaffold_node(adapter)
+    base_state = build_state(tmp_path, complex_refactor=True)
+    prepared_state = base_state.model_copy(update=prepare_node(base_state))
+    existing_target = (
+        Path(prepared_state.repo_map["payments-service"].local_path)
+        / "src/main/java/com/example/payments/LegacyJsonAdapter.java"
+    )
+    existing_target.parent.mkdir(parents=True, exist_ok=True)
+    existing_target.write_text(
+        "\n".join(
+            [
+                "package com.example.payments;",
+                "",
+                "import org.example.LegacyParser;",
+                "",
+                "public final class LegacyJsonAdapter {",
+                "    LegacyParser currentParser() {",
+                "        return null;",
+                "    }",
+                "",
+                "    String parsePayload(String payload) {",
+                "        return LegacyParser.parse(payload);",
+                "    }",
+                "}",
+                "",
+            ]
+        )
+    )
+
+    scaffold_node(prepared_state)
+
+    rendered_text = existing_target.read_text()
+    assert "import org.example.LegacyParser;" in rendered_text
+    assert "LegacyParser currentParser()" in rendered_text
+    assert "org.example.JsonParserBuilder.create().parse(payload)" in rendered_text
+
+
 def test_execute_complex_scaffold_node_rewrites_java_method_references(tmp_path) -> None:
     fixture_dir = Path(__file__).parent / "fixtures"
     adapter = ComplexRemediationAdapter(

@@ -566,6 +566,14 @@ def _apply_complex_symbol_rewrites(
         complex_plan=complex_plan,
     ):
         rewritten_text = rewritten_text.replace(legacy_reference, replacement_lambda)
+    for legacy_class in _iter_complex_import_cleanup_classes(
+        target=target,
+        complex_plan=complex_plan,
+    ):
+        rewritten_text = _remove_unused_exact_java_import(
+            rewritten_text,
+            legacy_class=legacy_class,
+        )
     return rewritten_text
 
 
@@ -611,6 +619,22 @@ def _iter_complex_static_import_rewrites(
         if rewrite not in rewrites:
             rewrites.append(rewrite)
     return rewrites
+
+
+def _iter_complex_import_cleanup_classes(
+    *,
+    target: CodeChangeTarget,
+    complex_plan: ComplexRemediationPlan,
+) -> list[str]:
+    legacy_classes: list[str] = []
+    related_symbols = set(target.related_symbols)
+    for mapping in complex_plan.symbol_mappings:
+        if mapping.legacy_symbol not in related_symbols and mapping.replacement_symbol not in related_symbols:
+            continue
+        legacy_class = _parse_java_symbol_class(mapping.legacy_symbol)
+        if legacy_class is not None and legacy_class not in legacy_classes:
+            legacy_classes.append(legacy_class)
+    return legacy_classes
 
 
 def _iter_complex_method_reference_rewrites(
@@ -1056,6 +1080,19 @@ def _looks_like_java_method_declaration(line: str, method_name: str) -> bool:
         )
         is not None
     )
+
+
+def _remove_unused_exact_java_import(text: str, *, legacy_class: str) -> str:
+    import_pattern = re.compile(
+        rf"(?m)^[ \t]*import\s+{re.escape(legacy_class)}\s*;\s*\n?"
+    )
+    if import_pattern.search(text) is None:
+        return text
+    stripped_text = import_pattern.sub("", text)
+    simple_name = legacy_class.rsplit(".", maxsplit=1)[-1]
+    if re.search(rf"(?<![\w.]){re.escape(simple_name)}\b", stripped_text) is not None:
+        return text
+    return re.sub(r"\n{3,}", "\n\n", stripped_text)
 
 
 def _find_matching_parenthesis(text: str, open_paren_index: int) -> int | None:
