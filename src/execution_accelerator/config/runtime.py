@@ -26,6 +26,23 @@ def _split_csv_setting(value: str | None) -> tuple[str, ...]:
     return tuple(segment.strip() for segment in value.split(",") if segment.strip())
 
 
+def _resolve_fixture_path_value(
+    env_var: str,
+    default_relative_path: str,
+    *,
+    execution_mode: ExecutionMode,
+    repo_root: Path,
+) -> str | None:
+    """Resolve a fixture-path env var without silently defaulting in live mode."""
+
+    configured_value = os.getenv(env_var)
+    if configured_value is not None:
+        return configured_value
+    if execution_mode == ExecutionMode.LIVE:
+        return None
+    return str(repo_root / default_relative_path)
+
+
 @dataclass(frozen=True)
 class RuntimeConfig:
     """Resolved filesystem and environment settings for local execution."""
@@ -98,73 +115,107 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
     dry_run = os.getenv("EA_DRY_RUN", "0") == "1"
     keep_workspace = os.getenv("EA_KEEP_WORKSPACE", "0") == "1"
     java_home_value = os.getenv("EA_JAVA_HOME")
-    jira_fixture_path_value = os.getenv(
+    jira_fixture_path_value = _resolve_fixture_path_value(
         "EA_JIRA_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "jira_issue.json"),
+        "tests/fixtures/jira_issue.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    repository_inventory_fixture_path_value = os.getenv(
+    repository_inventory_fixture_path_value = _resolve_fixture_path_value(
         "EA_REPOSITORY_INVENTORY_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "repository_inventory.json"),
+        "tests/fixtures/repository_inventory.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    advisory_fixture_path_value = os.getenv(
+    advisory_fixture_path_value = _resolve_fixture_path_value(
         "EA_ADVISORY_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "advisory_verification.json"),
+        "tests/fixtures/advisory_verification.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    maven_verification_fixture_path_value = os.getenv(
+    maven_verification_fixture_path_value = _resolve_fixture_path_value(
         "EA_MAVEN_VERIFICATION_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "maven_verification.json"),
+        "tests/fixtures/maven_verification.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    pom_fixture_before_path_value = os.getenv(
+    pom_fixture_before_path_value = _resolve_fixture_path_value(
         "EA_POM_FIXTURE_BEFORE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "pom_before.xml"),
+        "tests/fixtures/pom_before.xml",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    pom_fixture_after_path_value = os.getenv(
+    pom_fixture_after_path_value = _resolve_fixture_path_value(
         "EA_POM_FIXTURE_AFTER_PATH",
-        str(resolved_root / "tests" / "fixtures" / "pom_after.xml"),
+        "tests/fixtures/pom_after.xml",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    preflight_resolution_fixture_path_value = os.getenv(
+    preflight_resolution_fixture_path_value = _resolve_fixture_path_value(
         "EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "preflight_resolution.json"),
+        "tests/fixtures/preflight_resolution.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    complex_artifact_fixture_path_value = os.getenv(
+    complex_artifact_fixture_path_value = _resolve_fixture_path_value(
         "EA_COMPLEX_ARTIFACT_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "complex_artifacts.json"),
+        "tests/fixtures/complex_artifacts.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    compatibility_diff_fixture_path_value = os.getenv(
+    compatibility_diff_fixture_path_value = _resolve_fixture_path_value(
         "EA_COMPATIBILITY_DIFF_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "compatibility_diff.json"),
+        "tests/fixtures/compatibility_diff.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    decompiled_artifact_fixture_path_value = os.getenv(
+    decompiled_artifact_fixture_path_value = _resolve_fixture_path_value(
         "EA_DECOMPILED_ARTIFACT_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "decompiled_artifacts.json"),
+        "tests/fixtures/decompiled_artifacts.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    symbol_mapping_fixture_path_value = os.getenv(
+    symbol_mapping_fixture_path_value = _resolve_fixture_path_value(
         "EA_SYMBOL_MAPPING_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "symbol_mappings.json"),
+        "tests/fixtures/symbol_mappings.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    code_change_plan_fixture_path_value = os.getenv(
+    code_change_plan_fixture_path_value = _resolve_fixture_path_value(
         "EA_CODE_CHANGE_PLAN_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "code_change_plan.json"),
+        "tests/fixtures/code_change_plan.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    validation_result_fixture_path_value = os.getenv(
+    validation_result_fixture_path_value = _resolve_fixture_path_value(
         "EA_VALIDATION_RESULT_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "validation_result.json"),
+        "tests/fixtures/validation_result.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    rollback_fixture_path_value = os.getenv(
+    rollback_fixture_path_value = _resolve_fixture_path_value(
         "EA_ROLLBACK_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "rollback_plan.json"),
+        "tests/fixtures/rollback_plan.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    branch_publication_fixture_path_value = os.getenv(
+    branch_publication_fixture_path_value = _resolve_fixture_path_value(
         "EA_BRANCH_PUBLICATION_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "branch_publication.json"),
+        "tests/fixtures/branch_publication.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    pull_request_fixture_path_value = os.getenv(
+    pull_request_fixture_path_value = _resolve_fixture_path_value(
         "EA_PULL_REQUEST_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "pull_request.json"),
+        "tests/fixtures/pull_request.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
-    jira_completion_fixture_path_value = os.getenv(
+    jira_completion_fixture_path_value = _resolve_fixture_path_value(
         "EA_JIRA_COMPLETION_FIXTURE_PATH",
-        str(resolved_root / "tests" / "fixtures" / "jira_completion.json"),
+        "tests/fixtures/jira_completion.json",
+        execution_mode=execution_mode,
+        repo_root=resolved_root,
     )
 
     return RuntimeConfig(

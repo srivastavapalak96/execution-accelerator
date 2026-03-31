@@ -62,6 +62,47 @@ def test_load_runtime_config_reads_execution_mode(tmp_path, monkeypatch) -> None
     assert config.execution_mode == ExecutionMode.LIVE
 
 
+def test_load_runtime_config_does_not_seed_fixture_defaults_in_live_mode(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("EA_MODE", "live")
+    monkeypatch.delenv("EA_JIRA_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_REPOSITORY_INVENTORY_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_ADVISORY_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_MAVEN_VERIFICATION_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_POM_FIXTURE_BEFORE_PATH", raising=False)
+    monkeypatch.delenv("EA_POM_FIXTURE_AFTER_PATH", raising=False)
+    monkeypatch.delenv("EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_VALIDATION_RESULT_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_ROLLBACK_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_BRANCH_PUBLICATION_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_PULL_REQUEST_FIXTURE_PATH", raising=False)
+    monkeypatch.delenv("EA_JIRA_COMPLETION_FIXTURE_PATH", raising=False)
+
+    config = load_runtime_config(repo_root=tmp_path)
+
+    assert config.jira_fixture_path is None
+    assert config.repository_inventory_fixture_path is None
+    assert config.advisory_fixture_path is None
+    assert config.maven_verification_fixture_path is None
+    assert config.pom_fixture_before_path is None
+    assert config.pom_fixture_after_path is None
+    assert config.preflight_resolution_fixture_path is None
+    assert config.complex_artifact_fixture_path is None
+    assert config.compatibility_diff_fixture_path is None
+    assert config.decompiled_artifact_fixture_path is None
+    assert config.symbol_mapping_fixture_path is None
+    assert config.code_change_plan_fixture_path is None
+    assert config.validation_result_fixture_path is None
+    assert config.rollback_fixture_path is None
+    assert config.branch_publication_fixture_path is None
+    assert config.pull_request_fixture_path is None
+    assert config.jira_completion_fixture_path is None
+
+
 def test_load_runtime_config_reads_dry_run_and_keep_workspace_flags(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("EA_DRY_RUN", "1")
     monkeypatch.setenv("EA_KEEP_WORKSPACE", "1")
