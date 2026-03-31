@@ -310,6 +310,9 @@ def _build_repo_continuation_update(
             "pending_repos": pending_repos,
             "pending_approval_stage": None,
             "pending_approval_reason": None,
+            "failure_classifications": [],
+            "errors": [],
+            "retry_decision": None,
             "workflow_status": WorkflowStatus.COMPLETED,
         }
 

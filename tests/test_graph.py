@@ -788,7 +788,9 @@ def test_bootstrap_ticket_run_retries_transient_delivery_failure_before_succeedi
     assert result.state.workflow_status == WorkflowStatus.COMPLETED
     assert result.state.retry_count == 1
     assert result.state.total_attempts == 1
-    assert result.state.failure_classifications == ["network_transient"]
+    assert result.state.failure_classifications == []
+    assert result.state.errors == []
+    assert result.state.retry_decision is None
     assert result.state.branch_publication is not None
     assert result.state.pull_request_summary is not None
     assert result.state.jira_completion is not None
