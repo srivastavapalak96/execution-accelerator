@@ -47,7 +47,7 @@ from execution_accelerator.nodes import (
 )
 from execution_accelerator.policy import PolicyEngine
 from execution_accelerator.persistence import build_default_thread_id, build_thread_config, sqlite_checkpointer
-from execution_accelerator.schemas import ApprovalStage, HumanFeedback, RemediationStrategy
+from execution_accelerator.schemas import ApprovalStage, HumanFeedback, RemediationStrategy, WorkflowStatus
 from execution_accelerator.state import RemediationState
 
 
@@ -197,6 +197,7 @@ def build_remediation_graph(
         "publish_remediation",
         _select_post_delivery_node,
         {
+            "classify_failure": "classify_failure",
             "detect_maven_profile": "detect_maven_profile",
             END: END,
         },
@@ -216,6 +217,7 @@ def build_remediation_graph(
         {
             "execute_complex_scaffold": "execute_complex_scaffold",
             "escalate": "escalate",
+            "publish_remediation": "publish_remediation",
             "remediate_simple": "remediate_simple",
             "remediate_transitive": "remediate_transitive",
         },
@@ -446,6 +448,8 @@ def _select_post_delivery_approval_node(state: RemediationState) -> str:
 
 
 def _select_post_delivery_node(state: RemediationState) -> str:
+    if state.workflow_status == WorkflowStatus.FAILED and state.errors:
+        return "classify_failure"
     if state.pending_repos:
         return "detect_maven_profile"
     return END

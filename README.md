@@ -8,7 +8,7 @@ Today, this repository is best understood as a **partially live remediation prot
 - SQLite checkpoint persistence is real
 - workflow schemas/state are real
 - live Jira intake, repository preparation, OSV advisory lookup, Maven profile detection, and Maven verification are real
-- bounded retry routing for retryable test failures and transient dependency-inspection validation failures, live remediation, live validation, basic live delivery, and failure escalation bundles now exist
+- bounded retry routing for retryable test failures, transient dependency-inspection validation failures, and transient delivery failures, live remediation, live validation, basic live delivery, and failure escalation bundles now exist
 - the complex lane now persists a concrete migration tactic plus concrete file/symbol targets and open questions, and it now executes bounded real Java migration work before validation by rewriting supported method/constructor calls, references, static-imported legacy calls, static field/constant references, and obsolete exact imports, generating executable helper shims for missing target files, and scanning existing Java sources for detected legacy API usage, but broader tough-path behavior is still incomplete
 
 If you want the long-term target, read **`docs/vision.md`**.  
@@ -28,12 +28,12 @@ The current repo can run a persisted local flow for:
    - complex refactor scaffold
 6. live or fixture-backed validation, including a post-remediation dependency-tree rescan in live mode and a dependency license scan with optional denylist or allowlist enforcement
 7. fixture-backed or live git-backed rollback-on-failure, including cleanup of untracked remediation files in live mode
-8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira completion comments and optional done transitions; delivery-approved complex runs can now publish ready PRs instead of remaining draft-only, GitHub PR-create conflicts can recover the existing open PR and refresh stale title/body metadata instead of failing delivery, Jira done-transition conflicts can recover when the issue is already in the target status, Jira done transitions can now also be resolved live by target status name when a transition ID is not preconfigured, both PR bodies and Jira comments now publish workflow, route, approval, approval-comment, remediation-plan context, and multi-repo progress instead of placeholder text, and successful runs now continue across all pending affected repositories instead of stopping after the first one
+8. fixture-backed delivery metadata on success, plus live branch publication / PR creation / Jira completion comments and optional done transitions; delivery-approved complex runs can now publish ready PRs instead of remaining draft-only, GitHub PR-create conflicts can recover the existing open PR and refresh stale title/body metadata instead of failing delivery, transient publish-time delivery failures now become structured workflow errors and can retry `publish_remediation` without republishing already-created branch/PR state, Jira done-transition conflicts can recover when the issue is already in the target status, Jira done transitions can now also be resolved live by target status name when a transition ID is not preconfigured, both PR bodies and Jira comments now publish workflow, route, approval, approval-comment, remediation-plan context, and multi-repo progress instead of placeholder text, and successful runs now continue across all pending affected repositories instead of stopping after the first one
 9. fixture-backed or live failure escalation summaries, including persisted escalation bundle paths in run output, route rationale, approval provenance, code-diff summaries, validation context, richer complex-plan context for tough-path failures, and multi-repo progress context such as the failed repository plus completed/pending/skipped repositories
 10. persisted approval pauses for complex refactors, transitive overrides, and approval-tagged repositories, plus an optional second delivery approval gate for complex publication
 11. complex-refactor planning and bounded execution that now persist a primary migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions derived from compatibility analysis, and execute supported Java method/constructor rewrites, static-import rewrites, static field/constant rewrites, exact-import cleanup, and generated helper shims before validation
 12. CLI summaries that surface skipped repositories and raw skip reasons such as existing open remediation PRs, plus route rationale, changed-file counts, aggregate diff totals, the first failing validation check when validation breaks, and primary change summaries
-13. retry scheduling that now clears stale rollback/preflight/diff state before rerunning a remediation lane, successful validation clears stale rollback/retry directives from the current run snapshot, and transient dependency-tree or license-metadata inspection failures can now rerun within the same bounded retry budget
+13. retry scheduling that now clears stale rollback/preflight/diff state before rerunning a remediation lane, successful validation clears stale rollback/retry directives from the current run snapshot, transient dependency-tree or license-metadata inspection failures can now rerun within the same bounded retry budget, and transient delivery failures can rerun `publish_remediation` while preserving already-published branch/PR state
 14. CLI summaries that surface the latest terminal workflow error for failed or blocked runs and now show remediation plan summary/rationale directly
 15. Complex scaffold execution that can deterministically rewrite supported Java method-call and constructor migration sites in existing files before appending operator-facing scaffold notes
 
@@ -43,7 +43,7 @@ The default mode is:
 EA_MODE=fixture
 ```
 
-`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, bounded retry routing for retryable test failures and transient dependency-inspection validation failures, escalation bundles, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, including policy-driven approval for transitive overrides, tagged repositories, and optional second-stage complex delivery approval; the complex lane also persists a concrete migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions, and now materializes deterministic scaffolded file changes before validation, but tougher remediation lanes are still incomplete.
+`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, bounded retry routing for retryable test failures, transient dependency-inspection validation failures, and transient delivery failures, escalation bundles, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, including policy-driven approval for transitive overrides, tagged repositories, and optional second-stage complex delivery approval; the complex lane also persists a concrete migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions, and now materializes deterministic scaffolded file changes before validation, but tougher remediation lanes are still incomplete.
 
 ## Current limitations
 
@@ -51,7 +51,7 @@ This repository does **not** yet perform:
 
 - fuller Jira completion workflow handling beyond the current done-transition-by-id or done-transition-by-status support
 - richer license-policy handling beyond the current dependency license scan and optional denylist/allowlist enforcement
-- richer retry policies beyond the current bounded test-failure and transient-validation remediation re-runs
+- richer retry policies beyond the current bounded test-failure, transient-validation, and transient-delivery re-runs
 - richer policy enforcement beyond the current route/tag and complex-delivery approval rules
 - broad tough-path/EOL migrations beyond the current bounded Java rewrite/helper generation support
 - broader observability hardening beyond the escalation bundle artifact

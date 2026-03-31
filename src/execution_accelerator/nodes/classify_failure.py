@@ -31,6 +31,7 @@ def classify_failure(state: RemediationState) -> dict[str, object]:
     reason = _build_retry_reason(
         can_retry=can_retry,
         classification=classification,
+        retry_next_node=retry_next_node,
         total_attempts=total_attempts,
         max_total_attempts=max_total_attempts,
         retry_count=state.retry_count,
@@ -58,6 +59,11 @@ def classify_failure(state: RemediationState) -> dict[str, object]:
             },
         )
     )
+    clear_attempt_scoped_state = can_retry and retry_decision.next_node in {
+        "execute_complex_scaffold",
+        "remediate_simple",
+        "remediate_transitive",
+    }
 
     return {
         "total_attempts": total_attempts,
@@ -65,10 +71,10 @@ def classify_failure(state: RemediationState) -> dict[str, object]:
         "retry_count": retry_count,
         "retry_decision": retry_decision,
         "workflow_status": WorkflowStatus.IN_PROGRESS if retry_decision.next_node != "escalate" else WorkflowStatus.FAILED,
-        "rollback_plan": None if can_retry else state.rollback_plan,
-        "modified_files": [] if can_retry else state.modified_files,
-        "code_diffs": [] if can_retry else state.code_diffs,
-        "preflight_resolution": None if can_retry else state.preflight_resolution,
+        "rollback_plan": None if clear_attempt_scoped_state else state.rollback_plan,
+        "modified_files": [] if clear_attempt_scoped_state else state.modified_files,
+        "code_diffs": [] if clear_attempt_scoped_state else state.code_diffs,
+        "preflight_resolution": None if clear_attempt_scoped_state else state.preflight_resolution,
         "audit_events": audit_events,
     }
 
@@ -78,6 +84,12 @@ def _classify_latest_failure(state: RemediationState) -> FailureClassification:
         latest_error = state.errors[-1]
         if latest_error.code in {"policy_blocked", "approval_rejected"}:
             return FailureClassification.POLICY_BLOCK
+        if latest_error.code.startswith("delivery_"):
+            return (
+                FailureClassification.NETWORK_TRANSIENT
+                if latest_error.recoverable
+                else FailureClassification.UNKNOWN
+            )
         if latest_error.code == "validation_transient_failed":
             return FailureClassification.NETWORK_TRANSIENT
     if not state.validation_results:
@@ -108,6 +120,8 @@ def _classify_latest_failure(state: RemediationState) -> FailureClassification:
 
 
 def _select_retry_node(state: RemediationState) -> str | None:
+    if state.errors and state.errors[-1].code.startswith("delivery_"):
+        return "publish_remediation"
     if state.route_decision is None:
         return None
     if state.route_decision.strategy == "simple_update":
@@ -127,6 +141,7 @@ def _build_retry_reason(
     *,
     can_retry: bool,
     classification: FailureClassification,
+    retry_next_node: str | None,
     total_attempts: int,
     max_total_attempts: int,
     retry_count: int,
@@ -134,6 +149,8 @@ def _build_retry_reason(
     latest_error_recoverable: bool,
 ) -> str:
     if can_retry:
+        if classification == FailureClassification.NETWORK_TRANSIENT and retry_next_node == "publish_remediation":
+            return "Retryable transient delivery failure will rerun publication."
         if classification == FailureClassification.NETWORK_TRANSIENT:
             return "Retryable transient validation failure will rerun the active remediation lane."
         return "Retryable test failure will rerun the active remediation lane."

@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
+import httpx
+
 from execution_accelerator.adapters import DeliveryAdapter
 from execution_accelerator.config import load_runtime_config
 from execution_accelerator.schemas import AuditEvent, BranchPublicationResult, JiraCompletionResult, PullRequestSummary
@@ -332,6 +334,90 @@ def test_publish_remediation_node_prepares_next_pending_repository() -> None:
     assert update["approval_history"] == []
     assert update["retry_count"] == 0
     assert update["total_attempts"] == 0
+
+
+def test_publish_remediation_node_records_structured_delivery_failure() -> None:
+    class StubDeliveryAdapter:
+        def load_branch_publication(self, **_: object) -> BranchPublicationResult:
+            return BranchPublicationResult(
+                repository="payments-service",
+                branch_name="sec-999-remediate-legacy-json",
+                commit_sha="abc123",
+                commit_message="chore: remediate legacy-json for SEC-999",
+                pushed=True,
+            )
+
+        def load_pull_request(self, **_: object) -> PullRequestSummary:
+            return PullRequestSummary(
+                repository="payments-service",
+                number=99,
+                url="https://example.test/pr/99",
+                title="SEC-999: remediate legacy-json",
+                status="open",
+            )
+
+        def load_jira_completion(self, **_: object) -> JiraCompletionResult:
+            raise httpx.ConnectError("jira gateway timeout")
+
+    node = build_publish_remediation_node(cast(DeliveryAdapter, StubDeliveryAdapter()))
+    state = RemediationState(
+        initial_ticket_id="SEC-999",
+        current_working_repo="payments-service",
+        pending_repos=["payments-service"],
+    )
+
+    update = node(state)
+
+    assert update["workflow_status"] == WorkflowStatus.FAILED
+    assert cast(BranchPublicationResult, update["branch_publication"]).branch_name == "sec-999-remediate-legacy-json"
+    assert cast(PullRequestSummary, update["pull_request_summary"]).number == 99
+    assert update["jira_completion"] is None
+    assert update["errors"][-1].code == "delivery_jira_failed"
+    assert update["errors"][-1].recoverable is True
+    assert cast(list[AuditEvent], update["audit_events"])[-1].event_type == "delivery.failure"
+
+
+def test_publish_remediation_node_reuses_existing_delivery_state_on_retry() -> None:
+    class StubDeliveryAdapter:
+        def load_branch_publication(self, **_: object) -> BranchPublicationResult:
+            raise AssertionError("branch publication should not rerun")
+
+        def load_pull_request(self, **_: object) -> PullRequestSummary:
+            raise AssertionError("pull request creation should not rerun")
+
+        def load_jira_completion(self, **_: object) -> JiraCompletionResult:
+            return JiraCompletionResult(
+                ticket_id="SEC-1000",
+                status="done",
+                comment="Updated Jira ticket.",
+            )
+
+    node = build_publish_remediation_node(cast(DeliveryAdapter, StubDeliveryAdapter()))
+    state = RemediationState(
+        initial_ticket_id="SEC-1000",
+        current_working_repo="payments-service",
+        pending_repos=["payments-service"],
+        branch_publication={
+            "repository": "payments-service",
+            "branch_name": "sec-1000-remediate-legacy-json",
+            "commit_sha": "abc123",
+            "commit_message": "Apply automated remediation for SEC-1000",
+            "pushed": True,
+        },
+        pull_request_summary={
+            "repository": "payments-service",
+            "number": 100,
+            "url": "https://example.test/pr/100",
+            "title": "SEC-1000 remediate legacy-json",
+            "status": "open",
+        },
+    )
+
+    update = node(state)
+
+    assert update["workflow_status"] == WorkflowStatus.COMPLETED
+    assert cast(JiraCompletionResult, update["jira_completion"]).status == "done"
+    assert cast(BranchPublicationResult, update["branch_publication"]).branch_name == "sec-1000-remediate-legacy-json"
 
 
 def test_publish_remediation_node_includes_multi_repo_progress_in_delivery_context() -> None:

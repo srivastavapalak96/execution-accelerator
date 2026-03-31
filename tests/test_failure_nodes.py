@@ -233,6 +233,64 @@ def test_classify_failure_retries_transient_validation_failures(monkeypatch) -> 
     )
 
 
+def test_classify_failure_retries_transient_delivery_failures_without_clearing_state(monkeypatch) -> None:
+    monkeypatch.setenv("EA_MAX_RETRY_ATTEMPTS", "1")
+    state = RemediationState(
+        initial_ticket_id="SEC-126B",
+        route_decision={"strategy": RemediationStrategy.SIMPLE_UPDATE, "confidence": 0.93, "reason": "Direct fix."},
+        errors=[
+            {
+                "code": "delivery_jira_failed",
+                "message": "Jira completion failed: jira gateway timeout",
+                "recoverable": True,
+            }
+        ],
+        modified_files=["/tmp/workspace/pom.xml"],
+        code_diffs=[
+            {
+                "file_path": "pom.xml",
+                "change_summary": "Bump legacy-json to 1.2.4.",
+                "additions": 1,
+                "deletions": 1,
+            }
+        ],
+        preflight_resolution={
+            "repository": "payments-service",
+            "status": "passed",
+            "resolved_version": "1.2.4",
+            "dependency_kind": "direct",
+            "message": "Preflight passed.",
+        },
+        branch_publication={
+            "repository": "payments-service",
+            "branch_name": "sec-126b-remediate-legacy-json",
+            "commit_sha": "abc123",
+            "commit_message": "Apply automated remediation for SEC-126B",
+            "pushed": True,
+        },
+        pull_request_summary={
+            "repository": "payments-service",
+            "number": 126,
+            "url": "https://example.test/pr/126",
+            "title": "SEC-126B remediate legacy-json",
+            "status": "open",
+        },
+    )
+
+    update = classify_failure(state)
+
+    assert update["failure_classifications"][-1] == FailureClassification.NETWORK_TRANSIENT
+    assert update["retry_count"] == 1
+    assert update["retry_decision"].next_node == "publish_remediation"
+    assert update["retry_decision"].reason == "Retryable transient delivery failure will rerun publication."
+    assert update["modified_files"] == ["/tmp/workspace/pom.xml"]
+    assert update["code_diffs"][0].file_path == "pom.xml"
+    assert update["code_diffs"][0].change_summary == "Bump legacy-json to 1.2.4."
+    assert update["code_diffs"][0].additions == 1
+    assert update["code_diffs"][0].deletions == 1
+    assert update["preflight_resolution"].resolved_version == "1.2.4"
+
+
 def test_escalate_records_terminal_audit_event() -> None:
     state = RemediationState(
         initial_ticket_id="SEC-123",

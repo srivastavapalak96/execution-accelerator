@@ -5,11 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+import httpx
+
 from execution_accelerator.config import RuntimeConfig
-from execution_accelerator.adapters import DeliveryAdapter
+from execution_accelerator.adapters import DeliveryAdapter, DeliveryAdapterError
 from execution_accelerator.schemas import ApprovalRecord, ApprovalStage
 from execution_accelerator.schemas import AuditEvent, WorkflowStatus
-from execution_accelerator.state import RemediationState
+from execution_accelerator.state import RemediationState, WorkflowError
 from execution_accelerator.validation_summary import select_primary_validation_check
 
 
@@ -21,29 +23,43 @@ def build_publish_remediation_node(
     def publish_remediation(state: RemediationState) -> dict[str, object]:
         assert state.current_working_repo is not None
         workspace = state.repo_map.get(state.current_working_repo)
-
-        branch_publication = delivery_adapter.load_branch_publication(
-            repository=state.current_working_repo,
-            workspace_path=Path(workspace.local_path) if workspace is not None else None,
-            ticket_id=state.initial_ticket_id,
-            package_name=state.vulnerability_details.package_name if state.vulnerability_details is not None else None,
-        )
-        pull_request_summary = delivery_adapter.load_pull_request(
-            repository=state.current_working_repo,
-            owner=workspace.owner if workspace is not None else None,
-            base_branch=workspace.default_branch if workspace is not None else None,
-            head_branch=branch_publication.branch_name,
-            ticket_id=state.initial_ticket_id,
-            package_name=state.vulnerability_details.package_name if state.vulnerability_details is not None else None,
-            draft_pull_request=not _has_delivery_approval(state) if state.requires_delivery_approval else None,
-            body=_build_pull_request_body(state),
-        )
-        jira_completion = delivery_adapter.load_jira_completion(
-            ticket_id=state.initial_ticket_id,
-            repository=state.current_working_repo,
-            pull_request_url=pull_request_summary.url,
-            comment=_build_jira_completion_comment(state, pull_request_summary.url),
-        )
+        branch_publication = state.branch_publication
+        pull_request_summary = state.pull_request_summary
+        jira_completion = state.jira_completion
+        try:
+            if branch_publication is None:
+                branch_publication = delivery_adapter.load_branch_publication(
+                    repository=state.current_working_repo,
+                    workspace_path=Path(workspace.local_path) if workspace is not None else None,
+                    ticket_id=state.initial_ticket_id,
+                    package_name=state.vulnerability_details.package_name if state.vulnerability_details is not None else None,
+                )
+            if pull_request_summary is None:
+                pull_request_summary = delivery_adapter.load_pull_request(
+                    repository=state.current_working_repo,
+                    owner=workspace.owner if workspace is not None else None,
+                    base_branch=workspace.default_branch if workspace is not None else None,
+                    head_branch=branch_publication.branch_name,
+                    ticket_id=state.initial_ticket_id,
+                    package_name=state.vulnerability_details.package_name if state.vulnerability_details is not None else None,
+                    draft_pull_request=not _has_delivery_approval(state) if state.requires_delivery_approval else None,
+                    body=_build_pull_request_body(state),
+                )
+            if jira_completion is None:
+                jira_completion = delivery_adapter.load_jira_completion(
+                    ticket_id=state.initial_ticket_id,
+                    repository=state.current_working_repo,
+                    pull_request_url=pull_request_summary.url,
+                    comment=_build_jira_completion_comment(state, pull_request_summary.url),
+                )
+        except (DeliveryAdapterError, httpx.HTTPError) as error:
+            return _build_delivery_failure_update(
+                state=state,
+                error=error,
+                branch_publication=branch_publication,
+                pull_request_summary=pull_request_summary,
+                jira_completion=jira_completion,
+            )
 
         completed_repos = list(state.completed_repos)
         if state.current_working_repo not in completed_repos:
@@ -165,6 +181,76 @@ def _build_repo_progress_lines(state: RemediationState) -> list[str]:
     if skipped_repos:
         lines.append(f"- Skipped repositories: {'; '.join(skipped_repos)}")
     return lines
+
+
+def _build_delivery_failure_update(
+    *,
+    state: RemediationState,
+    error: DeliveryAdapterError | httpx.HTTPError,
+    branch_publication: object,
+    pull_request_summary: object,
+    jira_completion: object,
+) -> dict[str, object]:
+    error_code = _build_delivery_error_code(branch_publication, pull_request_summary, jira_completion)
+    workflow_error = WorkflowError(
+        code=error_code,
+        message=_build_delivery_error_message(error_code, error),
+        recoverable=_is_recoverable_delivery_error(error),
+        repository=state.current_working_repo,
+    )
+    errors = list(state.errors)
+    errors.append(workflow_error)
+    audit_events = list(state.audit_events)
+    audit_events.append(
+        AuditEvent(
+            event_type="delivery.failure",
+            message=f"Delivery failed for {state.current_working_repo}.",
+            details={
+                "repository": state.current_working_repo,
+                "error_code": workflow_error.code,
+                "recoverable": workflow_error.recoverable,
+            },
+        )
+    )
+    return {
+        "branch_publication": branch_publication,
+        "pull_request_summary": pull_request_summary,
+        "jira_completion": jira_completion,
+        "errors": errors,
+        "workflow_status": WorkflowStatus.FAILED,
+        "audit_events": audit_events,
+    }
+
+
+def _build_delivery_error_code(
+    branch_publication: object,
+    pull_request_summary: object,
+    jira_completion: object,
+) -> str:
+    if branch_publication is None:
+        return "delivery_branch_publication_failed"
+    if pull_request_summary is None:
+        return "delivery_pull_request_failed"
+    if jira_completion is None:
+        return "delivery_jira_failed"
+    return "delivery_failed"
+
+
+def _build_delivery_error_message(error_code: str, error: DeliveryAdapterError | httpx.HTTPError) -> str:
+    stage = {
+        "delivery_branch_publication_failed": "branch publication",
+        "delivery_pull_request_failed": "pull request publication",
+        "delivery_jira_failed": "Jira completion",
+    }.get(error_code, "delivery")
+    return f"{stage.capitalize()} failed: {error}"
+
+
+def _is_recoverable_delivery_error(error: DeliveryAdapterError | httpx.HTTPError) -> bool:
+    if isinstance(error, (httpx.TimeoutException, httpx.NetworkError)):
+        return True
+    if isinstance(error, httpx.HTTPStatusError):
+        return error.response.status_code in {408, 409, 425, 429, 500, 502, 503, 504}
+    return False
 
 
 def _find_latest_approved_record(state: RemediationState) -> ApprovalRecord | None:

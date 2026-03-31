@@ -758,6 +758,43 @@ def test_bootstrap_ticket_run_retries_transient_validation_failure_before_escala
     assert result.state.escalation_bundle is not None
 
 
+def test_bootstrap_ticket_run_retries_transient_delivery_failure_before_succeeding(tmp_path, monkeypatch) -> None:
+    _configure_runtime(monkeypatch, tmp_path)
+    monkeypatch.setenv("EA_MAX_RETRY_ATTEMPTS", "1")
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-503",
+        repository_name="payments-service",
+        fixture_path=Path(__file__).parent / "fixtures" / "pom_before.xml",
+    )
+    attempts = {"jira_completion": 0}
+    original_load_jira_completion = DeliveryAdapter.load_jira_completion
+
+    def flaky_jira_completion(self, **kwargs):
+        attempts["jira_completion"] += 1
+        if attempts["jira_completion"] == 1:
+            raise __import__("httpx").ConnectError("jira gateway timeout")
+        return original_load_jira_completion(self, **kwargs)
+
+    monkeypatch.setattr(DeliveryAdapter, "load_jira_completion", flaky_jira_completion)
+    config = load_runtime_config(repo_root=tmp_path)
+
+    result = bootstrap_ticket_run(
+        "SEC-503",
+        runtime_config=config,
+        thread_id="sec-503-thread",
+    )
+
+    assert result.state.workflow_status == WorkflowStatus.COMPLETED
+    assert result.state.retry_count == 1
+    assert result.state.total_attempts == 1
+    assert result.state.failure_classifications == ["network_transient"]
+    assert result.state.branch_publication is not None
+    assert result.state.pull_request_summary is not None
+    assert result.state.jira_completion is not None
+    assert attempts["jira_completion"] == 2
+
+
 def test_live_flow_runs_through_delivery_with_live_integrations(tmp_path, monkeypatch) -> None:
     fixtures_dir = Path(__file__).parent / "fixtures"
     config_dir = tmp_path / "config"
