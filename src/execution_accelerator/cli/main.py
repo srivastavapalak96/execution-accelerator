@@ -315,8 +315,11 @@ def _print_run_summary(*, thread_id: str, checkpoint_path: str | None, state: Re
     if state.branch_publication is not None:
         print(f"branch_name={state.branch_publication.branch_name}")
         print(f"branch_commit_sha={state.branch_publication.commit_sha}")
+        print(f"branch_commit_message={state.branch_publication.commit_message}")
     if state.pull_request_summary is not None:
         print(f"pull_request_number={state.pull_request_summary.number}")
+        print(f"pull_request_title={state.pull_request_summary.title}")
+        print(f"pull_request_status={state.pull_request_summary.status}")
         print(f"pull_request_url={state.pull_request_summary.url}")
     if state.jira_completion is not None:
         print(f"jira_ticket_status={state.jira_completion.status}")

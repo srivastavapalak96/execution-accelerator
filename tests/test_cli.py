@@ -258,7 +258,11 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "validation_check_count=4" in captured.out
     assert "retry_count=0" in captured.out
     assert "branch_name=sec-123-remediate-legacy-json" in captured.out
+    assert "branch_commit_message=Apply automated remediation for SEC-123" in captured.out
     assert "pull_request_number=42" in captured.out
+    assert "pull_request_title=SEC-123 remediate legacy-json" in captured.out
+    assert "pull_request_status=open" in captured.out
+    assert "pull_request_url=https://github.com/srivastavapalak96/execution-accelerator/pull/42" in captured.out
     assert "jira_ticket_status=done" in captured.out
 
 
@@ -523,7 +527,11 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     assert "validation_status=passed" in captured.out
     assert "validation_check_count=4" in captured.out
     assert "branch_name=sec-123-remediate-legacy-json" in captured.out
+    assert "branch_commit_message=Apply automated remediation for SEC-123" in captured.out
     assert "pull_request_number=42" in captured.out
+    assert "pull_request_title=SEC-123 remediate legacy-json" in captured.out
+    assert "pull_request_status=open" in captured.out
+    assert "pull_request_url=https://github.com/srivastavapalak96/execution-accelerator/pull/42" in captured.out
     assert "jira_ticket_status=done" in captured.out
 
 
@@ -589,7 +597,11 @@ def test_main_bootstraps_transitive_ticket(monkeypatch, capsys, tmp_path) -> Non
     assert "validation_status=passed" in captured.out
     assert "validation_check_count=4" in captured.out
     assert "branch_name=sec-123-remediate-legacy-json" in captured.out
+    assert "branch_commit_message=Apply automated remediation for SEC-123" in captured.out
     assert "pull_request_number=42" in captured.out
+    assert "pull_request_title=SEC-123 remediate legacy-json" in captured.out
+    assert "pull_request_status=open" in captured.out
+    assert "pull_request_url=https://github.com/srivastavapalak96/execution-accelerator/pull/42" in captured.out
     assert "jira_ticket_status=done" in captured.out
 
 
