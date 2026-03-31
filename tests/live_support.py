@@ -31,6 +31,9 @@ def serve_routes(
         def do_POST(self) -> None:  # noqa: N802
             self._serve("POST")
 
+        def do_PATCH(self) -> None:  # noqa: N802
+            self._serve("PATCH")
+
         def log_message(self, format: str, *args: object) -> None:  # noqa: A003
             return
 

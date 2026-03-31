@@ -252,6 +252,8 @@ class DeliveryAdapter:
                 owner=repository_owner,
                 head_branch=head_branch,
                 base_branch=base_branch,
+                expected_title=title,
+                expected_body=pull_request_body,
             )
             if existing_pull_request is not None:
                 return existing_pull_request
@@ -270,6 +272,8 @@ class DeliveryAdapter:
         owner: str,
         head_branch: str,
         base_branch: str | None,
+        expected_title: str,
+        expected_body: str,
     ) -> PullRequestSummary | None:
         assert self.github_api_base is not None
         assert self.github_token is not None
@@ -290,12 +294,64 @@ class DeliveryAdapter:
         payload = response.json()
         if not isinstance(payload, list) or not payload:
             return None
+        existing_payload = payload[0]
+        synchronized_payload = self._synchronize_existing_pull_request(
+            repository=repository,
+            owner=owner,
+            payload=existing_payload,
+            expected_title=expected_title,
+            expected_body=expected_body,
+            expected_base_branch=base_branch or "main",
+        )
         return _build_pull_request_summary(
             repository=repository,
-            payload=payload[0],
-            default_title=f"Remediate {repository}",
+            payload=synchronized_payload,
+            default_title=expected_title,
             default_draft=self.draft_pull_requests,
         )
+
+    def _synchronize_existing_pull_request(
+        self,
+        *,
+        repository: str,
+        owner: str,
+        payload: object,
+        expected_title: str,
+        expected_body: str,
+        expected_base_branch: str,
+    ) -> object:
+        if not isinstance(payload, dict):
+            raise DeliveryAdapterError("Live pull-request payload was not an object.")
+
+        updates: dict[str, str] = {}
+        current_title = payload.get("title")
+        if current_title != expected_title:
+            updates["title"] = expected_title
+        current_body = payload.get("body")
+        if current_body != expected_body:
+            updates["body"] = expected_body
+        current_base_branch = _extract_pull_request_base_branch(payload)
+        if current_base_branch is not None and current_base_branch != expected_base_branch:
+            updates["base"] = expected_base_branch
+        if not updates:
+            return payload
+
+        pull_request_number = payload.get("number")
+        if not isinstance(pull_request_number, int):
+            raise DeliveryAdapterError("Live pull-request payload is missing a numeric pull request number.")
+        assert self.github_api_base is not None
+        assert self.github_token is not None
+        response = httpx.patch(
+            f"{self.github_api_base.rstrip('/')}/repos/{owner}/{repository}/pulls/{pull_request_number}",
+            headers={
+                "Authorization": f"Bearer {self.github_token}",
+                "Accept": "application/vnd.github+json",
+            },
+            json=updates,
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return response.json()
 
     def load_jira_completion(
         self,
@@ -483,6 +539,14 @@ def _build_pull_request_summary(
         title=str(payload.get("title") or default_title),
         status="draft" if draft else str(payload.get("state") or "open"),
     )
+
+
+def _extract_pull_request_base_branch(payload: dict[str, object]) -> str | None:
+    base_payload = payload.get("base")
+    if not isinstance(base_payload, dict):
+        return None
+    base_ref = base_payload.get("ref")
+    return base_ref if isinstance(base_ref, str) else None
 
 
 def _is_transition_already_applied(response: httpx.Response) -> bool:

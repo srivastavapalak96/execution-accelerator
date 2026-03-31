@@ -393,7 +393,8 @@ def test_delivery_adapter_recovers_existing_pull_request_after_conflict() -> Non
                 status=200,
                 body=(
                     b'[{"number": 45, "html_url": "https://example.test/pr/45", '
-                    b'"title": "SEC-123: remediate legacy-json", "state": "open", "draft": false}]'
+                    b'"title": "SEC-123: remediate legacy-json", "state": "open", "draft": false, '
+                    b'"body": "Automated remediation for SEC-123."}]'
                 ),
             ),
         },
@@ -422,3 +423,67 @@ def test_delivery_adapter_recovers_existing_pull_request_after_conflict() -> Non
     assert requests_log[1][1].startswith(
         "/repos/payments-platform/payments-service/pulls?head=payments-platform%3Asec-123-remediate-legacy-json"
     )
+
+
+def test_delivery_adapter_refreshes_existing_pull_request_body_after_conflict() -> None:
+    requests_log: list[tuple[str, str, bytes]] = []
+    with serve_routes(
+        {
+            (
+                "POST",
+                "/repos/payments-platform/payments-service/pulls",
+            ): ResponseSpec(
+                status=422,
+                body=(
+                    b'{"message":"Validation Failed","errors":[{"message":"A pull request already exists for '
+                    b'payments-platform:sec-123-remediate-legacy-json."}]}'
+                ),
+            ),
+            (
+                "GET",
+                "/repos/payments-platform/payments-service/pulls",
+            ): ResponseSpec(
+                status=200,
+                body=(
+                    b'[{"number": 46, "html_url": "https://example.test/pr/46", '
+                    b'"title": "Old remediation title", "state": "open", "draft": false, '
+                    b'"body": "Stale body text", "base": {"ref": "main"}}]'
+                ),
+            ),
+            (
+                "PATCH",
+                "/repos/payments-platform/payments-service/pulls/46",
+            ): ResponseSpec(
+                status=200,
+                body=(
+                    b'{"number": 46, "html_url": "https://example.test/pr/46", '
+                    b'"title": "SEC-123: remediate legacy-json", "state": "open", "draft": false, '
+                    b'"body": "Automated remediation for SEC-123.\\n\\n- Package: org.example:legacy-json"}'
+                ),
+            ),
+        },
+        requests_log=requests_log,
+    ) as base_url:
+        adapter = DeliveryAdapter(
+            mode=ExecutionMode.LIVE,
+            github_api_base=base_url,
+            github_token="ghp_testtoken",
+            github_owner="payments-platform",
+            draft_pull_requests=False,
+        )
+
+        pull_request = adapter.load_pull_request(
+            repository="payments-service",
+            owner="payments-platform",
+            base_branch="main",
+            head_branch="sec-123-remediate-legacy-json",
+            ticket_id="SEC-123",
+            package_name="legacy-json",
+            body="Automated remediation for SEC-123.\n\n- Package: org.example:legacy-json",
+        )
+
+    assert pull_request.number == 46
+    assert pull_request.title == "SEC-123: remediate legacy-json"
+    assert [method for method, _, _ in requests_log] == ["POST", "GET", "PATCH"]
+    assert b'"title":"SEC-123: remediate legacy-json"' in requests_log[2][2]
+    assert b'"body":"Automated remediation for SEC-123.\\n\\n- Package: org.example:legacy-json"' in requests_log[2][2]
