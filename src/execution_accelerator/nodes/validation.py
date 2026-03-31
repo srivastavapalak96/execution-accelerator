@@ -7,7 +7,7 @@ from pathlib import Path
 
 from execution_accelerator.adapters import ValidationAdapter
 from execution_accelerator.schemas import AuditEvent, RepositoryValidationResult, ValidationStatus, WorkflowStatus
-from execution_accelerator.state import RemediationState, WorkflowError
+from execution_accelerator.state import RemediationState, WorkflowError, require_state_field
 
 
 def build_validate_remediation_node(
@@ -16,11 +16,16 @@ def build_validate_remediation_node(
     """Create a node that records validation results for one repository."""
 
     def validate_remediation(state: RemediationState) -> dict[str, object]:
-        assert state.current_working_repo is not None
+        current_working_repo = require_state_field(
+            state.current_working_repo,
+            source="validate_remediation",
+            field_name="current_working_repo",
+            message="Validation requires the current working repository to be set.",
+        )
 
-        workspace = state.repo_map.get(state.current_working_repo)
+        workspace = state.repo_map.get(current_working_repo)
         validation_result = validation_adapter.load_validation_result(
-            repository=state.current_working_repo,
+            repository=current_working_repo,
             workspace_path=Path(workspace.local_path) if workspace is not None else None,
             execution_plan=state.maven_plan,
             vulnerability_details=state.vulnerability_details,
@@ -33,9 +38,9 @@ def build_validate_remediation_node(
         audit_events.append(
             AuditEvent(
                 event_type="validation.run",
-                message=f"Completed validation checks for {state.current_working_repo}.",
+                message=f"Completed validation checks for {current_working_repo}.",
                 details={
-                    "repository": state.current_working_repo,
+                    "repository": current_working_repo,
                     "status": validation_result.status,
                     "check_count": len(validation_result.checks),
                 },
@@ -64,13 +69,24 @@ def build_handle_validation_failure_node(
     """Create a node that records rollback metadata after validation failure."""
 
     def handle_validation_failure(state: RemediationState) -> dict[str, object]:
-        assert state.current_working_repo is not None
-        assert state.validation_results
+        current_working_repo = require_state_field(
+            state.current_working_repo,
+            source="handle_validation_failure",
+            field_name="current_working_repo",
+            message="Validation failure handling requires the current working repository to be set.",
+        )
+        require_state_field(
+            state.validation_results[-1] if state.validation_results else None,
+            source="handle_validation_failure",
+            field_name="validation_results",
+            message="Validation failure handling requires at least one validation result.",
+            repository=current_working_repo,
+        )
 
         validation_result = state.validation_results[-1]
-        workspace = state.repo_map.get(state.current_working_repo)
+        workspace = state.repo_map.get(current_working_repo)
         rollback_plan = validation_adapter.load_rollback_plan(
-            repository=state.current_working_repo,
+            repository=current_working_repo,
             workspace_path=Path(workspace.local_path) if workspace is not None else None,
             modified_files=state.modified_files,
         )
@@ -80,7 +96,7 @@ def build_handle_validation_failure_node(
                 code=_build_validation_error_code(validation_result),
                 message=validation_result.summary or "Validation failed after remediation execution.",
                 recoverable=_is_recoverable_validation_failure(validation_result),
-                repository=state.current_working_repo,
+                repository=current_working_repo,
             )
         )
 
@@ -88,9 +104,9 @@ def build_handle_validation_failure_node(
         audit_events.append(
             AuditEvent(
                 event_type="validation.rollback",
-                message=f"Recorded rollback plan for {state.current_working_repo}.",
+                message=f"Recorded rollback plan for {current_working_repo}.",
                 details={
-                    "repository": state.current_working_repo,
+                    "repository": current_working_repo,
                     "rollback_status": rollback_plan.status,
                     "files_to_restore": rollback_plan.files_to_restore,
                 },

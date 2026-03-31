@@ -35,7 +35,8 @@ The current repo can run a persisted local flow for:
 12. CLI summaries that surface skipped repositories and raw skip reasons such as existing open remediation PRs, plus route rationale, changed-file counts, aggregate diff totals, the first failing validation check when validation breaks, and primary change summaries
 13. retry scheduling that now clears stale rollback/preflight/diff state before rerunning a remediation lane, successful validation clears stale rollback/retry directives from the current run snapshot, transient dependency-tree or license-metadata inspection failures can now rerun within the same bounded retry budget, transient delivery failures can rerun `publish_remediation` while preserving already-published branch/PR state, completed runs now clear stale terminal failure markers after a successful retry so operator summaries do not still report recovered errors, and the canonical retry budget is now `EA_MAX_RETRIES` with a default of `3` while `EA_MAX_RETRY_ATTEMPTS` remains a compatibility alias
 14. CLI summaries that surface the latest terminal workflow error for failed or blocked runs and now show remediation plan summary/rationale directly
-15. Complex scaffold execution that can deterministically rewrite supported Java method-call and constructor migration sites in existing files before appending operator-facing scaffold notes
+15. workflow nodes and graph routing helpers now surface missing required state as explicit `state_invariant_violated` workflow failures with escalation bundles instead of raw assertion crashes
+16. Complex scaffold execution that can deterministically rewrite supported Java method-call and constructor migration sites in existing files before appending operator-facing scaffold notes
 
 The default mode is:
 

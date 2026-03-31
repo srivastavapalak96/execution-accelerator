@@ -26,7 +26,12 @@ from execution_accelerator.schemas import (
     RemediationStrategy,
     SymbolMappingEntry,
 )
-from execution_accelerator.state import CodeDiffSummary, RemediationState
+from execution_accelerator.state import (
+    CodeDiffSummary,
+    RemediationState,
+    require_state_condition,
+    require_state_field,
+)
 
 
 class WorkspaceError(RuntimeError):
@@ -39,9 +44,24 @@ def build_remediate_simple_node(
     """Create a node that applies the Day 5 simple remediation plan."""
 
     def remediate_simple(state: RemediationState) -> dict[str, object]:
-        assert state.route_decision is not None
-        assert state.maven_verification is not None
-        assert state.route_decision.strategy == RemediationStrategy.SIMPLE_UPDATE
+        route_decision = require_state_field(
+            state.route_decision,
+            source="remediate_simple",
+            field_name="route_decision",
+            message="Simple remediation requires a selected remediation route.",
+        )
+        require_state_field(
+            state.maven_verification,
+            source="remediate_simple",
+            field_name="maven_verification",
+            message="Simple remediation requires Maven verification results.",
+        )
+        require_state_condition(
+            route_decision.strategy == RemediationStrategy.SIMPLE_UPDATE,
+            source="remediate_simple",
+            field_name="route_decision.strategy",
+            message="Simple remediation can only run for the simple_update route.",
+        )
 
         repository = state.current_working_repo or state.pending_repos[0]
         workspace = state.repo_map[repository]
@@ -88,9 +108,24 @@ def build_remediate_transitive_node(
     """Create a node that applies the Day 6 transitive override remediation plan."""
 
     def remediate_transitive(state: RemediationState) -> dict[str, object]:
-        assert state.route_decision is not None
-        assert state.maven_verification is not None
-        assert state.route_decision.strategy == RemediationStrategy.TRANSITIVE_OVERRIDE
+        route_decision = require_state_field(
+            state.route_decision,
+            source="remediate_transitive",
+            field_name="route_decision",
+            message="Transitive remediation requires a selected remediation route.",
+        )
+        require_state_field(
+            state.maven_verification,
+            source="remediate_transitive",
+            field_name="maven_verification",
+            message="Transitive remediation requires Maven verification results.",
+        )
+        require_state_condition(
+            route_decision.strategy == RemediationStrategy.TRANSITIVE_OVERRIDE,
+            source="remediate_transitive",
+            field_name="route_decision.strategy",
+            message="Transitive remediation can only run for the transitive_override route.",
+        )
 
         repository = state.current_working_repo or state.pending_repos[0]
         workspace = state.repo_map[repository]
@@ -138,11 +173,16 @@ def build_preflight_validation_node(
     """Create a node that loads the fixture-backed preflight validation result."""
 
     def preflight_validate(state: RemediationState) -> dict[str, object]:
-        assert state.current_working_repo is not None
+        current_working_repo = require_state_field(
+            state.current_working_repo,
+            source="preflight_validate",
+            field_name="current_working_repo",
+            message="Preflight validation requires the current working repository to be set.",
+        )
 
-        workspace = state.repo_map.get(state.current_working_repo)
+        workspace = state.repo_map.get(current_working_repo)
         preflight_resolution = preflight_adapter.load_result(
-            repository=state.current_working_repo,
+            repository=current_working_repo,
             workspace_path=Path(workspace.local_path) if workspace is not None else None,
             vulnerability_details=state.vulnerability_details,
             maven_verification=state.maven_verification,
@@ -152,9 +192,9 @@ def build_preflight_validation_node(
         audit_events.append(
             AuditEvent(
                 event_type="remediation.preflight",
-                message=f"Completed preflight validation for {state.current_working_repo}.",
+                message=f"Completed preflight validation for {current_working_repo}.",
                 details={
-                    "repository": state.current_working_repo,
+                    "repository": current_working_repo,
                     "status": preflight_resolution.status,
                     "resolved_version": preflight_resolution.resolved_version,
                 },
@@ -175,10 +215,30 @@ def build_prepare_complex_remediation_node(
     """Create a node that records the prepared complex-lane analysis plan."""
 
     def prepare_complex_remediation(state: RemediationState) -> dict[str, object]:
-        assert state.route_decision is not None
-        assert state.maven_verification is not None
-        assert state.vulnerability_details is not None
-        assert state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR
+        route_decision = require_state_field(
+            state.route_decision,
+            source="prepare_complex_remediation",
+            field_name="route_decision",
+            message="Complex remediation preparation requires a selected remediation route.",
+        )
+        maven_verification = require_state_field(
+            state.maven_verification,
+            source="prepare_complex_remediation",
+            field_name="maven_verification",
+            message="Complex remediation preparation requires Maven verification results.",
+        )
+        vulnerability_details = require_state_field(
+            state.vulnerability_details,
+            source="prepare_complex_remediation",
+            field_name="vulnerability_details",
+            message="Complex remediation preparation requires vulnerability details from Jira intake.",
+        )
+        require_state_condition(
+            route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR,
+            source="prepare_complex_remediation",
+            field_name="route_decision.strategy",
+            message="Complex remediation preparation can only run for the complex_refactor route.",
+        )
 
         repository = state.current_working_repo or state.pending_repos[0]
         artifact_candidates = complex_adapter.load_artifact_candidates()
@@ -188,8 +248,8 @@ def build_prepare_complex_remediation_node(
         complex_plan = ComplexRemediationPlan(
             repository=repository,
             summary=(
-                f"Analyze {state.vulnerability_details.package_name} "
-                f"from {state.vulnerability_details.installed_version} to {state.maven_verification.target_version} "
+                f"Analyze {vulnerability_details.package_name} "
+                f"from {vulnerability_details.installed_version} to {maven_verification.target_version} "
                 "before attempting code changes."
             ),
             artifact_candidates=artifact_candidates,
@@ -236,18 +296,39 @@ def build_execute_complex_scaffold_node(
     """Create a node that expands the Day 8 complex analysis into an execution scaffold."""
 
     def execute_complex_scaffold(state: RemediationState) -> dict[str, object]:
-        assert state.route_decision is not None
-        assert state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR
-        assert state.current_working_repo is not None
-        assert state.complex_remediation_plan is not None
+        route_decision = require_state_field(
+            state.route_decision,
+            source="execute_complex_scaffold",
+            field_name="route_decision",
+            message="Complex scaffold execution requires a selected remediation route.",
+        )
+        require_state_condition(
+            route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR,
+            source="execute_complex_scaffold",
+            field_name="route_decision.strategy",
+            message="Complex scaffold execution can only run for the complex_refactor route.",
+        )
+        current_working_repo = require_state_field(
+            state.current_working_repo,
+            source="execute_complex_scaffold",
+            field_name="current_working_repo",
+            message="Complex scaffold execution requires the current working repository to be set.",
+        )
+        complex_remediation_plan = require_state_field(
+            state.complex_remediation_plan,
+            source="execute_complex_scaffold",
+            field_name="complex_remediation_plan",
+            message="Complex scaffold execution requires a prepared complex remediation plan.",
+            repository=current_working_repo,
+        )
 
-        workspace = state.repo_map.get(state.current_working_repo)
+        workspace = state.repo_map.get(current_working_repo)
         if workspace is None:
             raise WorkspaceError("workspace context missing; repository intake failed")
         decompiled_artifacts = complex_adapter.load_decompiled_artifacts()
         symbol_mappings = complex_adapter.load_symbol_mappings()
         code_change_plan = complex_adapter.load_code_change_plan()
-        complex_plan = state.complex_remediation_plan.model_copy(
+        complex_plan = complex_remediation_plan.model_copy(
             update={
                 "target_files": code_change_plan.target_files,
                 "symbol_mappings": symbol_mappings,
@@ -270,9 +351,9 @@ def build_execute_complex_scaffold_node(
         audit_events.append(
             AuditEvent(
                 event_type="remediation.complex_scaffold",
-                message=f"Built complex execution scaffold for {state.current_working_repo}.",
+                message=f"Built complex execution scaffold for {current_working_repo}.",
                 details={
-                    "repository": state.current_working_repo,
+                    "repository": current_working_repo,
                     "decompiled_artifact_count": len(decompiled_artifacts),
                     "symbol_mapping_count": len(symbol_mappings),
                     "planned_file_count": len(code_change_plan.target_files),
@@ -297,29 +378,41 @@ def build_execute_complex_scaffold_node(
 
 
 def _build_simple_plan(state: RemediationState, repository: str) -> PomMutationPlan:
-    assert state.vulnerability_details is not None
-    assert state.maven_verification is not None
+    vulnerability_details = require_state_field(
+        state.vulnerability_details,
+        source="_build_simple_plan",
+        field_name="vulnerability_details",
+        message="Simple remediation planning requires vulnerability details from Jira intake.",
+        repository=repository,
+    )
+    maven_verification = require_state_field(
+        state.maven_verification,
+        source="_build_simple_plan",
+        field_name="maven_verification",
+        message="Simple remediation planning requires Maven verification results.",
+        repository=repository,
+    )
 
     current_repo = state.repo_map[repository]
     file_path = current_repo.manifest_path or "pom.xml"
     dependency = DependencyCoordinate(
-        group_id=state.vulnerability_details.package_name.split(":", maxsplit=1)[0],
-        artifact_id=state.vulnerability_details.package_name.split(":", maxsplit=1)[1],
-        version=state.maven_verification.target_version,
+        group_id=vulnerability_details.package_name.split(":", maxsplit=1)[0],
+        artifact_id=vulnerability_details.package_name.split(":", maxsplit=1)[1],
+        version=maven_verification.target_version,
     )
 
     return PomMutationPlan(
         repository=repository,
         strategy=RemediationStrategy.SIMPLE_UPDATE,
-        summary=f"Bump {state.vulnerability_details.package_name} to {state.maven_verification.target_version}.",
+        summary=f"Bump {vulnerability_details.package_name} to {maven_verification.target_version}.",
         changes=[
             PomMutationChange(
                 file_path=file_path,
                 dependency=dependency,
                 mutation_kind=PomMutationKind.DIRECT_VERSION_BUMP,
                 target_section=PomSectionTarget.PROJECT_DEPENDENCIES,
-                previous_version=state.vulnerability_details.installed_version,
-                target_version=state.maven_verification.target_version,
+                previous_version=vulnerability_details.installed_version,
+                target_version=maven_verification.target_version,
                 xml_path_hint="./dependencies/dependency/version",
             )
         ],
@@ -327,23 +420,35 @@ def _build_simple_plan(state: RemediationState, repository: str) -> PomMutationP
 
 
 def _build_transitive_plan(state: RemediationState, repository: str) -> PomMutationPlan:
-    assert state.vulnerability_details is not None
-    assert state.maven_verification is not None
+    vulnerability_details = require_state_field(
+        state.vulnerability_details,
+        source="_build_transitive_plan",
+        field_name="vulnerability_details",
+        message="Transitive remediation planning requires vulnerability details from Jira intake.",
+        repository=repository,
+    )
+    maven_verification = require_state_field(
+        state.maven_verification,
+        source="_build_transitive_plan",
+        field_name="maven_verification",
+        message="Transitive remediation planning requires Maven verification results.",
+        repository=repository,
+    )
 
     current_repo = state.repo_map[repository]
     file_path = current_repo.manifest_path or "pom.xml"
     dependency = DependencyCoordinate(
-        group_id=state.vulnerability_details.package_name.split(":", maxsplit=1)[0],
-        artifact_id=state.vulnerability_details.package_name.split(":", maxsplit=1)[1],
-        version=state.maven_verification.target_version,
+        group_id=vulnerability_details.package_name.split(":", maxsplit=1)[0],
+        artifact_id=vulnerability_details.package_name.split(":", maxsplit=1)[1],
+        version=maven_verification.target_version,
     )
 
     return PomMutationPlan(
         repository=repository,
         strategy=RemediationStrategy.TRANSITIVE_OVERRIDE,
         summary=(
-            f"Add a dependencyManagement override for {state.vulnerability_details.package_name} "
-            f"at {state.maven_verification.target_version}."
+            f"Add a dependencyManagement override for {vulnerability_details.package_name} "
+            f"at {maven_verification.target_version}."
         ),
         changes=[
             PomMutationChange(
@@ -351,8 +456,8 @@ def _build_transitive_plan(state: RemediationState, repository: str) -> PomMutat
                 dependency=dependency,
                 mutation_kind=PomMutationKind.DEPENDENCY_MANAGEMENT_OVERRIDE,
                 target_section=PomSectionTarget.DEPENDENCY_MANAGEMENT,
-                previous_version=state.vulnerability_details.installed_version,
-                target_version=state.maven_verification.target_version,
+                previous_version=vulnerability_details.installed_version,
+                target_version=maven_verification.target_version,
                 xml_path_hint="./dependencyManagement/dependencies/dependency/version",
             )
         ],

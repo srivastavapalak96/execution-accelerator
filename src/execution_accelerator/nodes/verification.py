@@ -18,7 +18,7 @@ from execution_accelerator.schemas import (
     VerificationStatus,
     WorkflowStatus,
 )
-from execution_accelerator.state import RemediationState
+from execution_accelerator.state import RemediationState, require_state_field
 
 
 def build_detect_maven_profile_node(
@@ -65,9 +65,14 @@ def build_verify_advisory_node(
     """Create a node that verifies the recommended remediation target from advisory data."""
 
     def verify_advisory(state: RemediationState) -> dict[str, object]:
-        assert state.vulnerability_details is not None
+        vulnerability_details = require_state_field(
+            state.vulnerability_details,
+            source="verify_advisory",
+            field_name="vulnerability_details",
+            message="Advisory verification requires vulnerability details from Jira intake.",
+        )
 
-        advisory_verification = advisory_adapter.load_verification(state.vulnerability_details)
+        advisory_verification = advisory_adapter.load_verification(vulnerability_details)
         audit_events = list(state.audit_events)
         audit_events.append(
             AuditEvent(
@@ -96,14 +101,31 @@ def build_verify_maven_target_node(
     """Create a node that verifies the selected target version against Maven metadata."""
 
     def verify_maven_target(state: RemediationState) -> dict[str, object]:
-        assert state.vulnerability_details is not None
-        assert state.advisory_verification is not None
-        assert state.current_working_repo is not None
+        vulnerability_details = require_state_field(
+            state.vulnerability_details,
+            source="verify_maven_target",
+            field_name="vulnerability_details",
+            message="Maven verification requires vulnerability details from Jira intake.",
+            repository=state.current_working_repo,
+        )
+        advisory_verification = require_state_field(
+            state.advisory_verification,
+            source="verify_maven_target",
+            field_name="advisory_verification",
+            message="Maven verification requires a verified advisory target first.",
+            repository=state.current_working_repo,
+        )
+        current_working_repo = require_state_field(
+            state.current_working_repo,
+            source="verify_maven_target",
+            field_name="current_working_repo",
+            message="Maven verification requires a selected working repository.",
+        )
 
         maven_verification = maven_adapter.load_verification(
-            state.vulnerability_details,
-            target_version=state.advisory_verification.recommended_fix_version,
-            repository_workspace=state.repo_map[state.current_working_repo],
+            vulnerability_details,
+            target_version=advisory_verification.recommended_fix_version,
+            repository_workspace=state.repo_map[current_working_repo],
             maven_plan=state.maven_plan,
         )
         audit_events = list(state.audit_events)
@@ -131,8 +153,18 @@ def build_verify_maven_target_node(
 def select_route(state: RemediationState) -> dict[str, object]:
     """Select the initial remediation lane from verified advisory and Maven metadata."""
 
-    assert state.advisory_verification is not None
-    assert state.maven_verification is not None
+    require_state_field(
+        state.advisory_verification,
+        source="select_route",
+        field_name="advisory_verification",
+        message="Route selection requires advisory verification to complete first.",
+    )
+    require_state_field(
+        state.maven_verification,
+        source="select_route",
+        field_name="maven_verification",
+        message="Route selection requires Maven verification to complete first.",
+    )
 
     route_decision = _build_route_decision(state)
     target_repositories = list(state.pending_repos or state.repo_map.keys())
@@ -168,10 +200,18 @@ def select_route(state: RemediationState) -> dict[str, object]:
 
 
 def _build_route_decision(state: RemediationState) -> RemediationRouteDecision:
-    advisory = state.advisory_verification
-    maven = state.maven_verification
-    assert advisory is not None
-    assert maven is not None
+    advisory = require_state_field(
+        state.advisory_verification,
+        source="_build_route_decision",
+        field_name="advisory_verification",
+        message="Building a route decision requires advisory verification results.",
+    )
+    maven = require_state_field(
+        state.maven_verification,
+        source="_build_route_decision",
+        field_name="maven_verification",
+        message="Building a route decision requires Maven verification results.",
+    )
 
     if (
         advisory.status != VerificationStatus.VERIFIED

@@ -11,7 +11,7 @@ from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.adapters import DeliveryAdapter, DeliveryAdapterError
 from execution_accelerator.schemas import ApprovalRecord, ApprovalStage
 from execution_accelerator.schemas import AuditEvent, WorkflowStatus
-from execution_accelerator.state import RemediationState, WorkflowError
+from execution_accelerator.state import RemediationState, WorkflowError, require_state_field
 from execution_accelerator.validation_summary import select_primary_validation_check
 
 
@@ -21,22 +21,27 @@ def build_publish_remediation_node(
     """Create a node that records publication and Jira completion metadata."""
 
     def publish_remediation(state: RemediationState) -> dict[str, object]:
-        assert state.current_working_repo is not None
-        workspace = state.repo_map.get(state.current_working_repo)
+        current_working_repo = require_state_field(
+            state.current_working_repo,
+            source="publish_remediation",
+            field_name="current_working_repo",
+            message="Delivery publication requires the current working repository to be set.",
+        )
+        workspace = state.repo_map.get(current_working_repo)
         branch_publication = state.branch_publication
         pull_request_summary = state.pull_request_summary
         jira_completion = state.jira_completion
         try:
             if branch_publication is None:
                 branch_publication = delivery_adapter.load_branch_publication(
-                    repository=state.current_working_repo,
+                    repository=current_working_repo,
                     workspace_path=Path(workspace.local_path) if workspace is not None else None,
                     ticket_id=state.initial_ticket_id,
                     package_name=state.vulnerability_details.package_name if state.vulnerability_details is not None else None,
                 )
             if pull_request_summary is None:
                 pull_request_summary = delivery_adapter.load_pull_request(
-                    repository=state.current_working_repo,
+                    repository=current_working_repo,
                     owner=workspace.owner if workspace is not None else None,
                     base_branch=workspace.default_branch if workspace is not None else None,
                     head_branch=branch_publication.branch_name,
@@ -48,7 +53,7 @@ def build_publish_remediation_node(
             if jira_completion is None:
                 jira_completion = delivery_adapter.load_jira_completion(
                     ticket_id=state.initial_ticket_id,
-                    repository=state.current_working_repo,
+                    repository=current_working_repo,
                     pull_request_url=pull_request_summary.url,
                     comment=_build_jira_completion_comment(state, pull_request_summary.url),
                 )
@@ -62,9 +67,9 @@ def build_publish_remediation_node(
             )
 
         completed_repos = list(state.completed_repos)
-        if state.current_working_repo not in completed_repos:
-            completed_repos.append(state.current_working_repo)
-        pending_repos = [repo for repo in state.pending_repos if repo != state.current_working_repo]
+        if current_working_repo not in completed_repos:
+            completed_repos.append(current_working_repo)
+        pending_repos = [repo for repo in state.pending_repos if repo != current_working_repo]
         continuation_update = _build_repo_continuation_update(
             state,
             pending_repos=pending_repos,
@@ -75,9 +80,9 @@ def build_publish_remediation_node(
         audit_events.append(
             AuditEvent(
                 event_type="delivery.publish",
-                message=f"Recorded branch, PR, and Jira completion for {state.current_working_repo}.",
+                message=f"Recorded branch, PR, and Jira completion for {current_working_repo}.",
                 details={
-                    "repository": state.current_working_repo,
+                    "repository": current_working_repo,
                     "branch_name": branch_publication.branch_name,
                     "pull_request_number": pull_request_summary.number,
                     "jira_status": jira_completion.status,
@@ -266,12 +271,17 @@ def build_skip_publish_for_dry_run_node(
     """Create a node that completes successfully without delivery side effects."""
 
     def skip_publish_for_dry_run(state: RemediationState) -> dict[str, object]:
-        assert state.current_working_repo is not None
+        current_working_repo = require_state_field(
+            state.current_working_repo,
+            source="skip_publish_for_dry_run",
+            field_name="current_working_repo",
+            message="Dry-run publication skipping requires the current working repository to be set.",
+        )
 
         completed_repos = list(state.completed_repos)
-        if state.current_working_repo not in completed_repos:
-            completed_repos.append(state.current_working_repo)
-        pending_repos = [repo for repo in state.pending_repos if repo != state.current_working_repo]
+        if current_working_repo not in completed_repos:
+            completed_repos.append(current_working_repo)
+        pending_repos = [repo for repo in state.pending_repos if repo != current_working_repo]
         continuation_update = _build_repo_continuation_update(
             state,
             pending_repos=pending_repos,
@@ -282,9 +292,9 @@ def build_skip_publish_for_dry_run_node(
         audit_events.append(
             AuditEvent(
                 event_type="delivery.skipped_dry_run",
-                message=f"Skipped publication side effects for {state.current_working_repo} in dry-run mode.",
+                message=f"Skipped publication side effects for {current_working_repo} in dry-run mode.",
                 details={
-                    "repository": state.current_working_repo,
+                    "repository": current_working_repo,
                     "dry_run": runtime_config.dry_run,
                 },
             )

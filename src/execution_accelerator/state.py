@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TypeVar
+
 from pydantic import Field
 
 from execution_accelerator.schemas import (
@@ -78,6 +80,93 @@ class WorkflowError(BaseSchemaModel):
     message: str = Field(min_length=1)
     recoverable: bool = False
     repository: str | None = None
+
+
+class StateInvariantViolation(RuntimeError):
+    """Raised when a workflow node is entered without required state."""
+
+    def __init__(self, *, source: str, field_name: str, message: str, repository: str | None = None) -> None:
+        super().__init__(message)
+        self.source = source
+        self.field_name = field_name
+        self.workflow_error = WorkflowError(
+            code="state_invariant_violated",
+            message=message,
+            recoverable=False,
+            repository=repository,
+        )
+
+
+_T = TypeVar("_T")
+
+
+def require_state_field(
+    value: _T | None,
+    *,
+    source: str,
+    field_name: str,
+    message: str,
+    repository: str | None = None,
+) -> _T:
+    """Return a required state field or raise an explicit invariant violation."""
+
+    if value is None:
+        raise StateInvariantViolation(
+            source=source,
+            field_name=field_name,
+            message=message,
+            repository=repository,
+        )
+    return value
+
+
+def require_state_condition(
+    condition: bool,
+    *,
+    source: str,
+    field_name: str,
+    message: str,
+    repository: str | None = None,
+) -> None:
+    """Assert a state-dependent condition without using bare asserts."""
+
+    if not condition:
+        raise StateInvariantViolation(
+            source=source,
+            field_name=field_name,
+            message=message,
+            repository=repository,
+        )
+
+
+def build_state_invariant_update(
+    state: "RemediationState",
+    *,
+    violation: StateInvariantViolation,
+) -> dict[str, object]:
+    """Convert an invariant violation into a terminal workflow-state update."""
+
+    errors = list(state.errors)
+    errors.append(violation.workflow_error)
+    audit_events = list(state.audit_events)
+    audit_events.append(
+        AuditEvent(
+            event_type="state.invariant",
+            message=f"State invariant violated in {violation.source}.",
+            details={
+                "source": violation.source,
+                "field_name": violation.field_name,
+                "error_code": violation.workflow_error.code,
+                "repository": violation.workflow_error.repository,
+            },
+        )
+    )
+    return {
+        "errors": errors,
+        "retry_decision": None,
+        "workflow_status": WorkflowStatus.FAILED,
+        "audit_events": audit_events,
+    }
 
 
 class RemediationState(BaseSchemaModel):

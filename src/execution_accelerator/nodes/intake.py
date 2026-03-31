@@ -7,7 +7,7 @@ from collections.abc import Callable
 from execution_accelerator.adapters import JiraAdapter, RepositoryInventoryAdapter
 from execution_accelerator.config import RuntimeConfig, load_credentials, probe_credentials
 from execution_accelerator.schemas import AuditEvent, WorkflowStatus
-from execution_accelerator.state import RemediationState, SkippedRepository
+from execution_accelerator.state import RemediationState, SkippedRepository, require_state_field
 
 
 def build_probe_credentials_node(
@@ -77,12 +77,17 @@ def build_load_repository_context_node(
     """Create a node that resolves affected repositories and materializes workspaces."""
 
     def load_repository_context(state: RemediationState) -> dict[str, object]:
-        assert state.vulnerability_details is not None
+        vulnerability_details = require_state_field(
+            state.vulnerability_details,
+            source="load_repository_context",
+            field_name="vulnerability_details",
+            message="Repository context loading requires vulnerability details from Jira intake.",
+        )
 
-        resolved_repositories = repository_inventory_adapter.resolve_repositories(state.vulnerability_details)
+        resolved_repositories = repository_inventory_adapter.resolve_repositories(vulnerability_details)
         targets = repository_inventory_adapter.build_targets(
             ticket_id=state.initial_ticket_id,
-            vulnerability_details=state.vulnerability_details,
+            vulnerability_details=vulnerability_details,
         )
         repo_map = dict(state.repo_map)
         skipped_repos = list(state.skipped_repos)

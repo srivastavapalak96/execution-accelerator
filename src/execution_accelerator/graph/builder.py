@@ -48,7 +48,12 @@ from execution_accelerator.nodes import (
 from execution_accelerator.policy import PolicyEngine
 from execution_accelerator.persistence import build_default_thread_id, build_thread_config, sqlite_checkpointer
 from execution_accelerator.schemas import ApprovalStage, HumanFeedback, RemediationStrategy, WorkflowStatus
-from execution_accelerator.state import RemediationState
+from execution_accelerator.state import (
+    RemediationState,
+    StateInvariantViolation,
+    build_state_invariant_update,
+    require_state_field,
+)
 
 
 _REMEDIATION_APPROVAL_REVIEW_NODE = "review_remediation_approval"
@@ -290,16 +295,27 @@ def bootstrap_ticket_run(
             delivery_adapter=delivery_adapter,
             checkpointer=checkpointer,
         )
-        result = graph.invoke(
-            initial_state.model_dump(mode="python"),
-            config=build_thread_config(resolved_thread_id),
-            interrupt_before=[_REMEDIATION_APPROVAL_REVIEW_NODE, _DELIVERY_APPROVAL_REVIEW_NODE],
-        )
+        config = build_thread_config(resolved_thread_id)
+        try:
+            result = graph.invoke(
+                initial_state.model_dump(mode="python"),
+                config=config,
+                interrupt_before=[_REMEDIATION_APPROVAL_REVIEW_NODE, _DELIVERY_APPROVAL_REVIEW_NODE],
+            )
+            state = RemediationState.model_validate(result)
+        except StateInvariantViolation as violation:
+            state = _persist_invariant_failure(
+                graph=graph,
+                config=config,
+                runtime_config=runtime_config,
+                fallback_state=initial_state,
+                violation=violation,
+            )
 
     return BootstrapRunResult(
         thread_id=resolved_thread_id,
         checkpoint_path=runtime_config.checkpoints_path,
-        state=RemediationState.model_validate(result),
+        state=state,
     )
 
 
@@ -384,20 +400,35 @@ def resume_ticket_run(
                 review_update,
                 as_node=approval_node,
             )
-            state = RemediationState.model_validate(graph.invoke(None, config=config))
+            try:
+                state = RemediationState.model_validate(graph.invoke(None, config=config))
+            except StateInvariantViolation as violation:
+                state = _persist_invariant_failure(
+                    graph=graph,
+                    config=config,
+                    runtime_config=runtime_config,
+                    fallback_state=current_state,
+                    violation=violation,
+                )
         else:
             state = RemediationState.model_validate(graph.get_state(config).values)
     return BootstrapRunResult(thread_id=thread_id, checkpoint_path=runtime_config.checkpoints_path, state=state)
 
 
 def _select_remediation_node(state: RemediationState) -> str:
-    assert state.route_decision is not None
+    route_decision = require_state_field(
+        state.route_decision,
+        source="_select_remediation_node",
+        field_name="route_decision",
+        message="Remediation routing requires a selected remediation route.",
+        repository=state.current_working_repo,
+    )
 
-    if state.route_decision.strategy == RemediationStrategy.SIMPLE_UPDATE:
+    if route_decision.strategy == RemediationStrategy.SIMPLE_UPDATE:
         return "remediate_simple"
-    if state.route_decision.strategy == RemediationStrategy.TRANSITIVE_OVERRIDE:
+    if route_decision.strategy == RemediationStrategy.TRANSITIVE_OVERRIDE:
         return "remediate_transitive"
-    if state.route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR:
+    if route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR:
         return "prepare_complex_remediation"
     return END
 
@@ -420,7 +451,13 @@ def _select_post_approval_node(state: RemediationState) -> str:
 
 def _build_post_validation_selector(*, dry_run: bool) -> Callable[[RemediationState], str]:
     def select_post_validation_node(state: RemediationState) -> str:
-        assert state.validation_results
+        require_state_field(
+            state.validation_results[-1] if state.validation_results else None,
+            source="_build_post_validation_selector",
+            field_name="validation_results",
+            message="Post-validation routing requires at least one validation result.",
+            repository=state.current_working_repo,
+        )
 
         if state.validation_results[-1].status == "failed":
             return "handle_validation_failure"
@@ -457,3 +494,26 @@ def _select_post_delivery_node(state: RemediationState) -> str:
 
 def _has_approved_stage(state: RemediationState, stage: ApprovalStage) -> bool:
     return any(record.stage == stage and record.decision == "approved" for record in state.approval_history)
+
+
+def _persist_invariant_failure(
+    *,
+    graph: Any,
+    config: Any,
+    runtime_config: RuntimeConfig,
+    fallback_state: RemediationState,
+    violation: StateInvariantViolation,
+) -> RemediationState:
+    current_state = fallback_state
+    try:
+        snapshot = graph.get_state(config)
+        if getattr(snapshot, "values", None):
+            current_state = RemediationState.model_validate(snapshot.values)
+    except Exception:
+        current_state = fallback_state
+
+    invariant_update = build_state_invariant_update(current_state, violation=violation)
+    failed_state = current_state.model_copy(update=invariant_update)
+    escalation_update = build_escalate_node(runtime_config)(failed_state)
+    graph.update_state(config, {**invariant_update, **escalation_update}, as_node="escalate")
+    return RemediationState.model_validate(graph.get_state(config).values)
