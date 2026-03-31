@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from execution_accelerator.adapters import DeliveryAdapter
 from execution_accelerator.cli.main import _print_run_summary, main
 from execution_accelerator.config import load_runtime_config
 from execution_accelerator.graph import BootstrapRunResult
@@ -328,6 +329,66 @@ def test_main_prints_escalation_bundle_for_failed_ticket(monkeypatch, capsys, tm
     bundle_path = Path(bundle_line.removeprefix("escalation_bundle_path="))
     assert bundle_path.exists()
     assert bundle_path.parent == tmp_path / "data" / "escalations"
+
+
+def test_main_prints_partial_delivery_context_for_failed_delivery_ticket(monkeypatch, capsys, tmp_path) -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "execution-accelerator",
+            "--bootstrap-ticket",
+            "SEC-504",
+            "--thread-id",
+            "sec-504-dev",
+        ],
+    )
+    monkeypatch.setenv("EA_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("EA_WORKSPACE_DIR", str(tmp_path / "workspace"))
+    monkeypatch.setenv("EA_LOGS_DIR", str(tmp_path / "logs"))
+    monkeypatch.setenv("EA_CHECKPOINTS_PATH", str(tmp_path / "state" / "checkpoints.sqlite"))
+    monkeypatch.setenv("EA_MAX_RETRY_ATTEMPTS", "1")
+    monkeypatch.setenv("EA_JIRA_FIXTURE_PATH", str(fixture_dir / "jira_issue.json"))
+    monkeypatch.setenv("EA_REPOSITORY_INVENTORY_FIXTURE_PATH", str(fixture_dir / "repository_inventory.json"))
+    monkeypatch.setenv("EA_ADVISORY_FIXTURE_PATH", str(fixture_dir / "advisory_verification.json"))
+    monkeypatch.setenv("EA_MAVEN_VERIFICATION_FIXTURE_PATH", str(fixture_dir / "maven_verification.json"))
+    monkeypatch.setenv("EA_POM_FIXTURE_BEFORE_PATH", str(fixture_dir / "pom_before.xml"))
+    monkeypatch.setenv("EA_POM_FIXTURE_AFTER_PATH", str(fixture_dir / "pom_after.xml"))
+    monkeypatch.setenv("EA_PREFLIGHT_RESOLUTION_FIXTURE_PATH", str(fixture_dir / "preflight_resolution.json"))
+    monkeypatch.setenv("EA_COMPLEX_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "complex_artifacts.json"))
+    monkeypatch.setenv("EA_COMPATIBILITY_DIFF_FIXTURE_PATH", str(fixture_dir / "compatibility_diff.json"))
+    monkeypatch.setenv("EA_DECOMPILED_ARTIFACT_FIXTURE_PATH", str(fixture_dir / "decompiled_artifacts.json"))
+    monkeypatch.setenv("EA_SYMBOL_MAPPING_FIXTURE_PATH", str(fixture_dir / "symbol_mappings.json"))
+    monkeypatch.setenv("EA_CODE_CHANGE_PLAN_FIXTURE_PATH", str(fixture_dir / "code_change_plan.json"))
+    monkeypatch.setenv("EA_VALIDATION_RESULT_FIXTURE_PATH", str(fixture_dir / "validation_result.json"))
+    monkeypatch.setenv("EA_ROLLBACK_FIXTURE_PATH", str(fixture_dir / "rollback_plan.json"))
+    monkeypatch.setenv("EA_BRANCH_PUBLICATION_FIXTURE_PATH", str(fixture_dir / "branch_publication.json"))
+    monkeypatch.setenv("EA_PULL_REQUEST_FIXTURE_PATH", str(fixture_dir / "pull_request.json"))
+    monkeypatch.setenv("EA_JIRA_COMPLETION_FIXTURE_PATH", str(fixture_dir / "jira_completion.json"))
+    seed_bootstrap_workspace_pom(
+        tmp_path / "workspace",
+        ticket_id="SEC-504",
+        repository_name="payments-service",
+        fixture_path=fixture_dir / "pom_before.xml",
+    )
+
+    def broken_jira_completion(self, **kwargs):
+        raise __import__("httpx").ConnectError("jira gateway timeout")
+
+    monkeypatch.setattr(DeliveryAdapter, "load_jira_completion", broken_jira_completion)
+
+    exit_code = main()
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "workflow_status=failed" in captured.out
+    assert "failure_classification=network_transient" in captured.out
+    assert "latest_error_code=delivery_jira_failed" in captured.out
+    assert "branch_name=sec-123-remediate-legacy-json" in captured.out
+    assert "pull_request_number=42" in captured.out
+    assert "pull_request_title=SEC-123 remediate legacy-json" in captured.out
+    assert "jira_ticket_status=" not in captured.out
+    assert "escalation_bundle_path=" in captured.out
 
 
 def test_main_prints_skipped_repository_summary(monkeypatch, capsys, tmp_path) -> None:

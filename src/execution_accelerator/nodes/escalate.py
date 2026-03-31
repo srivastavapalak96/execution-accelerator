@@ -100,6 +100,13 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
         "primary_validation_check_details": (
             primary_validation_check.details if primary_validation_check is not None else None
         ),
+        "branch_publication": (
+            state.branch_publication.model_dump(mode="python") if state.branch_publication is not None else None
+        ),
+        "pull_request_summary": (
+            state.pull_request_summary.model_dump(mode="python") if state.pull_request_summary is not None else None
+        ),
+        "jira_completion": state.jira_completion.model_dump(mode="python") if state.jira_completion is not None else None,
         "modified_files": state.modified_files,
         "code_diff_summaries": code_diff_summaries,
         "complex_migration_tactic": complex_plan.migration_tactic if complex_plan is not None else None,
@@ -129,6 +136,9 @@ def _write_escalation_bundle(*, state: RemediationState, runtime_config: Runtime
         primary_validation_check_details=(
             primary_validation_check.details if primary_validation_check is not None else None
         ),
+        branch_publication=state.branch_publication,
+        pull_request_summary=state.pull_request_summary,
+        jira_completion=state.jira_completion,
         modified_files=list(state.modified_files),
         code_diff_summaries=code_diff_summaries,
         complex_migration_tactic=complex_plan.migration_tactic if complex_plan is not None else None,

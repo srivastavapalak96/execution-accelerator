@@ -536,6 +536,9 @@ class EscalationBundle(BaseSchemaModel):
     primary_validation_check: str | None = None
     primary_validation_check_status: ValidationStatus | None = None
     primary_validation_check_details: str | None = None
+    branch_publication: BranchPublicationResult | None = None
+    pull_request_summary: PullRequestSummary | None = None
+    jira_completion: JiraCompletionResult | None = None
     modified_files: list[str] = Field(default_factory=list)
     code_diff_summaries: list[str] = Field(default_factory=list)
     complex_migration_tactic: ComplexMigrationTactic | None = None

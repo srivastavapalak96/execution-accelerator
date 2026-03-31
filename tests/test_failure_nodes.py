@@ -546,3 +546,49 @@ def test_escalate_node_captures_multi_repo_progress(tmp_path: Path) -> None:
     assert payload["completed_repos"] == ["payments-service"]
     assert payload["pending_repos"] == ["ledger-service"]
     assert payload["skipped_repos"] == [{"name": "reporting-service", "reason": "existing_pr:https://example.test/pr/7"}]
+
+
+def test_escalate_node_persists_partial_delivery_context(tmp_path: Path) -> None:
+    config = load_runtime_config(repo_root=tmp_path)
+    node = __import__("execution_accelerator.nodes", fromlist=["build_escalate_node"]).build_escalate_node(config)
+    state = RemediationState(
+        initial_ticket_id="SEC-1001",
+        current_working_repo="payments-service",
+        total_attempts=2,
+        failure_classifications=[FailureClassification.NETWORK_TRANSIENT],
+        errors=[
+            {
+                "code": "delivery_jira_failed",
+                "message": "Jira completion failed: jira gateway timeout",
+                "recoverable": True,
+                "repository": "payments-service",
+            }
+        ],
+        branch_publication={
+            "repository": "payments-service",
+            "branch_name": "sec-1001-remediate-legacy-json",
+            "commit_sha": "abc123",
+            "commit_message": "Apply automated remediation for SEC-1001",
+            "pushed": True,
+        },
+        pull_request_summary={
+            "repository": "payments-service",
+            "number": 77,
+            "url": "https://github.com/example/payments-service/pull/77",
+            "title": "SEC-1001 remediate legacy-json",
+            "status": "open",
+        },
+    )
+
+    update = node(state)
+    bundle = update["escalation_bundle"]
+    payload = json.loads(Path(bundle.bundle_path).read_text())
+
+    assert bundle.branch_publication is not None
+    assert bundle.branch_publication.branch_name == "sec-1001-remediate-legacy-json"
+    assert bundle.pull_request_summary is not None
+    assert bundle.pull_request_summary.number == 77
+    assert bundle.jira_completion is None
+    assert payload["branch_publication"]["branch_name"] == "sec-1001-remediate-legacy-json"
+    assert payload["pull_request_summary"]["number"] == 77
+    assert payload["jira_completion"] is None
