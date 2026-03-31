@@ -28,6 +28,8 @@ Execution Accelerator aims to become a **Jira-driven remediation system** that c
    - symbol mapping
    - deterministic or bounded agentic code updates
 
+AI scope is intentionally narrow: deterministic paths stay primary, and bounded LLM fallback is reserved for tough-path ambiguity and repair flows. See **`docs/adr/0001-ai-scope.md`**.
+
 ## Operating principles
 
 1. **End-to-end first**

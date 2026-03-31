@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from execution_accelerator.config.runtime import resolve_max_retry_attempts
 from execution_accelerator.schemas import AuditEvent, FailureClassification, RetryDecision, WorkflowStatus
 from execution_accelerator.state import RemediationState
 
@@ -17,7 +18,7 @@ def classify_failure(state: RemediationState) -> dict[str, object]:
     failure_classifications.append(classification)
 
     max_total_attempts = int(os.getenv("EA_MAX_TOTAL_ATTEMPTS", "10"))
-    max_retry_attempts = int(os.getenv("EA_MAX_RETRY_ATTEMPTS", "0"))
+    max_retry_attempts = resolve_max_retry_attempts()
     retry_next_node = _select_retry_node(state)
     latest_error = state.errors[-1] if state.errors else None
     can_retry = (

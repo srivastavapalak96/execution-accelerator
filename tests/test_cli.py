@@ -95,6 +95,7 @@ def test_main_prints_config(monkeypatch, capsys, tmp_path) -> None:
     assert exit_code == 0
     assert "repo_root=" in captured.out
     assert "execution_mode=fixture" in captured.out
+    assert "max_retry_attempts=3" in captured.out
     assert "dry_run=False" in captured.out
     assert "keep_workspace=False" in captured.out
     assert f"data_dir={tmp_path / 'data'}" in captured.out

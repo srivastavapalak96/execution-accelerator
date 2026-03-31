@@ -91,6 +91,7 @@ def main() -> int:
             config = load_runtime_config()
             print(f"repo_root={config.repo_root}")
             print(f"execution_mode={config.execution_mode}")
+            print(f"max_retry_attempts={config.max_retry_attempts}")
             print(f"dry_run={config.dry_run}")
             print(f"keep_workspace={config.keep_workspace}")
             print(f"data_dir={config.data_dir}")

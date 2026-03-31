@@ -57,6 +57,32 @@ def test_classify_failure_schedules_retry_for_recoverable_simple_update(monkeypa
     assert update["workflow_status"] == "in_progress"
 
 
+def test_classify_failure_uses_default_retry_budget_when_unset(monkeypatch) -> None:
+    monkeypatch.delenv("EA_MAX_RETRIES", raising=False)
+    monkeypatch.delenv("EA_MAX_RETRY_ATTEMPTS", raising=False)
+    state = RemediationState(
+        initial_ticket_id="SEC-123",
+        route_decision={"strategy": RemediationStrategy.SIMPLE_UPDATE, "confidence": 0.93, "reason": "Direct fix."},
+        errors=[{"code": "validation_test_failed", "message": "Tests failed.", "recoverable": True}],
+        validation_results=[
+            {
+                "repository": "payments-service",
+                "status": ValidationStatus.FAILED,
+                "checks": [
+                    ValidationCheck(name="compile", status=ValidationStatus.PASSED, details="Compile passed."),
+                    ValidationCheck(name="unit-tests", status=ValidationStatus.FAILED, details="Tests failed."),
+                ],
+                "summary": "Tests failed.",
+            }
+        ],
+    )
+
+    update = classify_failure(state)
+
+    assert update["retry_count"] == 1
+    assert update["retry_decision"].next_node == "remediate_simple"
+
+
 def test_classify_failure_clears_attempt_scoped_state_before_retry(monkeypatch) -> None:
     monkeypatch.setenv("EA_MAX_RETRY_ATTEMPTS", "1")
     state = RemediationState(

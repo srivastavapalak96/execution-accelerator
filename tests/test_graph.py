@@ -280,6 +280,7 @@ def test_bootstrap_ticket_run_processes_multiple_repositories(tmp_path, monkeypa
 
 def test_bootstrap_ticket_run_captures_multi_repo_failure_context(tmp_path, monkeypatch) -> None:
     _configure_runtime(monkeypatch, tmp_path)
+    monkeypatch.setenv("EA_MAX_RETRIES", "0")
     multi_repo_jira_path = tmp_path / "fixtures" / "jira_issue_multi.json"
     multi_repo_jira_path.parent.mkdir(parents=True, exist_ok=True)
     multi_repo_jira_path.write_text(

@@ -37,6 +37,7 @@ class RuntimeConfig:
     cache_dir: Path
     checkpoints_path: Path
     execution_mode: ExecutionMode
+    max_retry_attempts: int
     dry_run: bool
     keep_workspace: bool
     advisory_api_base_url: str
@@ -93,6 +94,7 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         repo_root=resolved_root,
     )
     execution_mode = ExecutionMode(os.getenv("EA_MODE", ExecutionMode.FIXTURE))
+    max_retry_attempts = resolve_max_retry_attempts()
     dry_run = os.getenv("EA_DRY_RUN", "0") == "1"
     keep_workspace = os.getenv("EA_KEEP_WORKSPACE", "0") == "1"
     java_home_value = os.getenv("EA_JAVA_HOME")
@@ -173,6 +175,7 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         cache_dir=cache_dir,
         checkpoints_path=checkpoints_path,
         execution_mode=execution_mode,
+        max_retry_attempts=max_retry_attempts,
         dry_run=dry_run,
         keep_workspace=keep_workspace,
         advisory_api_base_url=os.getenv("EA_OSV_API_BASE", "https://api.osv.dev"),
@@ -275,3 +278,12 @@ def load_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         ),
         github_owner=os.getenv("EA_GITHUB_OWNER"),
     )
+
+
+def resolve_max_retry_attempts() -> int:
+    """Resolve the retry budget from the canonical env var or its deprecated alias."""
+
+    value = os.getenv("EA_MAX_RETRIES")
+    if value is None:
+        value = os.getenv("EA_MAX_RETRY_ATTEMPTS", "3")
+    return int(value)

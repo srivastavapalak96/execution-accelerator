@@ -18,6 +18,7 @@ def test_load_runtime_config_uses_repo_relative_defaults(tmp_path, monkeypatch) 
 
     assert config.repo_root == tmp_path
     assert config.execution_mode == ExecutionMode.FIXTURE
+    assert config.max_retry_attempts == 3
     assert config.dry_run is False
     assert config.keep_workspace is False
     assert config.data_dir == Path(tmp_path / ".local" / "data")
@@ -42,6 +43,15 @@ def test_load_runtime_config_reads_optional_environment(tmp_path, monkeypatch) -
     assert config.jira_done_status_name == "Done"
     assert config.github_owner == "srivastavapalak96"
     assert config.checkpoints_path == Path(tmp_path / "checkpoints.sqlite")
+
+
+def test_load_runtime_config_prefers_canonical_retry_env(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("EA_MAX_RETRIES", "4")
+    monkeypatch.setenv("EA_MAX_RETRY_ATTEMPTS", "1")
+
+    config = load_runtime_config(repo_root=tmp_path)
+
+    assert config.max_retry_attempts == 4
 
 
 def test_load_runtime_config_reads_execution_mode(tmp_path, monkeypatch) -> None:

@@ -2,7 +2,7 @@
 
 Execution Accelerator is a **local, checkpointed remediation workflow prototype** for Maven vulnerability tickets.
 
-Today, this repository is best understood as a **partially live remediation prototype with a still-incomplete live delivery path**:
+Today, this repository is best understood as a **partially live remediation prototype with a still-incomplete live delivery path**. The long-term target remains **deterministic-first with bounded LLM fallback only for tough-path and repair work**:
 
 - LangGraph orchestration is real
 - SQLite checkpoint persistence is real
@@ -11,7 +11,7 @@ Today, this repository is best understood as a **partially live remediation prot
 - bounded retry routing for retryable test failures, transient dependency-inspection validation failures, and transient delivery failures, live remediation, live validation, basic live delivery, and failure escalation bundles now exist
 - the complex lane now persists a concrete migration tactic plus concrete file/symbol targets and open questions, and it now executes bounded real Java migration work before validation by rewriting supported method/constructor calls, references, static-imported legacy calls, static field/constant references, and obsolete exact imports, generating executable helper shims for missing target files, and scanning existing Java sources for detected legacy API usage, but broader tough-path behavior is still incomplete
 
-If you want the long-term target, read **`docs/vision.md`**.  
+If you want the long-term target, read **`docs/vision.md`** and **`docs/adr/0001-ai-scope.md`**.  
 If you want the truth about what works right now, read **`docs/status.md`**.
 
 ## What works today
@@ -33,7 +33,7 @@ The current repo can run a persisted local flow for:
 10. persisted approval pauses for complex refactors, transitive overrides, and approval-tagged repositories, plus an optional second delivery approval gate for complex publication
 11. complex-refactor planning and bounded execution that now persist a primary migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions derived from compatibility analysis, and execute supported Java method/constructor rewrites, static-import rewrites, static field/constant rewrites, exact-import cleanup, and generated helper shims before validation
 12. CLI summaries that surface skipped repositories and raw skip reasons such as existing open remediation PRs, plus route rationale, changed-file counts, aggregate diff totals, the first failing validation check when validation breaks, and primary change summaries
-13. retry scheduling that now clears stale rollback/preflight/diff state before rerunning a remediation lane, successful validation clears stale rollback/retry directives from the current run snapshot, transient dependency-tree or license-metadata inspection failures can now rerun within the same bounded retry budget, transient delivery failures can rerun `publish_remediation` while preserving already-published branch/PR state, and completed runs now clear stale terminal failure markers after a successful retry so operator summaries do not still report recovered errors
+13. retry scheduling that now clears stale rollback/preflight/diff state before rerunning a remediation lane, successful validation clears stale rollback/retry directives from the current run snapshot, transient dependency-tree or license-metadata inspection failures can now rerun within the same bounded retry budget, transient delivery failures can rerun `publish_remediation` while preserving already-published branch/PR state, completed runs now clear stale terminal failure markers after a successful retry so operator summaries do not still report recovered errors, and the canonical retry budget is now `EA_MAX_RETRIES` with a default of `3` while `EA_MAX_RETRY_ATTEMPTS` remains a compatibility alias
 14. CLI summaries that surface the latest terminal workflow error for failed or blocked runs and now show remediation plan summary/rationale directly
 15. Complex scaffold execution that can deterministically rewrite supported Java method-call and constructor migration sites in existing files before appending operator-facing scaffold notes
 
@@ -43,7 +43,7 @@ The default mode is:
 EA_MODE=fixture
 ```
 
-`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, bounded retry routing for retryable test failures, transient dependency-inspection validation failures, and transient delivery failures, escalation bundles, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, including policy-driven approval for transitive overrides, tagged repositories, and optional second-stage complex delivery approval; the complex lane also persists a concrete migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions, and now materializes deterministic scaffolded file changes before validation, but tougher remediation lanes are still incomplete.
+`EA_MODE=live` is now explicit. Intake, verification, remediation, validation, rollback, bounded retry routing for retryable test failures, transient dependency-inspection validation failures, and transient delivery failures, escalation bundles, a basic delivery path, and persisted approval pause/resume are real enough to exercise a live run, including policy-driven approval for transitive overrides, tagged repositories, and optional second-stage complex delivery approval; the complex lane also persists a concrete migration tactic, actionable migration steps, concrete file/symbol targets, and unresolved execution questions, and now materializes deterministic scaffolded file changes before validation, but tougher remediation lanes are still incomplete. Retry behavior now defaults on via `EA_MAX_RETRIES=3` unless explicitly overridden.
 
 ## Current limitations
 
