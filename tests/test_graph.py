@@ -885,6 +885,7 @@ def test_live_flow_runs_through_delivery_with_live_integrations(tmp_path, monkey
     monkeypatch.setenv("EA_KEEP_WORKSPACE", "1")
     monkeypatch.setenv("EA_JIRA_EMAIL", "bot@example.com")
     monkeypatch.setenv("EA_JIRA_TOKEN", "jira-token")
+    monkeypatch.setenv("EA_JIRA_PROBE_TICKET", "SEC-900")
     monkeypatch.setenv("GITHUB_TOKEN", "gh-token")
     monkeypatch.setenv("GITHUB_OWNER", "payments-platform")
     monkeypatch.setenv("EA_GIT_USER_NAME", "Execution Bot")
@@ -933,7 +934,12 @@ def test_live_flow_runs_through_delivery_with_live_integrations(tmp_path, monkey
     with serve_routes(
         {
             ("GET", "/rest/api/3/myself"): ResponseSpec(status=200, body=b"{}"),
+            ("GET", "/rest/api/3/issue/SEC-900/transitions"): ResponseSpec(status=200, body=b'{"transitions": []}'),
             ("GET", "/user"): ResponseSpec(status=200, body=b"{}"),
+            (
+                "GET",
+                "/repos/payments-platform/payments-service",
+            ): ResponseSpec(status=200, body=b'{"permissions": {"push": true}}'),
             ("GET", "/rest/api/3/issue/SEC-900"): ResponseSpec(status=200, body=json.dumps(issue_response).encode()),
             ("GET", "/search/issues"): ResponseSpec(
                 status=200,
@@ -1048,6 +1054,7 @@ def test_live_flow_runs_through_rollback_after_validation_failure(tmp_path, monk
     monkeypatch.setenv("EA_KEEP_WORKSPACE", "1")
     monkeypatch.setenv("EA_JIRA_EMAIL", "bot@example.com")
     monkeypatch.setenv("EA_JIRA_TOKEN", "jira-token")
+    monkeypatch.setenv("EA_JIRA_PROBE_TICKET", "SEC-901")
     monkeypatch.setenv("GITHUB_TOKEN", "gh-token")
     monkeypatch.setenv("GITHUB_OWNER", "payments-platform")
     monkeypatch.setenv("EA_GIT_USER_NAME", "Execution Bot")
@@ -1095,7 +1102,12 @@ def test_live_flow_runs_through_rollback_after_validation_failure(tmp_path, monk
     with serve_routes(
         {
             ("GET", "/rest/api/3/myself"): ResponseSpec(status=200, body=b"{}"),
+            ("GET", "/rest/api/3/issue/SEC-901/transitions"): ResponseSpec(status=200, body=b'{"transitions": []}'),
             ("GET", "/user"): ResponseSpec(status=200, body=b"{}"),
+            (
+                "GET",
+                "/repos/payments-platform/payments-service",
+            ): ResponseSpec(status=200, body=b'{"permissions": {"push": true}}'),
             ("GET", "/rest/api/3/issue/SEC-901"): ResponseSpec(status=200, body=json.dumps(issue_response).encode()),
             ("GET", "/search/issues"): ResponseSpec(status=200, body=b'{\"items\": []}'),
             ("POST", "/v1/query"): ResponseSpec(status=200, body=json.dumps(osv_response).encode()),

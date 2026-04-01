@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 
 import httpx
+import yaml
 
 from execution_accelerator.schemas import ExecutionMode
 
@@ -23,6 +24,9 @@ class Credentials:
     git_user_name: str | None
     git_user_email: str | None
     maven_settings: Path | None
+    jira_probe_ticket: str | None
+    github_probe_repository: str | None
+    skip_write_scope_probe: bool
 
 
 @dataclass(frozen=True)
@@ -58,6 +62,11 @@ def load_credentials(*, repo_root: Path | None = None) -> Credentials:
             if maven_settings_value
             else None
         ),
+        jira_probe_ticket=os.getenv("EA_JIRA_PROBE_TICKET"),
+        github_probe_repository=(
+            os.getenv("EA_GITHUB_PROBE_REPOSITORY") or _load_default_github_probe_repository(repo_root=resolved_root)
+        ),
+        skip_write_scope_probe=_read_bool_env("EA_SKIP_WRITE_SCOPE_PROBE"),
     )
 
 
@@ -91,6 +100,33 @@ def _default_jira_probe(credentials: Credentials) -> None:
         timeout=15.0,
     )
     response.raise_for_status()
+    if credentials.skip_write_scope_probe:
+        return
+    if not credentials.jira_probe_ticket:
+        raise MissingCredentialError(
+            "EA_JIRA_PROBE_TICKET is required for live Jira write-scope probing."
+        )
+    transitions_url = (
+        f"{credentials.jira_base_url.rstrip('/')}/rest/api/3/issue/"
+        f"{credentials.jira_probe_ticket}/transitions"
+    )
+    try:
+        transitions_response = httpx.get(
+            transitions_url,
+            auth=(credentials.jira_email, credentials.jira_token),
+            timeout=15.0,
+        )
+        transitions_response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        status_code = exc.response.status_code
+        if status_code == 403:
+            raise MissingCredentialError(
+                "jira token lacks transitions scope: GET /transitions returned 403."
+            ) from exc
+        raise MissingCredentialError(
+            f"jira write-scope probe failed for {credentials.jira_probe_ticket}: "
+            f"GET /transitions returned {status_code}."
+        ) from exc
 
 
 def _default_github_probe(credentials: Credentials) -> None:
@@ -106,6 +142,35 @@ def _default_github_probe(credentials: Credentials) -> None:
     )
     response.raise_for_status()
     _validate_github_scopes(response.headers.get("x-oauth-scopes"))
+    if credentials.skip_write_scope_probe:
+        return
+    if not credentials.github_owner or not credentials.github_probe_repository:
+        raise MissingCredentialError(
+            "GitHub write-scope probe requires a repository target; set EA_GITHUB_PROBE_REPOSITORY "
+            "or configure config/repositories.yaml."
+        )
+    repo_response = httpx.get(
+        (
+            f"{credentials.github_api_base.rstrip('/')}/repos/"
+            f"{credentials.github_owner}/{credentials.github_probe_repository}"
+        ),
+        headers={
+            "Authorization": f"Bearer {credentials.github_token}",
+            "Accept": "application/vnd.github+json",
+        },
+        timeout=15.0,
+    )
+    repo_response.raise_for_status()
+    payload = repo_response.json()
+    if not isinstance(payload, dict):
+        raise MissingCredentialError("GitHub repository probe returned an unexpected payload.")
+    permissions = payload.get("permissions")
+    if isinstance(permissions, dict):
+        push_permission = permissions.get("push")
+        if push_permission is False:
+            raise MissingCredentialError(
+                "github token lacks push permission for the configured probe repository."
+            )
 
 
 def _require_live_credentials(credentials: Credentials) -> None:
@@ -133,6 +198,27 @@ def _resolve_path(value: str, *, repo_root: Path) -> Path:
     if not path.is_absolute():
         path = repo_root / path
     return path.resolve()
+
+
+def _load_default_github_probe_repository(*, repo_root: Path) -> str | None:
+    config_path = repo_root / "config" / "repositories.yaml"
+    if not config_path.exists():
+        return None
+    loaded = yaml.safe_load(config_path.read_text()) or {}
+    if not isinstance(loaded, dict):
+        return None
+    repositories = loaded.get("repositories")
+    if not isinstance(repositories, list) or not repositories:
+        return None
+    first_repository = repositories[0]
+    if not isinstance(first_repository, dict):
+        return None
+    repository_name = first_repository.get("name")
+    return repository_name if isinstance(repository_name, str) and repository_name.strip() else None
+
+
+def _read_bool_env(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _validate_github_scopes(scopes_header: str | None) -> None:
