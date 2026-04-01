@@ -7,7 +7,6 @@ from pathlib import Path
 
 import httpx
 
-from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig, load_credentials
 from execution_accelerator.execution import (
     DependencyTreeEntry,
@@ -105,7 +104,6 @@ class ValidationAdapter:
                 maven_verification=maven_verification,
             )
 
-        require_fixture_mode(self.mode, capability="Validation live execution")
         resolved_fixture_path = fixture_path or self.validation_result_fixture_path
         if resolved_fixture_path is None:
             raise ValidationConfigurationError(
@@ -247,7 +245,6 @@ class ValidationAdapter:
                 proxy_jump=proxy_jump,
                 ssh_key=ssh_key,
             )
-        require_fixture_mode(self.mode, capability="Rollback live execution")
         resolved_fixture_path = fixture_path or self.rollback_fixture_path
         if resolved_fixture_path is None:
             raise ValidationConfigurationError(

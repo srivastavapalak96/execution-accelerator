@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 import pytest
 
 from execution_accelerator.adapters import (
+    FixtureOnlyError,
     PomMutationAdapter,
     PomMutationConfigurationError,
     PomMutationTargetError,
@@ -106,6 +107,13 @@ def test_pom_mutation_adapter_requires_configuration() -> None:
     adapter = PomMutationAdapter()
 
     with pytest.raises(PomMutationConfigurationError):
+        adapter.load_fixture_before()
+
+
+def test_pom_mutation_fixture_helpers_reject_live_mode() -> None:
+    adapter = PomMutationAdapter(mode="live")
+
+    with pytest.raises(FixtureOnlyError, match="EA_MODE=fixture"):
         adapter.load_fixture_before()
 
 

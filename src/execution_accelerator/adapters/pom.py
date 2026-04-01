@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-from execution_accelerator.adapters._mode import require_fixture_mode
+from execution_accelerator.adapters._mode import FixtureOnlyError
 from execution_accelerator.config import RuntimeConfig, load_credentials
 from execution_accelerator.execution import DependencyTreeEntry, MavenRunner, OpenRewriteRunner
 from execution_accelerator.schemas import (
@@ -74,7 +74,8 @@ class PomMutationAdapter:
     def load_fixture_before(self, *, fixture_path: Path | None = None) -> str:
         """Load the baseline pom fixture."""
 
-        require_fixture_mode(self.mode, capability="Pom live mutation seeding")
+        if self.mode == ExecutionMode.LIVE:
+            raise FixtureOnlyError("Pom fixture seeding is only available in EA_MODE=fixture.")
         resolved_fixture_path = fixture_path or self.fixture_before_path
         if resolved_fixture_path is None:
             raise PomMutationConfigurationError(
@@ -95,7 +96,6 @@ class PomMutationAdapter:
         if self.mode == ExecutionMode.LIVE:
             return self._apply_live_plan(plan, workspace_path=workspace_path, execution_plan=execution_plan)
 
-        require_fixture_mode(self.mode, capability="Pom live mutation")
         root = ET.fromstring(
             xml_text,
             parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)),
@@ -201,7 +201,8 @@ class PomMutationAdapter:
     def expected_fixture_after(self, *, fixture_path: Path | None = None) -> str:
         """Load the expected mutated pom fixture for local verification."""
 
-        require_fixture_mode(self.mode, capability="Pom live mutation verification")
+        if self.mode == ExecutionMode.LIVE:
+            raise FixtureOnlyError("Pom fixture verification is only available in EA_MODE=fixture.")
         resolved_fixture_path = fixture_path or self.fixture_after_path
         if resolved_fixture_path is None:
             raise PomMutationConfigurationError(
@@ -260,7 +261,6 @@ class PreflightResolutionAdapter:
                 execution_plan=execution_plan,
             )
 
-        require_fixture_mode(self.mode, capability="Preflight live validation")
         resolved_fixture_path = fixture_path or self.fixture_path
         if resolved_fixture_path is None:
             raise PomMutationConfigurationError(

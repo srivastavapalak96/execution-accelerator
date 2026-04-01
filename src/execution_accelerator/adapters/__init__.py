@@ -1,5 +1,6 @@
 """External system adapters."""
 
+from ._mode import FixtureOnlyError
 from .jira import JiraAdapter, JiraAdapterError, JiraConfigurationError, JiraTicketMismatchError
 from .complex import (
     ComplexRemediationAdapter,
@@ -32,6 +33,7 @@ from .validation import ValidationAdapter, ValidationAdapterError, ValidationCon
 
 __all__ = [
     "JiraAdapter",
+    "FixtureOnlyError",
     "JiraAdapterError",
     "JiraConfigurationError",
     "JiraTicketMismatchError",

@@ -8,7 +8,6 @@ from pathlib import Path
 import httpx
 import re
 
-from execution_accelerator.adapters._mode import require_fixture_mode
 from execution_accelerator.config import RuntimeConfig, load_credentials
 from execution_accelerator.execution import GitRunner
 from execution_accelerator.policy import PolicyEngine
@@ -118,7 +117,6 @@ class DeliveryAdapter:
                 proxy_jump=proxy_jump,
                 ssh_key=ssh_key,
             )
-        require_fixture_mode(self.mode, capability="Delivery live publication")
         resolved_fixture_path = fixture_path or self.branch_publication_fixture_path
         if resolved_fixture_path is None:
             raise DeliveryConfigurationError(
@@ -201,7 +199,6 @@ class DeliveryAdapter:
                 draft_pull_request=draft_pull_request,
                 body=body,
             )
-        require_fixture_mode(self.mode, capability="Delivery live pull-request creation")
         resolved_fixture_path = fixture_path or self.pull_request_fixture_path
         if resolved_fixture_path is None:
             raise DeliveryConfigurationError(
@@ -379,7 +376,6 @@ class DeliveryAdapter:
                 pull_request_url=pull_request_url,
                 comment=comment,
             )
-        require_fixture_mode(self.mode, capability="Delivery live Jira completion")
         resolved_fixture_path = fixture_path or self.jira_completion_fixture_path
         if resolved_fixture_path is None:
             raise DeliveryConfigurationError(

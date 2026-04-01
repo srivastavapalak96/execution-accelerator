@@ -5,6 +5,10 @@ from __future__ import annotations
 from execution_accelerator.schemas import ExecutionMode
 
 
+class FixtureOnlyError(RuntimeError):
+    """Raised when a fixture-only helper is called in live mode."""
+
+
 def require_fixture_mode(mode: ExecutionMode, *, capability: str) -> None:
     """Raise until the requested capability is implemented for live mode."""
 
