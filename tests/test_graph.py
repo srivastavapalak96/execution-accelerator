@@ -136,7 +136,7 @@ def test_bootstrap_ticket_run_persists_checkpointed_state(tmp_path, monkeypatch)
     assert loaded_state.workflow_status == WorkflowStatus.COMPLETED
     assert len(result.state.targets) == 1
     assert result.state.current_target_index == 0
-    assert len(loaded_state.audit_events) == 13
+    assert len(loaded_state.audit_events) == 14
     assert Path(loaded_state.repo_map["payments-service"].local_path).is_dir()
     assert (
         Path(loaded_state.repo_map["payments-service"].local_path) / ".execution-accelerator-repo.json"
@@ -178,7 +178,7 @@ def test_bootstrap_ticket_run_persists_transitive_override_state(tmp_path, monke
     assert result.state.preflight_resolution is not None
     assert result.state.preflight_resolution.dependency_kind == "transitive"
     assert len(result.state.targets) == 1
-    assert len(result.state.audit_events) == 13
+    assert len(result.state.audit_events) == 14
     mutated_root = ET.fromstring(Path(result.state.modified_files[0]).read_text())
     version = mutated_root.find(
         ".//{http://maven.apache.org/POM/4.0.0}dependencyManagement/"
@@ -691,7 +691,7 @@ def test_bootstrap_ticket_run_records_failure_and_rollback_state(tmp_path, monke
     assert result.state.failure_classifications[-1] == "compile_error"
     assert result.state.errors[-1].code == "validation_compile_failed"
     assert len(result.state.targets) == 1
-    assert len(result.state.audit_events) == 15
+    assert len(result.state.audit_events) == 16
     assert Path(result.state.escalation_bundle.bundle_path).exists()
     assert loaded_state.escalation_bundle is not None
     assert loaded_state.escalation_bundle.bundle_path == result.state.escalation_bundle.bundle_path

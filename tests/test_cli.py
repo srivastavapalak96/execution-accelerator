@@ -234,7 +234,7 @@ def test_main_bootstraps_ticket(monkeypatch, capsys, tmp_path) -> None:
     assert "workflow_status=completed" in captured.out
     assert "target_count=1" in captured.out
     assert "current_target_index=0" in captured.out
-    assert "audit_event_count=13" in captured.out
+    assert "audit_event_count=14" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
     assert "severity=high" in captured.out
     assert "recommended_fix_version=1.2.4" in captured.out
@@ -638,7 +638,7 @@ def test_main_loads_persisted_thread_state(monkeypatch, capsys, tmp_path) -> Non
     assert "target_count=1" in captured.out
     assert "pending_repos=" in captured.out
     assert "completed_repos=payments-service" in captured.out
-    assert "audit_event_count=13" in captured.out
+    assert "audit_event_count=14" in captured.out
     assert "package_name=org.example:legacy-json" in captured.out
     assert "recommended_fix_version=1.2.4" in captured.out
     assert "route_strategy=simple_update" in captured.out

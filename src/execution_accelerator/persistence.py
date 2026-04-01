@@ -23,10 +23,13 @@ def ensure_runtime_directories(config: RuntimeConfig) -> None:
     config.checkpoints_path.parent.mkdir(parents=True, exist_ok=True)
 
 
-def build_thread_config(thread_id: str) -> dict[str, dict[str, str]]:
+def build_thread_config(thread_id: str) -> dict[str, object]:
     """Return the LangGraph runtime config for a persisted thread."""
 
-    return {"configurable": {"thread_id": thread_id}}
+    return {
+        "configurable": {"thread_id": thread_id},
+        "recursion_limit": 64,
+    }
 
 
 def build_default_thread_id(ticket_id: str) -> str:

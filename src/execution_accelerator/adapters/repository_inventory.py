@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 import json
 from pathlib import Path
 import re
@@ -24,6 +25,7 @@ from execution_accelerator.state import RepositoryWorkspace
 
 
 REPOSITORY_DIR_PATTERN = re.compile(r"[^a-z0-9]+")
+IDEMPOTENCY_CLOSED_LOOKBACK_DAYS = 30
 
 
 class RepositoryInventoryAdapterError(RuntimeError):
@@ -141,7 +143,7 @@ class RepositoryInventoryAdapter:
         ]
 
     def find_existing_pull_request(self, target: RemediationTarget) -> str | None:
-        """Look for an existing open remediation PR before cloning a workspace."""
+        """Look for an existing open or recently closed remediation PR before cloning a workspace."""
 
         if self.mode != ExecutionMode.LIVE:
             return None
@@ -165,14 +167,44 @@ class RepositoryInventoryAdapter:
             for term in (target.ticket_id, target.package_name, target.target_version)
             if term
         )
-        query = f"repo:{repository_owner}/{target.repository_name} is:pr is:open {search_terms}".strip()
-        search_url = f"{credentials.github_api_base.rstrip('/')}/search/issues"
+        open_match = self._search_existing_pull_request(
+            repository_owner=repository_owner,
+            repository_name=target.repository_name,
+            search_terms=search_terms,
+            status_query="is:open",
+            github_api_base=credentials.github_api_base,
+            github_token=credentials.github_token,
+        )
+        if open_match is not None:
+            return open_match
+        recent_closed_cutoff = (datetime.now(UTC) - timedelta(days=IDEMPOTENCY_CLOSED_LOOKBACK_DAYS)).date().isoformat()
+        return self._search_existing_pull_request(
+            repository_owner=repository_owner,
+            repository_name=target.repository_name,
+            search_terms=search_terms,
+            status_query=f"is:closed updated:>={recent_closed_cutoff}",
+            github_api_base=credentials.github_api_base,
+            github_token=credentials.github_token,
+        )
+
+    def _search_existing_pull_request(
+        self,
+        *,
+        repository_owner: str,
+        repository_name: str,
+        search_terms: str,
+        status_query: str,
+        github_api_base: str,
+        github_token: str,
+    ) -> str | None:
+        search_url = f"{github_api_base.rstrip('/')}/search/issues"
+        query = f"repo:{repository_owner}/{repository_name} is:pr {status_query} {search_terms}".strip()
         try:
             response = httpx.get(
                 search_url,
                 params={"q": query, "per_page": 1},
                 headers={
-                    "Authorization": f"Bearer {credentials.github_token}",
+                    "Authorization": f"Bearer {github_token}",
                     "Accept": "application/vnd.github+json",
                 },
                 timeout=30.0,
@@ -181,7 +213,7 @@ class RepositoryInventoryAdapter:
             payload = response.json()
         except httpx.HTTPError as exc:
             raise RepositoryInventoryAdapterError(
-                f"Failed to search for existing PRs for '{target.repository_name}': {exc}"
+                f"Failed to search for existing PRs for '{repository_name}': {exc}"
             ) from exc
 
         if not isinstance(payload, dict):

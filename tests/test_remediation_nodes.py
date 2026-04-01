@@ -15,6 +15,7 @@ from execution_accelerator.adapters import (
     RepositoryInventoryAdapter,
 )
 from execution_accelerator.nodes import (
+    build_check_repository_idempotency_node,
     build_execute_complex_scaffold_node,
     build_load_repository_context_node,
     build_preflight_validation_node,
@@ -46,11 +47,24 @@ def build_state(tmp_path: Path, *, transitive: bool = False, complex_refactor: b
             workspace_root=tmp_path / "workspace",
         )
     )(RemediationState(initial_ticket_id="SEC-123", vulnerability_details=vulnerability_details))
+    repo_context_update = build_check_repository_idempotency_node(
+        RepositoryInventoryAdapter(
+            fixture_path=fixture_dir / "repository_inventory.json",
+            workspace_root=tmp_path / "workspace",
+        )
+    )(
+        RemediationState(
+            initial_ticket_id="SEC-123",
+            vulnerability_details=vulnerability_details,
+            targets=repo_update["targets"],
+        )
+    )
     state = RemediationState(
         initial_ticket_id="SEC-123",
         vulnerability_details=vulnerability_details,
-        repo_map=repo_update["repo_map"],
-        pending_repos=repo_update["pending_repos"],
+        targets=repo_update["targets"],
+        repo_map=repo_context_update["repo_map"],
+        pending_repos=repo_context_update["pending_repos"],
         advisory_verification=AdvisoryVerificationAdapter(
             fixture_path=fixture_dir / "advisory_verification.json"
         ).load_verification(vulnerability_details),

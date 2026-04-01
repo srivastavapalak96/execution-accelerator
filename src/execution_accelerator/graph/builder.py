@@ -24,6 +24,7 @@ from execution_accelerator.config import RuntimeConfig
 from execution_accelerator.nodes import (
     bootstrap_state,
     build_apply_policy_node,
+    build_check_repository_idempotency_node,
     build_prepare_delivery_approval_node,
     build_review_approval_node,
     build_escalate_node,
@@ -93,6 +94,10 @@ def build_remediation_graph(
         "load_repository_context",
         cast(Any, build_load_repository_context_node(repository_inventory_adapter)),
     )
+    builder.add_node(
+        "check_repository_idempotency",
+        cast(Any, build_check_repository_idempotency_node(repository_inventory_adapter)),
+    )
     builder.add_node("detect_maven_profile", cast(Any, build_detect_maven_profile_node(runtime_config)))
     builder.add_node(
         "verify_advisory",
@@ -146,7 +151,15 @@ def build_remediation_graph(
     builder.add_edge("bootstrap_state", "probe_credentials")
     builder.add_edge("probe_credentials", "ingest_and_parse_jira")
     builder.add_edge("ingest_and_parse_jira", "load_repository_context")
-    builder.add_edge("load_repository_context", "detect_maven_profile")
+    builder.add_edge("load_repository_context", "check_repository_idempotency")
+    builder.add_conditional_edges(
+        "check_repository_idempotency",
+        _select_post_idempotency_node,
+        {
+            "detect_maven_profile": "detect_maven_profile",
+            END: END,
+        },
+    )
     builder.add_edge("detect_maven_profile", "verify_advisory")
     builder.add_edge("verify_advisory", "verify_maven_target")
     builder.add_edge("verify_maven_target", "select_route")
@@ -431,6 +444,10 @@ def _select_remediation_node(state: RemediationState) -> str:
     if route_decision.strategy == RemediationStrategy.COMPLEX_REFACTOR:
         return "prepare_complex_remediation"
     return END
+
+
+def _select_post_idempotency_node(state: RemediationState) -> str:
+    return "detect_maven_profile" if state.pending_repos else END
 
 
 def _select_post_policy_node(state: RemediationState) -> str:

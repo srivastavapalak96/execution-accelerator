@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import subprocess
+import typing
 
 import pytest
 
@@ -176,6 +177,79 @@ def test_repository_inventory_adapter_live_idempotency_uses_lookup_callback(tmp_
     existing_pr = adapter.find_existing_pull_request(targets[0])
 
     assert existing_pr == "https://github.com/example/payments-service/pull/42"
+
+
+def test_repository_inventory_adapter_live_idempotency_checks_recently_closed_prs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = _write_live_inventory_config(tmp_path)
+    adapter = RepositoryInventoryAdapter(
+        config_path=config_path,
+        workspace_root=tmp_path / "workspace",
+        mode=ExecutionMode.LIVE,
+    )
+    monkeypatch.setenv("GITHUB_TOKEN", "gh-token")
+    monkeypatch.setenv("GITHUB_OWNER", "payments-platform")
+    queries: list[str] = []
+
+    class DummyResponse:
+        def __init__(self, payload: dict[str, object]) -> None:
+            self._payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return self._payload
+
+    def fake_get(*args: typing.Any, **kwargs: typing.Any) -> DummyResponse:
+        query = str(kwargs["params"]["q"])
+        queries.append(query)
+        if "is:open" in query:
+            return DummyResponse({"items": []})
+        return DummyResponse({"items": [{"html_url": "https://github.com/example/payments-service/pull/88"}]})
+
+    monkeypatch.setattr("execution_accelerator.adapters.repository_inventory.httpx.get", fake_get)
+    targets = adapter.build_targets(ticket_id="SEC-777", vulnerability_details=build_vulnerability_details())
+
+    existing_pr = adapter.find_existing_pull_request(targets[0])
+
+    assert existing_pr == "https://github.com/example/payments-service/pull/88"
+    assert "is:open" in queries[0]
+    assert "is:closed" in queries[1]
+    assert "updated:>=" in queries[1]
+
+
+def test_repository_inventory_adapter_live_idempotency_ignores_old_closed_prs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = _write_live_inventory_config(tmp_path)
+    adapter = RepositoryInventoryAdapter(
+        config_path=config_path,
+        workspace_root=tmp_path / "workspace",
+        mode=ExecutionMode.LIVE,
+    )
+    monkeypatch.setenv("GITHUB_TOKEN", "gh-token")
+    monkeypatch.setenv("GITHUB_OWNER", "payments-platform")
+
+    class DummyResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {"items": []}
+
+    monkeypatch.setattr(
+        "execution_accelerator.adapters.repository_inventory.httpx.get",
+        lambda *args, **kwargs: DummyResponse(),
+    )
+    targets = adapter.build_targets(ticket_id="SEC-777", vulnerability_details=build_vulnerability_details())
+
+    existing_pr = adapter.find_existing_pull_request(targets[0])
+
+    assert existing_pr is None
 
 
 def test_repository_inventory_adapter_cleans_up_live_workspace_when_not_kept(tmp_path: Path) -> None:

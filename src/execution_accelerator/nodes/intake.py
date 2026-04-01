@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 from execution_accelerator.adapters import JiraAdapter, RepositoryInventoryAdapter
 from execution_accelerator.config import RuntimeConfig, load_credentials, probe_credentials
-from execution_accelerator.schemas import AuditEvent, WorkflowStatus
+from execution_accelerator.schemas import AuditEvent, RepositoryInventoryRecord, WorkflowStatus
 from execution_accelerator.state import RemediationState, SkippedRepository, require_state_field
 
 
@@ -74,7 +74,7 @@ def build_ingest_and_parse_jira_node(
 def build_load_repository_context_node(
     repository_inventory_adapter: RepositoryInventoryAdapter,
 ) -> Callable[[RemediationState], dict[str, object]]:
-    """Create a node that resolves affected repositories and materializes workspaces."""
+    """Create a node that resolves affected repositories into remediation targets."""
 
     def load_repository_context(state: RemediationState) -> dict[str, object]:
         vulnerability_details = require_state_field(
@@ -89,20 +89,59 @@ def build_load_repository_context_node(
             ticket_id=state.initial_ticket_id,
             vulnerability_details=vulnerability_details,
         )
+        audit_events = list(state.audit_events)
+        audit_events.append(
+            AuditEvent(
+                event_type="repository.context_load",
+                message=f"Resolved repository intake context for {state.initial_ticket_id}.",
+                details={
+                    "ticket_id": state.initial_ticket_id,
+                    "resolved_repos": [repository.name for repository in resolved_repositories],
+                    "target_count": len(targets),
+                },
+            )
+        )
+
+        return {
+            "targets": targets,
+            "current_target_index": 0,
+            "audit_events": audit_events,
+        }
+
+    return load_repository_context
+
+
+def build_check_repository_idempotency_node(
+    repository_inventory_adapter: RepositoryInventoryAdapter,
+) -> Callable[[RemediationState], dict[str, object]]:
+    """Create a node that checks PR idempotency before workspace preparation."""
+
+    def check_repository_idempotency(state: RemediationState) -> dict[str, object]:
         repo_map = dict(state.repo_map)
         skipped_repos = list(state.skipped_repos)
         pending_repos: list[str] = []
 
-        for repository, target in zip(resolved_repositories, targets, strict=True):
+        for target in state.targets:
             existing_pull_request = repository_inventory_adapter.find_existing_pull_request(target)
             if existing_pull_request is not None:
                 skipped_repos.append(
                     SkippedRepository(
-                        name=repository.name,
+                        name=target.repository_name,
                         reason=f"existing_pr:{existing_pull_request}",
                     )
                 )
                 continue
+            repository = RepositoryInventoryRecord(
+                name=target.repository_name,
+                clone_url=target.clone_url,
+                default_branch=target.default_branch,
+                build_system=target.build_system,
+                manifest_path=target.manifest_path,
+                maven_settings=target.maven_settings,
+                proxy_jump=target.proxy_jump,
+                owner=target.owner,
+                tags=target.tags,
+            )
             workspace = repository_inventory_adapter.prepare_workspace(
                 ticket_id=state.initial_ticket_id,
                 repository=repository,
@@ -113,31 +152,31 @@ def build_load_repository_context_node(
                     "manifest_path": repository.manifest_path,
                     "owner": repository.owner,
                     "tags": repository.tags,
-                    }
-                )
+                }
+            )
             pending_repos.append(repository.name)
 
         audit_events = list(state.audit_events)
         audit_events.append(
             AuditEvent(
-                event_type="repository.context_load",
-                message=f"Resolved repository intake context for {state.initial_ticket_id}.",
+                event_type="repository.idempotency_check",
+                message=f"Checked repository idempotency for {state.initial_ticket_id}.",
                 details={
                     "ticket_id": state.initial_ticket_id,
-                    "resolved_repos": pending_repos,
-                    "target_count": len(targets),
+                    "pending_repo_count": len(pending_repos),
                     "skipped_repo_count": len(skipped_repos),
                 },
             )
         )
 
         return {
-            "targets": targets,
-            "current_target_index": 0,
             "repo_map": repo_map,
             "pending_repos": pending_repos,
             "skipped_repos": skipped_repos,
+            "workflow_status": (
+                WorkflowStatus.COMPLETED if not pending_repos else state.workflow_status
+            ),
             "audit_events": audit_events,
         }
 
-    return load_repository_context
+    return check_repository_idempotency
