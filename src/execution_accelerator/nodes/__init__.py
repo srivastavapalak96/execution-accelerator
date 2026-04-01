@@ -1,7 +1,7 @@
 """LangGraph node implementations."""
 
 from .approval import build_prepare_delivery_approval_node, build_review_approval_node
-from .bootstrap import bootstrap_state, prepare_planning_stub
+from .bootstrap import bootstrap_state
 from .classify_failure import classify_failure
 from .delivery import build_publish_remediation_node, build_skip_publish_for_dry_run_node
 from .escalate import build_escalate_node, escalate
@@ -29,7 +29,6 @@ from .verification import (
 
 __all__ = [
     "bootstrap_state",
-    "prepare_planning_stub",
     "build_prepare_delivery_approval_node",
     "build_review_approval_node",
     "classify_failure",

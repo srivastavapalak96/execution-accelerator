@@ -11,7 +11,7 @@ from .sandbox import CommandResult
 
 _REWRITE_RUN_GOAL = "org.openrewrite.maven:rewrite-maven-plugin:run"
 _REWRITE_DRY_RUN_GOAL = "org.openrewrite.maven:rewrite-maven-plugin:dryRun"
-_UPGRADE_DEPENDENCY_RECIPE = "org.openrewrite.java.dependencies.UpgradeDependencyVersion"
+_UPGRADE_DEPENDENCY_RECIPE = "org.openrewrite.maven.UpgradeDependencyVersion"
 
 
 @dataclass
@@ -71,8 +71,9 @@ class OpenRewriteRunner:
         args = [goal, f"-Drewrite.activeRecipes={recipe_name}"]
         if self.recipe_artifact_coordinates:
             args.append(f"-Drewrite.recipeArtifactCoordinates={self.recipe_artifact_coordinates}")
-        for key, value in sorted((recipe_options or {}).items()):
-            args.append(f"-Drewrite.{key}={value}")
+        if recipe_options:
+            serialized_options = ",".join(f"{key}={value}" for key, value in sorted(recipe_options.items()))
+            args.append(f"-Drewrite.options={serialized_options}")
         return self.maven_runner.run(
             cwd,
             args,

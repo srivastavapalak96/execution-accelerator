@@ -170,7 +170,7 @@ def test_remediate_simple_node_uses_openrewrite_in_live_mode(tmp_path) -> None:
         )
     )
 
-    assert calls[0][0] == "org.openrewrite.java.dependencies.UpgradeDependencyVersion"
+    assert calls[0][0] == "org.openrewrite.maven.UpgradeDependencyVersion"
     assert calls[0][1] == {
         "groupId": "org.example",
         "artifactId": "legacy-json",

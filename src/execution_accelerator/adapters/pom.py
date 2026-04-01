@@ -136,7 +136,7 @@ class PomMutationAdapter:
                 continue
             self.openrewrite_runner.apply_recipe(
                 workspace_path,
-                recipe_name="org.openrewrite.java.dependencies.UpgradeDependencyVersion",
+                recipe_name="org.openrewrite.maven.UpgradeDependencyVersion",
                 execution_plan=execution_plan,
                 recipe_options={
                     "groupId": change.dependency.group_id,

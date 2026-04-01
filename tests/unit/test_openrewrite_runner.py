@@ -48,10 +48,8 @@ def test_openrewrite_runner_plans_upgrade_with_detected_maven_settings(tmp_path:
     assert invoked_args[0] == "-s"
     assert invoked_args[1] == str(settings_path)
     assert invoked_args[2] == "org.openrewrite.maven:rewrite-maven-plugin:dryRun"
-    assert "-Drewrite.activeRecipes=org.openrewrite.java.dependencies.UpgradeDependencyVersion" in invoked_args
-    assert "-Drewrite.groupId=org.example" in invoked_args
-    assert "-Drewrite.artifactId=legacy-json" in invoked_args
-    assert "-Drewrite.newVersion=1.2.4" in invoked_args
+    assert "-Drewrite.activeRecipes=org.openrewrite.maven.UpgradeDependencyVersion" in invoked_args
+    assert "-Drewrite.options=artifactId=legacy-json,groupId=org.example,newVersion=1.2.4" in invoked_args
 
 
 def test_openrewrite_runner_applies_named_recipe_with_recipe_artifact_coordinates(tmp_path: Path) -> None:
@@ -86,4 +84,4 @@ def test_openrewrite_runner_applies_named_recipe_with_recipe_artifact_coordinate
     assert invoked_args[0] == "org.openrewrite.maven:rewrite-maven-plugin:run"
     assert "-Drewrite.activeRecipes=org.openrewrite.java.migrate.UpgradeToJava17" in invoked_args
     assert "-Drewrite.recipeArtifactCoordinates=org.openrewrite.recipe:rewrite-migrate-java:1.0.0" in invoked_args
-    assert "-Drewrite.style=google" in invoked_args
+    assert "-Drewrite.options=style=google" in invoked_args
