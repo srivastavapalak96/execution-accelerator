@@ -97,6 +97,7 @@ def test_repository_inventory_adapter_builds_targets_from_live_inventory(tmp_pat
     assert targets[0].owner == "payments-platform"
     assert targets[0].maven_settings == str((tmp_path / "config" / "settings.xml").resolve())
     assert targets[0].proxy_jump == "bastion.internal"
+    assert targets[0].ssh_key == str((tmp_path / "config" / "id_ed25519").resolve())
 
 
 def test_repository_inventory_adapter_prepares_live_workspace_with_real_clone(tmp_path: Path) -> None:
@@ -117,6 +118,7 @@ def test_repository_inventory_adapter_prepares_live_workspace_with_real_clone(tm
     assert (workspace_path / ".execution-accelerator-repo.json").exists()
     assert workspace.clone_url == str(source_repo)
     assert workspace.maven_settings == str((tmp_path / "config" / "settings.xml").resolve())
+    assert workspace.ssh_key == str((tmp_path / "config" / "id_ed25519").resolve())
 
 
 def test_repository_inventory_adapter_passes_proxy_jump_to_git_runner(tmp_path: Path) -> None:
@@ -148,7 +150,14 @@ def test_repository_inventory_adapter_passes_proxy_jump_to_git_runner(tmp_path: 
             (dest / ".git").mkdir()
             return dest
 
-        def head_sha(self, repo_dir: Path) -> str:
+        def head_sha(
+            self,
+            repo_dir: Path,
+            *,
+            proxy_jump: str | None = None,
+            ssh_key: Path | None = None,
+        ) -> str:
+            del repo_dir, proxy_jump, ssh_key
             return "abc123"
 
     adapter = RepositoryInventoryAdapter(
@@ -162,6 +171,7 @@ def test_repository_inventory_adapter_passes_proxy_jump_to_git_runner(tmp_path: 
     adapter.prepare_workspace(ticket_id="SEC-655", repository=repository)
 
     assert calls[0]["proxy_jump"] == "bastion.internal"
+    assert calls[0]["ssh_key"] == (tmp_path / "config" / "id_ed25519").resolve()
 
 
 def test_repository_inventory_adapter_live_idempotency_uses_lookup_callback(tmp_path: Path) -> None:
@@ -274,6 +284,7 @@ def _write_live_inventory_config(tmp_path: Path, *, clone_url: str = "https://gi
     config_path = tmp_path / "config" / "repositories.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     (config_path.parent / "settings.xml").write_text("<settings />\n")
+    (config_path.parent / "id_ed25519").write_text("not-a-real-key\n")
     config_path.write_text(
         "\n".join(
             [
@@ -285,6 +296,7 @@ def _write_live_inventory_config(tmp_path: Path, *, clone_url: str = "https://gi
                 "    manifest_path: pom.xml",
                 "    maven_settings: settings.xml",
                 "    proxy_jump: bastion.internal",
+                "    ssh_key: id_ed25519",
                 "    owner: payments-platform",
                 "    tags:",
                 "      - payments",

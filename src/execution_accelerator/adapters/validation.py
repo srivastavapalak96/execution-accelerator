@@ -233,6 +233,8 @@ class ValidationAdapter:
         repository: str,
         workspace_path: Path | None = None,
         modified_files: list[str] | None = None,
+        proxy_jump: str | None = None,
+        ssh_key: Path | None = None,
         fixture_path: Path | None = None,
     ) -> RollbackPlan:
         """Load the placeholder rollback plan for one repository."""
@@ -242,6 +244,8 @@ class ValidationAdapter:
                 repository=repository,
                 workspace_path=workspace_path,
                 modified_files=modified_files or [],
+                proxy_jump=proxy_jump,
+                ssh_key=ssh_key,
             )
         require_fixture_mode(self.mode, capability="Rollback live execution")
         resolved_fixture_path = fixture_path or self.rollback_fixture_path
@@ -260,6 +264,8 @@ class ValidationAdapter:
         repository: str,
         workspace_path: Path | None,
         modified_files: list[str],
+        proxy_jump: str | None,
+        ssh_key: Path | None,
     ) -> RollbackPlan:
         if self.git_runner is None:
             raise ValidationConfigurationError("Live rollback requires a configured Git runner.")
@@ -271,9 +277,16 @@ class ValidationAdapter:
             tracked_paths, untracked_paths = self.git_runner.partition_tracked_paths(
                 workspace_path,
                 paths=files_to_restore,
+                proxy_jump=proxy_jump,
+                ssh_key=ssh_key,
             )
             if tracked_paths:
-                self.git_runner.restore_paths(workspace_path, paths=tracked_paths)
+                self.git_runner.restore_paths(
+                    workspace_path,
+                    paths=tracked_paths,
+                    proxy_jump=proxy_jump,
+                    ssh_key=ssh_key,
+                )
             if untracked_paths:
                 self.git_runner.remove_untracked_paths(workspace_path, paths=untracked_paths)
             status = RollbackStatus.APPLIED

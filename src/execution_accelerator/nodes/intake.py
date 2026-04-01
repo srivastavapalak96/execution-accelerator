@@ -139,6 +139,7 @@ def build_check_repository_idempotency_node(
                 manifest_path=target.manifest_path,
                 maven_settings=target.maven_settings,
                 proxy_jump=target.proxy_jump,
+                ssh_key=target.ssh_key,
                 owner=target.owner,
                 tags=target.tags,
             )
@@ -152,6 +153,7 @@ def build_check_repository_idempotency_node(
                     "manifest_path": repository.manifest_path,
                     "owner": repository.owner,
                     "tags": repository.tags,
+                    "ssh_key": repository.ssh_key,
                 }
             )
             pending_repos.append(repository.name)

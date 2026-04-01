@@ -177,6 +177,7 @@ class RepositoryInventoryRecord(BaseSchemaModel):
     manifest_path: str = Field(min_length=1)
     maven_settings: str | None = None
     proxy_jump: str | None = None
+    ssh_key: str | None = None
     owner: str | None = None
     tags: list[str] = Field(default_factory=list)
 
@@ -201,6 +202,7 @@ class RemediationTarget(BaseSchemaModel):
     manifest_path: str = Field(min_length=1)
     maven_settings: str | None = None
     proxy_jump: str | None = None
+    ssh_key: str | None = None
     owner: str | None = None
     tags: list[str] = Field(default_factory=list)
 

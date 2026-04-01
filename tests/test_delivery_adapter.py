@@ -78,6 +78,71 @@ def test_delivery_adapter_publishes_live_branch(tmp_path: Path) -> None:
     assert remote_heads.stdout.strip()
 
 
+def test_delivery_adapter_passes_proxy_jump_and_ssh_key_to_git_runner(tmp_path: Path) -> None:
+    calls: list[tuple[str, str | None, Path | None]] = []
+
+    class CapturingGitRunner:
+        def configure_user(self, repo_dir: Path, *, name: str, email: str, proxy_jump: str | None = None, ssh_key: Path | None = None) -> None:
+            del repo_dir, name, email
+            calls.append(("configure_user", proxy_jump, ssh_key))
+
+        def create_branch(self, repo_dir: Path, branch_name: str, *, proxy_jump: str | None = None, ssh_key: Path | None = None) -> None:
+            del repo_dir, branch_name
+            calls.append(("create_branch", proxy_jump, ssh_key))
+
+        def add_all(self, repo_dir: Path, *, proxy_jump: str | None = None, ssh_key: Path | None = None) -> None:
+            del repo_dir
+            calls.append(("add_all", proxy_jump, ssh_key))
+
+        def status_clean(self, repo_dir: Path, *, proxy_jump: str | None = None, ssh_key: Path | None = None) -> bool:
+            del repo_dir
+            calls.append(("status_clean", proxy_jump, ssh_key))
+            return False
+
+        def commit(self, repo_dir: Path, *, message: str, proxy_jump: str | None = None, ssh_key: Path | None = None) -> None:
+            del repo_dir, message
+            calls.append(("commit", proxy_jump, ssh_key))
+
+        def head_sha(self, repo_dir: Path, *, proxy_jump: str | None = None, ssh_key: Path | None = None) -> str:
+            del repo_dir
+            calls.append(("head_sha", proxy_jump, ssh_key))
+            return "a" * 40
+
+        def push(self, repo_dir: Path, *, remote: str = "origin", branch_name: str, proxy_jump: str | None = None, ssh_key: Path | None = None) -> None:
+            del repo_dir, remote, branch_name
+            calls.append(("push", proxy_jump, ssh_key))
+
+    ssh_key = tmp_path / "id_ed25519"
+    adapter = DeliveryAdapter(
+        mode=ExecutionMode.LIVE,
+        git_runner=CapturingGitRunner(),  # type: ignore[arg-type]
+        git_user_name="Automation Bot",
+        git_user_email="bot@example.com",
+    )
+
+    branch = adapter.load_branch_publication(
+        repository="payments-service",
+        workspace_path=tmp_path / "workspace",
+        ticket_id="SEC-123",
+        package_name="legacy-json",
+        proxy_jump="bastion.internal",
+        ssh_key=ssh_key,
+    )
+
+    assert branch.commit_sha == "a" * 40
+    assert [call[0] for call in calls] == [
+        "configure_user",
+        "create_branch",
+        "add_all",
+        "status_clean",
+        "commit",
+        "head_sha",
+        "push",
+    ]
+    assert all(call[1] == "bastion.internal" for call in calls)
+    assert all(call[2] == ssh_key for call in calls)
+
+
 def test_delivery_adapter_requires_configuration() -> None:
     adapter = DeliveryAdapter()
 

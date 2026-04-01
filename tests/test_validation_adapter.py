@@ -517,6 +517,43 @@ def test_validation_adapter_removes_untracked_files_during_live_rollback(tmp_pat
     assert scaffold_path.exists() is False
 
 
+def test_validation_adapter_passes_proxy_jump_and_ssh_key_to_git_runner(tmp_path: Path) -> None:
+    calls: list[tuple[str, str | None, Path | None]] = []
+
+    class CapturingGitRunner:
+        def partition_tracked_paths(self, repo_dir: Path, *, paths: list[str], proxy_jump: str | None = None, ssh_key: Path | None = None) -> tuple[list[str], list[str]]:
+            del repo_dir, paths
+            calls.append(("partition_tracked_paths", proxy_jump, ssh_key))
+            return (["pom.xml"], [])
+
+        def restore_paths(self, repo_dir: Path, *, paths: list[str], proxy_jump: str | None = None, ssh_key: Path | None = None) -> None:
+            del repo_dir, paths
+            calls.append(("restore_paths", proxy_jump, ssh_key))
+
+        def remove_untracked_paths(self, repo_dir: Path, *, paths: list[str]) -> None:
+            del repo_dir, paths
+            calls.append(("remove_untracked_paths", None, None))
+
+    ssh_key = tmp_path / "id_ed25519"
+    adapter = ValidationAdapter(
+        mode=ExecutionMode.LIVE,
+        git_runner=CapturingGitRunner(),  # type: ignore[arg-type]
+    )
+
+    plan = adapter.load_rollback_plan(
+        repository="payments-service",
+        workspace_path=tmp_path / "workspace",
+        modified_files=[str(tmp_path / "workspace" / "pom.xml")],
+        proxy_jump="bastion.internal",
+        ssh_key=ssh_key,
+    )
+
+    assert plan.status == "applied"
+    assert [call[0] for call in calls] == ["partition_tracked_paths", "restore_paths"]
+    assert all(call[1] == "bastion.internal" for call in calls)
+    assert all(call[2] == ssh_key for call in calls)
+
+
 def test_validation_adapter_reports_live_security_rescan_failure(tmp_path: Path) -> None:
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()

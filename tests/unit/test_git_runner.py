@@ -3,7 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 import subprocess
 
+import pytest
+
 from execution_accelerator.execution import GitRunner
+from execution_accelerator.execution.sandbox import CommandResult
 
 
 def test_git_runner_clone_and_read_repo_state(tmp_path: Path) -> None:
@@ -70,6 +73,47 @@ def test_git_runner_partitions_and_removes_untracked_paths(tmp_path: Path) -> No
     assert untracked == ["notes.txt"]
     assert tracked_file.exists() is True
     assert untracked_file.exists() is False
+
+
+def test_git_runner_threads_proxy_jump_and_ssh_key_to_all_git_subprocesses(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_envs: list[dict[str, str] | None] = []
+
+    def fake_run_command(command, *, cwd, timeout, env, log_path, secrets):
+        del timeout, secrets
+        captured_envs.append(env)
+        if command[:3] == ["git", "rev-parse", "--abbrev-ref"]:
+            return CommandResult(command=tuple(command), cwd=cwd, returncode=0, stdout="main\n", stderr="", log_path=log_path)
+        if command[:3] == ["git", "rev-parse", "HEAD"]:
+            return CommandResult(command=tuple(command), cwd=cwd, returncode=0, stdout="a" * 40 + "\n", stderr="", log_path=log_path)
+        if command[:3] == ["git", "status", "--porcelain"]:
+            return CommandResult(command=tuple(command), cwd=cwd, returncode=0, stdout="", stderr="", log_path=log_path)
+        if command[:3] == ["git", "ls-files", "--error-unmatch"]:
+            return CommandResult(command=tuple(command), cwd=cwd, returncode=0, stdout="pom.xml\n", stderr="", log_path=log_path)
+        return CommandResult(command=tuple(command), cwd=cwd, returncode=0, stdout="", stderr="", log_path=log_path)
+
+    monkeypatch.setattr("execution_accelerator.execution.git_runner.run_command", fake_run_command)
+    ssh_key = tmp_path / "fixtures" / "id_ed25519"
+    runner = GitRunner(
+        log_dir=tmp_path / "logs",
+        proxy_jump="bastion.internal",
+        ssh_key=ssh_key,
+    )
+
+    runner.clone("ssh://git@example.com/payments-service.git", tmp_path / "clone", branch="main")
+    runner.current_branch(tmp_path / "clone")
+    runner.head_sha(tmp_path / "clone")
+    runner.status_clean(tmp_path / "clone")
+    runner.push(tmp_path / "clone", branch_name="feature/proxy")
+    runner.restore_paths(tmp_path / "clone", paths=["pom.xml"])
+    runner.partition_tracked_paths(tmp_path / "clone", paths=["pom.xml"])
+
+    assert captured_envs
+    assert all(env is not None for env in captured_envs)
+    assert all("-J bastion.internal" in env["GIT_SSH_COMMAND"] for env in captured_envs if env is not None)
+    assert all(str(ssh_key.resolve()) in env["GIT_SSH_COMMAND"] for env in captured_envs if env is not None)
 
 
 def _create_source_repo(path: Path) -> Path:

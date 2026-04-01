@@ -136,6 +136,7 @@ class RepositoryInventoryAdapter:
                 manifest_path=repository.manifest_path,
                 maven_settings=repository.maven_settings,
                 proxy_jump=repository.proxy_jump,
+                ssh_key=repository.ssh_key,
                 owner=repository.owner,
                 tags=repository.tags,
             )
@@ -254,8 +255,13 @@ class RepositoryInventoryAdapter:
                 repository_dir,
                 branch=repository.default_branch,
                 proxy_jump=repository.proxy_jump,
+                ssh_key=Path(repository.ssh_key) if repository.ssh_key else None,
             )
-            head_sha = self.git_runner.head_sha(cloned_dir)
+            head_sha = self.git_runner.head_sha(
+                cloned_dir,
+                proxy_jump=repository.proxy_jump,
+                ssh_key=Path(repository.ssh_key) if repository.ssh_key else None,
+            )
             metadata = {
                 **repository.model_dump(mode="json"),
                 "head_sha": head_sha,
@@ -276,6 +282,7 @@ class RepositoryInventoryAdapter:
             manifest_path=repository.manifest_path,
             maven_settings=repository.maven_settings,
             proxy_jump=repository.proxy_jump,
+            ssh_key=repository.ssh_key,
             owner=repository.owner,
             tags=repository.tags,
         )
@@ -335,6 +342,7 @@ def _resolve_live_inventory_paths(
         repository.model_copy(
             update={
                 "maven_settings": _resolve_optional_path(repository.maven_settings, base_dir=config_path.parent),
+                "ssh_key": _resolve_optional_path(repository.ssh_key, base_dir=config_path.parent),
             }
         )
         for repository in payload.repositories

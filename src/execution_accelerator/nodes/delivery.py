@@ -38,6 +38,8 @@ def build_publish_remediation_node(
                     workspace_path=Path(workspace.local_path) if workspace is not None else None,
                     ticket_id=state.initial_ticket_id,
                     package_name=state.vulnerability_details.package_name if state.vulnerability_details is not None else None,
+                    proxy_jump=workspace.proxy_jump if workspace is not None else None,
+                    ssh_key=Path(workspace.ssh_key) if workspace is not None and workspace.ssh_key is not None else None,
                 )
             if pull_request_summary is None:
                 pull_request_summary = delivery_adapter.load_pull_request(

@@ -89,6 +89,8 @@ def build_handle_validation_failure_node(
             repository=current_working_repo,
             workspace_path=Path(workspace.local_path) if workspace is not None else None,
             modified_files=state.modified_files,
+            proxy_jump=workspace.proxy_jump if workspace is not None else None,
+            ssh_key=Path(workspace.ssh_key) if workspace is not None and workspace.ssh_key is not None else None,
         )
         errors = list(state.errors)
         errors.append(

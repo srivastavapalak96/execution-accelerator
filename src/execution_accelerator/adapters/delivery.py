@@ -103,6 +103,8 @@ class DeliveryAdapter:
         workspace_path: Path | None = None,
         ticket_id: str | None = None,
         package_name: str | None = None,
+        proxy_jump: str | None = None,
+        ssh_key: Path | None = None,
         fixture_path: Path | None = None,
     ) -> BranchPublicationResult:
         """Load placeholder branch and commit publication metadata."""
@@ -113,6 +115,8 @@ class DeliveryAdapter:
                 workspace_path=workspace_path,
                 ticket_id=ticket_id,
                 package_name=package_name,
+                proxy_jump=proxy_jump,
+                ssh_key=ssh_key,
             )
         require_fixture_mode(self.mode, capability="Delivery live publication")
         resolved_fixture_path = fixture_path or self.branch_publication_fixture_path
@@ -132,6 +136,8 @@ class DeliveryAdapter:
         workspace_path: Path | None,
         ticket_id: str | None,
         package_name: str | None,
+        proxy_jump: str | None,
+        ssh_key: Path | None,
     ) -> BranchPublicationResult:
         if self.git_runner is None:
             raise DeliveryConfigurationError("Live branch publication requires a configured Git runner.")
@@ -151,14 +157,16 @@ class DeliveryAdapter:
             workspace_path,
             name=self.git_user_name,
             email=self.git_user_email,
+            proxy_jump=proxy_jump,
+            ssh_key=ssh_key,
         )
-        self.git_runner.create_branch(workspace_path, branch_name)
-        self.git_runner.add_all(workspace_path)
-        if self.git_runner.status_clean(workspace_path):
+        self.git_runner.create_branch(workspace_path, branch_name, proxy_jump=proxy_jump, ssh_key=ssh_key)
+        self.git_runner.add_all(workspace_path, proxy_jump=proxy_jump, ssh_key=ssh_key)
+        if self.git_runner.status_clean(workspace_path, proxy_jump=proxy_jump, ssh_key=ssh_key):
             raise DeliveryAdapterError(f"No changes to publish for repository '{repository}'.")
-        self.git_runner.commit(workspace_path, message=commit_message)
-        commit_sha = self.git_runner.head_sha(workspace_path)
-        self.git_runner.push(workspace_path, branch_name=branch_name)
+        self.git_runner.commit(workspace_path, message=commit_message, proxy_jump=proxy_jump, ssh_key=ssh_key)
+        commit_sha = self.git_runner.head_sha(workspace_path, proxy_jump=proxy_jump, ssh_key=ssh_key)
+        self.git_runner.push(workspace_path, branch_name=branch_name, proxy_jump=proxy_jump, ssh_key=ssh_key)
         return BranchPublicationResult(
             repository=repository,
             branch_name=branch_name,
