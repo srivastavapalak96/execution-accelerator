@@ -53,6 +53,7 @@ class RepositoryInventoryAdapter:
         git_runner: GitRunner | None = None,
         keep_workspace: bool = False,
         existing_pull_request_lookup: Callable[[RemediationTarget], str | None] | None = None,
+        pom_fixture_before_path: Path | None = None,
     ) -> None:
         self.fixture_path = fixture_path
         self.workspace_root = workspace_root
@@ -61,6 +62,7 @@ class RepositoryInventoryAdapter:
         self.git_runner = git_runner
         self.keep_workspace = keep_workspace
         self.existing_pull_request_lookup = existing_pull_request_lookup
+        self.pom_fixture_before_path = pom_fixture_before_path
 
     @classmethod
     def from_runtime_config(cls, config: RuntimeConfig) -> "RepositoryInventoryAdapter":
@@ -73,6 +75,7 @@ class RepositoryInventoryAdapter:
             config_path=config.repo_root / "config" / "repositories.yaml",
             git_runner=GitRunner(log_dir=config.logs_dir / "git"),
             keep_workspace=config.keep_workspace,
+            pom_fixture_before_path=config.pom_fixture_before_path,
         )
 
     def load_inventory(self, *, fixture_path: Path | None = None) -> RepositoryInventoryPayload:
@@ -269,6 +272,7 @@ class RepositoryInventoryAdapter:
         else:
             repository_dir.mkdir(parents=True, exist_ok=True)
             metadata = repository.model_dump(mode="json")
+            self._seed_fixture_pom(repository_dir, repository.manifest_path)
 
         metadata_path = repository_dir / ".execution-accelerator-repo.json"
         metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
@@ -286,6 +290,20 @@ class RepositoryInventoryAdapter:
             owner=repository.owner,
             tags=repository.tags,
         )
+
+    def _seed_fixture_pom(self, repository_dir: Path, manifest_path: str) -> None:
+        """Seed the workspace pom in fixture mode so the simple/transitive lanes have something to mutate.
+
+        Live mode never reaches this branch because git clone provides the real pom.
+        """
+
+        if self.pom_fixture_before_path is None or not self.pom_fixture_before_path.exists():
+            return
+        target = repository_dir / manifest_path
+        if target.exists():
+            return
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(self.pom_fixture_before_path.read_text())
 
     def cleanup_workspace(
         self,
