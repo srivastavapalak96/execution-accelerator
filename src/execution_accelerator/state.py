@@ -25,6 +25,7 @@ from execution_accelerator.schemas import (
     LlmCallRecord,
     MavenVerification,
     HumanFeedback,
+    RepairProposal,
     PolicyDecision,
     PomMutationPlan,
     PreflightResolutionResult,
@@ -208,6 +209,8 @@ class RemediationState(BaseSchemaModel):
     policy_decisions: list[PolicyDecision] = Field(default_factory=list)
     llm_calls: list[LlmCallRecord] = Field(default_factory=list)
     llm_tokens_used: int = Field(default=0, ge=0)
+    repair_proposals: list[RepairProposal] = Field(default_factory=list)
+    relevant_repair_inputs: list[tuple[str, str]] = Field(default_factory=list)
     errors: list[WorkflowError] = Field(default_factory=list)
     retry_count: int = Field(default=0, ge=0)
     retry_decision: RetryDecision | None = None
