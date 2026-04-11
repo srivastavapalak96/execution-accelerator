@@ -26,14 +26,14 @@ Execution Accelerator aims to become a **Jira-driven remediation system** that c
    - jar fetch and decompile
    - compatibility diffing
    - symbol mapping
-   - deterministic or bounded agentic code updates
+   - deterministic or bounded code updates
 
-AI scope is intentionally narrow: deterministic paths stay primary, and bounded LLM fallback is reserved for tough-path ambiguity and repair flows. See **`docs/adr/0001-ai-scope.md`**.
+LLM scope is intentionally narrow: deterministic paths stay primary, and bounded LLM fallback is reserved for tough-path ambiguity and repair flows. See **`docs/adr/0001-llm-scope.md`**.
 
 ## Operating principles
 
 1. **End-to-end first**
-2. **Deterministic before agentic**
+2. **Deterministic before LLM-assisted**
 3. **Validation gates delivery**
 4. **Retry and escalation must be explicit**
 5. **Human approval is a fallback, not the steady state**
