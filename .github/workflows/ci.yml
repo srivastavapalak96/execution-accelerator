@@ -3,6 +3,13 @@ name: CI
 on:
   push:
   pull_request:
+  schedule:
+    # Run the integration suite once a day at 06:00 UTC.
+    - cron: "0 6 * * *"
+
+# Only the trusted GitHub event payloads are referenced below, and they only
+# appear inside `if:` expressions (parsed by GitHub, not shell). No event-sourced
+# string is interpolated into a `run:` step.
 
 jobs:
   test:
@@ -28,4 +35,36 @@ jobs:
         run: python -m mypy --strict src/execution_accelerator
 
       - name: Run fixture tests
-        run: python -m pytest -q tests
+        run: python -m pytest -q tests --ignore=tests/integration
+
+  integration:
+    # Real-systems suite: hits api.osv.dev, runs real mvn / git, etc.
+    # Runs on the nightly cron schedule, and on PRs labelled `integration`.
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'schedule'
+      || (github.event_name == 'pull_request'
+          && contains(github.event.pull_request.labels.*.name, 'integration'))
+    env:
+      EA_INTEGRATION: "1"
+      EA_MODE: fixture
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install dependencies
+        run: python -m pip install -e .[dev]
+
+      - name: Run integration tests
+        run: python -m pytest -q tests/integration
