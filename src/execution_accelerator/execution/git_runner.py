@@ -134,6 +134,34 @@ class GitRunner:
             ssh_key=ssh_key,
         )
 
+    def delete_remote_branch(
+        self,
+        repo_dir: Path,
+        *,
+        remote: str = "origin",
+        branch_name: str,
+        proxy_jump: str | None = None,
+        ssh_key: Path | None = None,
+    ) -> None:
+        """Delete ``branch_name`` from ``remote`` for post-push rollback.
+
+        Used when validation fails after the branch has already been pushed and
+        a draft PR may have been opened. Best-effort: if the remote branch is
+        already gone, the failed git invocation is swallowed so local rollback
+        bookkeeping still completes.
+        """
+
+        try:
+            self._run_git(
+                ["push", remote, "--delete", branch_name],
+                cwd=repo_dir,
+                action="push-delete",
+                proxy_jump=proxy_jump,
+                ssh_key=ssh_key,
+            )
+        except GitCommandError:
+            return
+
     def restore_paths(
         self,
         repo_dir: Path,
