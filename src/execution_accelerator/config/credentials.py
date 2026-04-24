@@ -23,6 +23,7 @@ class Credentials:
     github_api_base: str
     git_user_name: str | None
     git_user_email: str | None
+    gpg_signing_key: str | None
     maven_settings: Path | None
     jira_probe_ticket: str | None
     github_probe_repository: str | None
@@ -57,6 +58,7 @@ def load_credentials(*, repo_root: Path | None = None) -> Credentials:
         github_api_base=os.getenv("EA_GITHUB_API_BASE", "https://api.github.com"),
         git_user_name=os.getenv("EA_GIT_USER_NAME"),
         git_user_email=os.getenv("EA_GIT_USER_EMAIL"),
+        gpg_signing_key=os.getenv("EA_GPG_SIGNING_KEY"),
         maven_settings=(
             _resolve_path(maven_settings_value, repo_root=resolved_root)
             if maven_settings_value
