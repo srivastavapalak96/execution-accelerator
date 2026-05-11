@@ -559,6 +559,16 @@ class LlmCallRecord(BaseSchemaModel):
     token_count: int = Field(default=0, ge=0)
 
 
+class RepairProposal(BaseSchemaModel):
+    """LLM-generated patch proposal staged for compile-gated application."""
+
+    failure_classification: FailureClassification
+    rationale: str = Field(min_length=1, max_length=2000)
+    unified_diff: str = Field(min_length=1)
+    affected_files: tuple[str, ...] = Field(default_factory=tuple)
+    attempt_index: int = Field(ge=1)
+
+
 class HumanFeedback(BaseSchemaModel):
     """Human review feedback captured during interrupt/resume flows."""
 
