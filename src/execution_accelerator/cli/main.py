@@ -71,6 +71,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--approval-comments",
         help="Optional comments recorded alongside an approval decision.",
     )
+    parser.add_argument(
+        "--probe-llm",
+        action="store_true",
+        help="Probe the configured LLM provider with a hello-world structured call and exit.",
+    )
+    parser.add_argument(
+        "--status",
+        metavar="THREAD_ID",
+        help="Print a rich operator-friendly summary of a persisted thread (route, attempts, PR, next action).",
+    )
+    parser.add_argument(
+        "--abort",
+        metavar="THREAD_ID",
+        help="Abort a thread: cleanup workspace, mark workflow failed, leave a Jira note (if live).",
+    )
     return parser
 
 
@@ -86,6 +101,9 @@ def main() -> int:
         if args.version:
             print(__version__)
             return 0
+
+        if args.probe_llm:
+            return _probe_llm()
 
         if args.show_config:
             config = load_runtime_config()
@@ -159,6 +177,12 @@ def main() -> int:
                 state=state,
             )
             return 0
+
+        if args.status:
+            return _print_status(args.status)
+
+        if args.abort:
+            return _abort_thread(args.abort)
 
         parser.print_help()
         return 0
@@ -331,3 +355,157 @@ def _find_latest_approved_record(state: RemediationState) -> ApprovalRecord | No
         if record.decision == "approved":
             return record
     return None
+
+
+def _probe_llm() -> int:
+    """Run a hello-world structured call against the configured LLM provider.
+
+    Prints the provider, model, response, and approximate token count, then exits.
+    Useful as a 1-second smoke test that the wrapper, env vars, and provider
+    endpoint are all wired up correctly.
+    """
+
+    from execution_accelerator.llm.client import LlmClientError, build_llm_client
+
+    try:
+        client = build_llm_client()
+    except LlmClientError as exc:
+        print("llm_probe_status=error")
+        print(f"llm_probe_error={exc}")
+        return 2
+
+    prompt = (
+        "Return a JSON object with keys 'ok' (true) and 'message' (string). "
+        "Echo the message: 'execution-accelerator probe'. Return only JSON."
+    )
+    try:
+        text, tokens = client.invoke_json(prompt=prompt)
+    except LlmClientError as exc:
+        print("llm_probe_status=error")
+        print(f"llm_probe_provider={client.provider}")
+        print(f"llm_probe_model={client.model}")
+        print(f"llm_probe_error={exc}")
+        return 2
+
+    print("llm_probe_status=ok")
+    print(f"llm_probe_provider={client.provider}")
+    print(f"llm_probe_model={client.model}")
+    print(f"llm_probe_token_count={tokens}")
+    print(f"llm_probe_response={text[:200]}")
+    return 0
+
+
+def _print_status(thread_id: str) -> int:
+    """Print a rich operator-friendly summary of a persisted thread."""
+
+    config = load_runtime_config()
+    state = load_remediation_state(runtime_config=config, thread_id=thread_id)
+    print(f"thread_id={thread_id}")
+    print(f"ticket_id={state.initial_ticket_id}")
+    print(f"workflow_status={state.workflow_status}")
+    if state.route_decision is not None:
+        print(f"route_strategy={state.route_decision.strategy}")
+        print(f"route_confidence={state.route_decision.confidence:.2f}")
+    print(f"total_attempts={state.total_attempts}")
+    print(f"retry_count={state.retry_count}")
+    print(f"completed_repos={','.join(state.completed_repos)}")
+    print(f"pending_repos={','.join(state.pending_repos)}")
+    if state.skipped_repos:
+        print(f"skipped_repo_count={len(state.skipped_repos)}")
+    if state.errors:
+        last_error = state.errors[-1]
+        print(f"last_error_code={last_error.code}")
+        print(f"last_error_message={last_error.message}")
+    if state.pull_request_summary is not None:
+        print(f"pull_request_url={state.pull_request_summary.url}")
+        print(f"pull_request_status={state.pull_request_summary.status}")
+    if state.escalation_bundle is not None:
+        print(f"escalation_bundle_path={state.escalation_bundle.bundle_path}")
+    print(f"llm_call_count={len(state.llm_calls)}")
+    print(f"llm_tokens_used={state.llm_tokens_used}")
+    next_action = _next_action_hint(state)
+    if next_action:
+        print(f"next_action={next_action}")
+    return 0
+
+
+def _abort_thread(thread_id: str) -> int:
+    """Mark a thread aborted: append an audit entry and persist a final WorkflowError.
+
+    This does not currently delete remote branches or close PRs (that is wired
+    by the live delivery adapter on the failure path). Use after a stuck run to
+    flag operator intent before manually intervening.
+    """
+
+    from datetime import UTC, datetime
+
+    from execution_accelerator.persistence import build_thread_config, sqlite_checkpointer
+    from execution_accelerator.schemas import AuditEvent, WorkflowStatus
+    from execution_accelerator.state import WorkflowError
+
+    config = load_runtime_config()
+    state = load_remediation_state(runtime_config=config, thread_id=thread_id)
+    state.workflow_status = WorkflowStatus.FAILED
+    state.audit_events.append(
+        AuditEvent(
+            event_type="cli.abort",
+            message=f"Operator aborted thread {thread_id} via CLI.",
+            details={"timestamp": datetime.now(UTC).isoformat()},
+        )
+    )
+    state.errors.append(
+        WorkflowError(
+            code="operator_abort",
+            message=f"Thread {thread_id} aborted by operator.",
+            recoverable=False,
+            repository=state.current_working_repo,
+        )
+    )
+    with sqlite_checkpointer(config) as checkpointer:
+        # We use the live graph just to land an update_state call; nothing
+        # else needs to run.
+        from execution_accelerator.adapters import (
+            AdvisoryVerificationAdapter,
+            ComplexRemediationAdapter,
+            DeliveryAdapter,
+            JiraAdapter,
+            MavenVerificationAdapter,
+            PomMutationAdapter,
+            PreflightResolutionAdapter,
+            RepositoryInventoryAdapter,
+            ValidationAdapter,
+        )
+        from execution_accelerator.graph import compile_remediation_graph
+
+        graph = compile_remediation_graph(
+            runtime_config=config,
+            jira_adapter=JiraAdapter.from_runtime_config(config),
+            repository_inventory_adapter=RepositoryInventoryAdapter.from_runtime_config(config),
+            advisory_verification_adapter=AdvisoryVerificationAdapter.from_runtime_config(config),
+            maven_verification_adapter=MavenVerificationAdapter.from_runtime_config(config),
+            complex_remediation_adapter=ComplexRemediationAdapter.from_runtime_config(config),
+            pom_mutation_adapter=PomMutationAdapter.from_runtime_config(config),
+            preflight_resolution_adapter=PreflightResolutionAdapter.from_runtime_config(config),
+            validation_adapter=ValidationAdapter.from_runtime_config(config),
+            delivery_adapter=DeliveryAdapter.from_runtime_config(config),
+            checkpointer=checkpointer,
+        )
+        graph.update_state(build_thread_config(thread_id), state.model_dump(mode="python"))
+    print(f"thread_id={thread_id}")
+    print("workflow_status=failed")
+    print("abort_status=recorded")
+    return 0
+
+
+def _next_action_hint(state: RemediationState) -> str:
+    """Return a one-line "what to do next" string based on the persisted state."""
+
+    if state.workflow_status == "completed":
+        return "run complete; nothing to do"
+    if state.pending_approval_stage is not None:
+        return f"awaiting approval: --resume {state.initial_ticket_id} --approval-decision approved|rejected"
+    if state.workflow_status == "failed":
+        return "run failed; inspect escalation bundle or rerun --bootstrap-ticket after fixing the cause"
+    if state.workflow_status == "in_progress" and state.pending_repos:
+        return f"resume run with --resume to continue across {len(state.pending_repos)} pending repo(s)"
+    return ""
