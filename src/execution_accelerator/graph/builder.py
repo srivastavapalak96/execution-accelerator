@@ -325,11 +325,46 @@ def bootstrap_ticket_run(
                 violation=violation,
             )
 
+    _emit_run_observability(
+        runtime_config=runtime_config,
+        thread_id=resolved_thread_id,
+        state=state,
+    )
     return BootstrapRunResult(
         thread_id=resolved_thread_id,
         checkpoint_path=runtime_config.checkpoints_path,
         state=state,
     )
+
+
+def _emit_run_observability(
+    *,
+    runtime_config: RuntimeConfig,
+    thread_id: str,
+    state: RemediationState,
+) -> None:
+    """Write per-run audit JSONL + metrics CSV. Best-effort; never raises."""
+
+    from execution_accelerator.observability import append_metrics_row, write_audit_jsonl
+
+    try:
+        write_audit_jsonl(
+            audit_events=state.audit_events,
+            logs_dir=runtime_config.logs_dir,
+            thread_id=thread_id,
+        )
+    except OSError:
+        # The audit sink is best-effort; a write failure must not crash the
+        # whole run when state is already persisted via SQLite checkpointing.
+        pass
+    try:
+        append_metrics_row(
+            metrics_path=runtime_config.data_dir / "metrics.csv",
+            thread_id=thread_id,
+            state=state,
+        )
+    except OSError:
+        pass
 
 
 def load_remediation_state(*, runtime_config: RuntimeConfig, thread_id: str) -> RemediationState:
@@ -425,6 +460,11 @@ def resume_ticket_run(
                 )
         else:
             state = RemediationState.model_validate(graph.get_state(config).values)
+    _emit_run_observability(
+        runtime_config=runtime_config,
+        thread_id=thread_id,
+        state=state,
+    )
     return BootstrapRunResult(thread_id=thread_id, checkpoint_path=runtime_config.checkpoints_path, state=state)
 
 
