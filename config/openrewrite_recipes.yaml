@@ -1,0 +1,40 @@
+# OpenRewrite recipe registry consulted by the tough-path ladder.
+#
+# Each entry maps a (group, artifact, fromMajor, toMajor) tuple to an
+# OpenRewrite recipe FQN that the runner will invoke via
+# `mvn org.openrewrite.maven:rewrite-maven-plugin:run -Drewrite.activeRecipes=...`.
+#
+# The matcher performs the simplest possible match: exact group+artifact,
+# with major-version range comparison. Patch versions are not considered.
+recipes:
+  - match:
+      group: junit
+      artifact: junit
+      from_major: 4
+      to_major: 5
+    recipe: org.openrewrite.java.testing.junit5.JUnit4to5Migration
+    rationale: Community-maintained JUnit 4 -> 5 migration recipe.
+
+  - match:
+      group: org.apache.commons
+      artifact: commons-lang
+      from_major: 2
+      to_major: 3
+    recipe: org.openrewrite.java.migrate.commons.UpgradeApacheCommonsLang_2_3
+    rationale: OpenRewrite migrate module recipe for Commons Lang 2 -> 3.
+
+  - match:
+      group: javax.servlet
+      artifact: javax.servlet-api
+      from_major: 3
+      to_major: 4
+    recipe: org.openrewrite.java.migrate.jakarta.JavaxServletToJakartaServlet
+    rationale: javax.servlet -> jakarta.servlet namespace migration.
+
+  - match:
+      group: joda-time
+      artifact: joda-time
+      from_major: 2
+      to_major: 2
+    recipe: org.openrewrite.java.migrate.joda.JodaTimeBestPractices
+    rationale: Replace JodaTime APIs with java.time equivalents where possible.
