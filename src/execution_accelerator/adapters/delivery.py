@@ -40,6 +40,7 @@ class DeliveryAdapter:
         git_runner: GitRunner | None = None,
         git_user_name: str | None = None,
         git_user_email: str | None = None,
+        gpg_signing_key: str | None = None,
         github_api_base: str | None = None,
         github_token: str | None = None,
         github_owner: str | None = None,
@@ -57,6 +58,7 @@ class DeliveryAdapter:
         self.git_runner = git_runner
         self.git_user_name = git_user_name
         self.git_user_email = git_user_email
+        self.gpg_signing_key = gpg_signing_key
         self.github_api_base = github_api_base
         self.github_token = github_token
         self.github_owner = github_owner
@@ -84,6 +86,7 @@ class DeliveryAdapter:
             ),
             git_user_name=credentials.git_user_name,
             git_user_email=credentials.git_user_email,
+            gpg_signing_key=credentials.gpg_signing_key,
             github_api_base=credentials.github_api_base,
             github_token=credentials.github_token,
             github_owner=credentials.github_owner,
@@ -158,6 +161,13 @@ class DeliveryAdapter:
             proxy_jump=proxy_jump,
             ssh_key=ssh_key,
         )
+        if self.gpg_signing_key:
+            self.git_runner.signing_key(
+                workspace_path,
+                self.gpg_signing_key,
+                proxy_jump=proxy_jump,
+                ssh_key=ssh_key,
+            )
         self.git_runner.create_branch(workspace_path, branch_name, proxy_jump=proxy_jump, ssh_key=ssh_key)
         self.git_runner.add_all(workspace_path, proxy_jump=proxy_jump, ssh_key=ssh_key)
         if self.git_runner.status_clean(workspace_path, proxy_jump=proxy_jump, ssh_key=ssh_key):
@@ -357,6 +367,42 @@ class DeliveryAdapter:
         )
         response.raise_for_status()
         return response.json()
+
+    def close_pull_request(
+        self,
+        *,
+        repository: str,
+        pull_request_number: int,
+        reason: str = "automation rollback",
+    ) -> bool:
+        """Close an open pull request via the GitHub API. Returns True on success.
+
+        Best-effort: an HTTP error (PR already closed, network blip, etc.) is
+        swallowed and False is returned so the caller can continue with local
+        rollback bookkeeping. The Jira comment carries the user-facing
+        explanation; this method is the GitHub side of the post-push rollback.
+        """
+
+        if self.github_api_base is None or self.github_token is None or self.github_owner is None:
+            return False
+        url = (
+            f"{self.github_api_base.rstrip('/')}/repos/"
+            f"{self.github_owner}/{repository}/pulls/{pull_request_number}"
+        )
+        try:
+            response = httpx.patch(
+                url,
+                headers={
+                    "Authorization": f"Bearer {self.github_token}",
+                    "Accept": "application/vnd.github+json",
+                },
+                json={"state": "closed", "body": f"Closed by execution-accelerator: {reason}"},
+                timeout=30.0,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError:
+            return False
+        return True
 
     def load_jira_completion(
         self,
