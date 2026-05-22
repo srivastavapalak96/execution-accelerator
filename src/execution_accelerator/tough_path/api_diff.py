@@ -1,6 +1,6 @@
 """Step 3b of the tough-path ladder: extract public APIs and diff old vs new.
 
-We do not invoke ``javap`` directly here — instead we walk the decompiled
+We do not invoke ``javap`` directly here -- instead we walk the decompiled
 ``*.java`` output produced by :mod:`decompiler` and extract public class /
 method / field signatures with a small line-based parser. This trades a
 tiny amount of fidelity (we don't see private bridge methods, package-private

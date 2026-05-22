@@ -2,10 +2,10 @@
 
 Modules:
 
-* :mod:`recipe_matcher` — step 1, YAML-driven OpenRewrite recipe lookup.
-* :mod:`decompiler` — step 3a, Maven JAR download + CFR decompile (sha256-keyed cache).
-* :mod:`api_diff` — step 3b, public-API extraction + diff over the decompiled tree.
-* :mod:`symbol_mapper` — step 3c, deterministic similarity scoring with optional LLM enrichment.
+* :mod:`recipe_matcher` -- step 1, YAML-driven OpenRewrite recipe lookup.
+* :mod:`decompiler` -- step 3a, Maven JAR download + CFR decompile (sha256-keyed cache).
+* :mod:`api_diff` -- step 3b, public-API extraction + diff over the decompiled tree.
+* :mod:`symbol_mapper` -- step 3c, deterministic similarity scoring with optional LLM enrichment.
 
 Steps 2 (JavaParser deterministic structural edits) and 4 (LLM patch generator)
 are still planned; the pieces above plug into the complex subgraph composed by

@@ -2,12 +2,12 @@
 
 The matcher is intentionally simple: exact group + artifact match, with major-
 version range comparison. Patch versions and qualifiers (``-RC1``, ``-SNAPSHOT``,
-etc.) are discarded — the question this layer answers is "is there a known
+etc.) are discarded -- the question this layer answers is "is there a known
 community recipe for this kind of jump?", not "is this exact version diff safe?"
 that's the job of the policy engine and validation gates.
 
 Registry loads from ``config/openrewrite_recipes.yaml`` by default; tests inject
-their own path. Unknown matches return ``None`` — that's the signal the ladder
+their own path. Unknown matches return ``None`` -- that's the signal the ladder
 should fall through to deterministic structural edits.
 """
 

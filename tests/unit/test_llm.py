@@ -166,7 +166,7 @@ def test_structured_call_blocks_hosted_provider_when_sensitive_data_present() ->
     # the .provider attribute on a StubLlmClient.
     client = StubLlmClient(
         provider="anthropic",
-        model="claude",
+        model="hosted-test",
         responder=stub_responder_for({"ok": True, "message": "x"}),
     )
     with pytest.raises(PromptHasSensitiveData):

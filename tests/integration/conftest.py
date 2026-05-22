@@ -31,7 +31,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
     pytest passes the *entire* test session's items list to every conftest's
     collection hook, so we must restrict our marker to tests that actually live
-    under ``tests/integration/`` — otherwise we would skip the whole unit suite.
+    under ``tests/integration/`` -- otherwise we would skip the whole unit suite.
     """
 
     if os.getenv(INTEGRATION_ENV_VAR) == "1":

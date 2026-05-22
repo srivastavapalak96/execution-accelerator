@@ -133,7 +133,7 @@ def reconcile_with_llm_confidence(
 ) -> MappingProposal:
     """Combine the deterministic candidate score with an LLM-provided confidence.
 
-    Final confidence is ``min(deterministic, llm)`` — never let the LLM inflate
+    Final confidence is ``min(deterministic, llm)`` -- never let the LLM inflate
     trust above what similarity scoring justifies.
     """
 

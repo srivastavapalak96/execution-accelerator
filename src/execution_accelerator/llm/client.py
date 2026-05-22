@@ -2,9 +2,9 @@
 
 Three concrete clients are supported:
 
-* ``ollama``  — local default; talks to ``http://localhost:11434`` via httpx.
-* ``anthropic`` — hosted; requires ``langchain-anthropic`` extra.
-* ``openai`` — hosted; requires ``langchain-openai`` extra.
+* ``ollama``  -- local default; talks to ``http://localhost:11434`` via httpx.
+* ``anthropic`` -- hosted; requires ``langchain-anthropic`` extra.
+* ``openai`` -- hosted; requires ``langchain-openai`` extra.
 
 A fourth ``stub`` client backs all unit tests under ``EA_MODE=fixture`` so the
 graph + repair nodes can be exercised without a network or a model server.
@@ -118,7 +118,7 @@ def build_llm_client(
 
     ``stub_responder`` short-circuits to a ``StubLlmClient`` for unit tests; if
     not provided, the env-driven path is used. Hosted providers (``anthropic``,
-    ``openai``) raise ``LlmClientError`` until their extras are wired — this is
+    ``openai``) raise ``LlmClientError`` until their extras are wired -- this is
     intentional, callers should fall back to Ollama or run with the stub.
     """
 
@@ -135,7 +135,7 @@ def build_llm_client(
         return OllamaLlmClient(provider="ollama", model=model, base_url=base_url, timeout=timeout)
 
     if provider in {"anthropic", "openai"}:
-        # The hosted providers are intentionally not wired in this build — see
+        # The hosted providers are intentionally not wired in this build -- see
         # ADR-0001. When they are, replace this branch with a real client.
         raise LlmClientError(
             f"Hosted LLM provider '{provider}' is not yet implemented; "

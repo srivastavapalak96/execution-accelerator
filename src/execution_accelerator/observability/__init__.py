@@ -1,4 +1,4 @@
-"""Observability helpers — structured logging, audit sink, metrics CSV."""
+"""Observability helpers -- structured logging, audit sink, metrics CSV."""
 
 from .audit_sink import write_audit_jsonl
 from .logging import configure_logging

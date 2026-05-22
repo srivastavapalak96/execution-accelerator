@@ -1,7 +1,7 @@
 """Unit tests for post-push rollback helpers (B4):
 
-* GitRunner.delete_remote_branch — best-effort remote branch delete
-* DeliveryAdapter.close_pull_request — best-effort PR close via GitHub REST
+* GitRunner.delete_remote_branch -- best-effort remote branch delete
+* DeliveryAdapter.close_pull_request -- best-effort PR close via GitHub REST
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ def test_delete_remote_branch_swallows_failure(tmp_path: Path) -> None:
 
     with patch("execution_accelerator.execution.git_runner.run_command", side_effect=failing):
         runner.delete_remote_branch(tmp_path / "repo", branch_name="foo")
-        # Did not raise — that's the contract.
+        # Did not raise -- that's the contract.
 
 
 def test_delete_remote_branch_swallows_thrown_command_error(tmp_path: Path) -> None:
@@ -163,7 +163,7 @@ def test_close_pull_request_swallows_4xx() -> None:
 
     with patch("httpx.patch", side_effect=four_oh_three):
         # raise_for_status will raise httpx.HTTPStatusError, which is a
-        # subclass of httpx.HTTPError — the adapter must catch it.
+        # subclass of httpx.HTTPError -- the adapter must catch it.
         result = adapter.close_pull_request(repository="repo", pull_request_number=1)
 
     assert result is False

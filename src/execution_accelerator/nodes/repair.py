@@ -1,25 +1,12 @@
 """LLM-assisted repair nodes for compile and test failures.
 
-These nodes are constructed to participate in the classified retry matrix
-(see docs/vision.md): when ``classify_failure`` reports ``compile_error`` or
-``test_failure`` and there is retry budget remaining, the graph should route
-through ``repair_compile`` or ``repair_tests`` before the next validation
-attempt.
+When ``classify_failure`` reports ``compile_error`` or ``test_failure`` with
+retry budget remaining, the graph routes through ``repair_compile`` or
+``repair_tests`` before the next validation attempt. Both stage a
+``RepairProposal`` on state; the validation adapter applies it under
+``git apply --check`` and ``mvn compile``.
 
-Both nodes:
-
-* require an :class:`LlmClient` (default Ollama; tests inject a stub),
-* feed the structured-output prompt through ``redact + budget + retry``
-  guards from :mod:`execution_accelerator.llm.structured`,
-* enforce per-patch size limits so a runaway LLM cannot drop a 10k-line
-  diff onto the workspace,
-* refuse to apply any patch that does not pass ``mvn -B -q compile``
-  (compile gating is the responsibility of the validation node that runs
-  after the repair node; the repair node only stages the patch).
-
-The actual ``git apply``-then-``mvn compile`` loop lives in the validation
-adapter — keeping the LLM-facing logic narrow makes it testable without a
-real Maven/Java toolchain.
+Per-patch size limits live here (10 files, 500 changed lines).
 """
 
 from __future__ import annotations

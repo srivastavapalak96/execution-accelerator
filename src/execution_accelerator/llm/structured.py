@@ -56,7 +56,7 @@ def structured_call(
 
     Returns the parsed Pydantic model plus the audit record. The caller is
     expected to append the record to ``state.llm_calls`` (we do not mutate the
-    state here — the caller knows whether the surrounding node should commit
+    state here -- the caller knows whether the surrounding node should commit
     state changes).
     """
 
