@@ -1,39 +1,68 @@
-# Execution Accelerator Status
+# Status
 
-This file tracks the repository **as implemented today**, not the aspirational end state.
+A scan-friendly view of what's implemented today.
 
-| Area | Status | Notes |
-|------|--------|-------|
-| LangGraph + SQLite checkpoints | SHIPPED | Persisted runs and checkpoint reload are implemented. |
-| Typed schemas and remediation state | SHIPPED | Core workflow models and state exist, bootstrap now seeds a concrete initial remediation plan from ticket scope, persisted remediation plans carry more concrete complex-lane summary/rationale details, and complex scaffold execution can apply deterministic Java method-call and constructor rewrites for supported mappings. |
-| Fixture execution mode | SHIPPED | `EA_MODE=fixture` is the default and covered by tests. |
-| Live execution mode | PARTIAL | `EA_MODE=live` now covers credential probe, Jira intake, repository inventory/clone, OSV advisory lookup, Maven verification, OpenRewrite-backed POM mutation, live preflight, live validation, and basic live delivery; startup credential probing now also checks Jira transition access plus GitHub repo push access before work begins, live mode no longer silently defaults fixture-path settings to `tests/fixtures/*` when those overrides were never configured, and the live-capable adapters no longer carry dead `require_fixture_mode(...)` guards on those paths. |
-| Jira intake | PARTIAL | Fixture-backed by default; live issue reads work with `config/jira.yaml` plus Jira credentials. |
-| Repository inventory + workspace prep | PARTIAL | Fixture-backed by default; live inventory from `config/repositories.yaml`, PR idempotency lookup now checks both open remediation PRs and recently closed ones before workspace prep, per-repo `maven_settings`, `proxy_jump`, and `ssh_key` values now flow through clone/publish/rollback git operations, successful runs now continue across multiple pending affected repositories instead of stopping after the first one, and CLI summaries now surface skipped repositories with their reasons. |
-| Advisory verification | PARTIAL | Fixture-backed by default; live OSV lookup with local cache now exists. |
-| Maven verification | PARTIAL | Fixture-backed by default; live metadata + dependency-tree verification now exists, including direct/transitive classification and risk evaluation. |
-| Simple remediation lane | PARTIAL | Fixture-backed default path remains, and live mode now delegates direct upgrades through OpenRewrite-backed mutation using the real `org.openrewrite.maven.UpgradeDependencyVersion` recipe plus `rewrite.options` CLI syntax. |
-| Transitive remediation lane | PARTIAL | Fixture-backed default path remains, and live mode now delegates managed dependency overrides through OpenRewrite-backed mutation. |
-| Complex remediation lane | PARTIAL | Analysis/execution support exists, and the persisted complex plan now records a primary migration tactic plus actionable migration steps, concrete file/symbol targets, and unresolved execution questions derived from compatibility analysis; bounded real migration execution now rewrites supported Java method calls, constructor calls, method references, constructor references, static-imported legacy calls, static field/constant references, and obsolete exact imports, generates executable helper shims for missing target files, and scans existing Java sources for detected legacy API usage before validation, but a broader EOL recipe/decompile/diff ladder is still missing. |
-| Validation | PARTIAL | Live preflight resolution now checks the workspace dependency tree, live validation runs `mvn verify`, parses Surefire/Failsafe results, rescans the dependency tree for the remediated version with a normalized `security-scan` check name aligned to fixture mode, runs a dependency `license-scan` check backed by artifact POM metadata with optional denylist or allowlist enforcement, and can trigger git-backed rollback on failure, including cleanup of untracked remediation files. |
-| Delivery | PARTIAL | Live branch publication and PR creation now exist; Jira completion can post a comment and optionally fire a configured done transition, including resolving the transition live by target status name when an explicit transition ID is not configured, delivery-approved complex runs can publish ready PRs instead of remaining draft-only, GitHub PR-create conflicts can recover the existing open PR and refresh stale title/body metadata instead of failing delivery, transient publish-time delivery failures now become structured workflow errors that preserve already-created branch/PR state, Jira done-transition conflicts can recover when the ticket is already in the desired target status, and both PR bodies and Jira comments now publish workflow, route, approval, approval-comment, remediation-plan context, and multi-repo progress instead of placeholder text, but richer workflow handling is still missing. |
-| Failure classification | PARTIAL | Failures route through classify -> rollback -> escalate, unresolved post-remediation security scan failures now classify as `recipe_noop` instead of `unknown`, transient dependency-inspection validation failures now classify as `network_transient`, transient delivery failures now classify as `network_transient` when recoverable, missing required workflow state now terminates as explicit `state_invariant_violated` errors instead of assertion crashes, and failed runs persist escalation bundle metadata. |
-| Retry matrix | PARTIAL | Retryable test failures, transient dependency-tree or license-metadata inspection failures, and transient publish-time delivery failures can now re-run within a bounded retry budget before escalating; retry scheduling now clears stale rollback/preflight/diff state before rerunning remediation lanes, preserves publish state for delivery retries, successful validation clears stale rollback/retry directives from the current run snapshot, completed runs now clear stale terminal failure markers after a successful retry, the canonical retry budget is now `EA_MAX_RETRIES` with a default of `3` while `EA_MAX_RETRY_ATTEMPTS` remains a compatibility alias, validation and delivery workflow errors now mark only those retryable classes as recoverable, compile failures still escalate immediately, and richer retry policies are still missing. |
-| Policy engine | PARTIAL | A basic policy engine runs after route selection, can block tagged repositories, can require approval for complex refactors, transitive overrides, approval-tagged repositories, and optional complex-delivery publication, and now drives draft PR publication policy. |
-| Human approval interrupt | PARTIAL | Approval-required runs now pause before remediation, can optionally pause again before complex delivery publication, persist approval state/history, surface approval reasons in CLI summaries, and can resume after explicit approve/reject input. |
-| Live PR creation and Jira updates | PARTIAL | PR creation is live; Jira updates can post completion comments and optionally apply a configured done transition by explicit transition ID or by resolving the target status name from the live transitions list. |
-| Tough-path EOL migrations | PARTIAL | Bounded Java symbol-rewrite, static-import rewrite, static field/constant rewrite, exact-import cleanup, and helper-generation support now exists for supported complex migrations, but no broader recipe/decompile/diff/mapping ladder exists yet. |
-| Observability and escalation bundles | PARTIAL | Failed runs now write JSON escalation bundles under `data/escalations/`, including route rationale, approval provenance, code-diff summaries, latest validation status/check context, richer complex-plan context for tough-path failures, multi-repo failure progress such as the failed repository plus completed/pending/skipped repositories, and partial delivery context such as already-published branch/PR state when publication fails mid-flight, and CLI summaries surface bundle paths, skip reasons, route rationale, approval comments, total attempts, failure classification, changed-file summaries, aggregate diff totals, the first failing validation check when validation breaks, more precise validation failure codes in the latest workflow error, and successful delivery metadata such as branch commit message plus pull-request title/status/url; broader observability hardening is still missing. |
-| CI workflow | SHIPPED | GitHub Actions runs ruff, strict mypy, and fixture-mode pytest on every push/PR; a separate `integration` job runs `tests/integration/` nightly via cron and on PRs labelled `integration`, gated by `EA_INTEGRATION=1`. |
-| Real-systems integration tests | SHIPPED | 8 tests under `tests/integration/` exercise real OSV.dev advisory queries, real `mvn` (`--version`, `dependency:tree`, Maven Central `maven-metadata.xml`), and real `git clone`/`rev-parse` against a checked-in `simple-maven` sample project plus a tmp bare repo; the suite is skipped automatically when `EA_INTEGRATION` is unset so default `make test` is unaffected. |
-| Bounded LLM client | SHIPPED | `src/execution_accelerator/llm/{client,structured,redact,budget}.py` provides an Ollama-default LLM client with a stub for tests; `structured_call` enforces redaction (refuses to send to hosted providers when credential shapes remain), per-ticket call/token budgets (default 20 calls / 100k tokens), and one bounded retry on Pydantic validation failure. CLI gains `--probe-llm` for end-to-end provider verification. |
-| LLM-driven repair nodes | PARTIAL | `nodes/repair.py` produces structured `RepairProposal`s for compile and test failures via the LLM wrapper, with per-patch limits (10 files / 500 lines). The proposals are staged on `state.repair_proposals`; graph wiring into the classified retry matrix is the next step (Tier C4). |
-| OpenRewrite recipe matcher | SHIPPED | `tough_path/recipe_matcher.py` + `config/openrewrite_recipes.yaml` map `(group, artifact, fromMajor, toMajor)` tuples to community OpenRewrite recipe FQNs (JUnit 4→5, commons-lang 2→3, javax.servlet→jakarta, JodaTime→java.time). |
-| JAR download + CFR decompile | SHIPPED | `tough_path/decompiler.py` fetches a Maven coordinate from a configurable repository, sha256-keyed cache under `.local/cache/jars/`, then invokes CFR (`tools/cfr.jar`) via `subprocess` to produce decompiled source under `.local/cache/decompiled/`. Raises `DecompilerToolMissing` when `tools/cfr.jar` is absent so the ladder can escalate cleanly. |
-| Public-API extraction + diff | SHIPPED | `tough_path/api_diff.py` walks decompiled `*.java`, extracts every public class/method/field with a line-based parser, renders the diff (removed/added/changed) into the existing `CompatibilityDiffEntry` schema. |
-| Deterministic + LLM-bounded symbol mapper | SHIPPED | `tough_path/symbol_mapper.py` scores every candidate by token Jaccard + signature compatibility + package proximity. `reconcile_with_llm_confidence` enforces `final = min(deterministic, llm)` so an LLM cannot inflate trust beyond the similarity score. |
-| Post-push rollback primitives | SHIPPED | `GitRunner.delete_remote_branch` (best-effort, swallows already-deleted) + `DeliveryAdapter.close_pull_request` (PATCHes state=closed, swallows HTTP errors). Failure-path wiring into `handle_validation_failure` lands with subgraph composition (C4). |
-| Optional GPG-signed commits | SHIPPED | `EA_GPG_SIGNING_KEY` flows from environment → `Credentials` → `DeliveryAdapter`. When set, live branch publication invokes `GitRunner.signing_key` (commit.gpgsign=true) right after `configure_user`. |
-| Per-run audit JSONL | SHIPPED | Every run writes `.local/logs/audit-{thread_id}.jsonl` with one event per line, in stored order. Idempotent (overwrites on re-run) since `RemediationState.audit_events` is the source of truth. |
-| Per-run metrics CSV | SHIPPED | Every run appends one row to `.local/data/metrics.csv` with thread id, ticket id, workflow status, route strategy, attempt counts, modified files, code-diff totals, LLM call/token counts, PR URL, and escalation bundle path. |
-| Operator CLI flags | SHIPPED | `--status THREAD_ID` prints route, attempts, last error, PR URL, and a "next action" hint; `--abort THREAD_ID` records an `operator_abort` `WorkflowError` plus a `cli.abort` audit event so a stuck thread can be cleanly quarantined before manual intervention. |
+| Capability | Status |
+|---|---|
+| **Orchestration** | |
+| LangGraph state machine + SQLite checkpointing | Shipped |
+| Pydantic-typed `RemediationState` end-to-end | Shipped |
+| Two-stage human-approval interrupts | Shipped |
+| Multi-repository iteration | Shipped |
+| **Intake & verification** | |
+| Live Jira REST v3 intake (with `config/jira.yaml`) | Shipped |
+| `git clone` with bastion `proxy_jump` + `ssh_key` | Shipped |
+| Idempotency (open + recently-closed PR search) | Shipped |
+| Maven profile detection (JDK / reactor / parent / BOM) | Shipped |
+| OSV advisory verification with 24h cache | Shipped |
+| Maven Central metadata + `dependency:tree` analysis | Shipped |
+| Maven version-range evaluator | Shipped |
+| **Remediation** | |
+| Simple direct-version bump via OpenRewrite | Shipped |
+| Transitive `dependencyManagement` override | Shipped |
+| Complex Java rewrites (methods / constructors / refs / static fields) | Shipped |
+| Tough-path: OpenRewrite recipe matcher | Shipped |
+| Tough-path: CFR decompiler with sha256-keyed cache | Shipped |
+| Tough-path: public-API diff (removed / added / changed) | Shipped |
+| Tough-path: similarity-based symbol mapper with LLM-confidence cap | Shipped |
+| **Validation** | |
+| `mvn verify` + Surefire/Failsafe parsing | Shipped |
+| OSV rescan via version-range evaluation | Shipped |
+| License diff with allow/deny lists | Shipped |
+| Real `git restore` + untracked cleanup on failure | Shipped |
+| **Delivery** | |
+| `git push` + GitHub PR + Jira comment + Jira transition | Shipped |
+| PR-conflict recovery (re-bind to existing open PR) | Shipped |
+| Optional GPG-signed commits (`EA_GPG_SIGNING_KEY`) | Shipped |
+| Post-push rollback primitives (`delete_remote_branch`, `close_pull_request`) | Shipped |
+| **AI integration** | |
+| Pluggable LLM client (Ollama default; Anthropic/OpenAI hooks) | Shipped |
+| Prompt redaction for hosted providers | Shipped |
+| Per-ticket call + token budgets | Shipped |
+| LLM-staged repair proposals for compile + test failures | Shipped |
+| **Failure handling** | |
+| Classified retry matrix (network / compile / test / recipe / policy) | Shipped |
+| `WorkflowError` invariant guards (no `assert` in `nodes/`) | Shipped |
+| JSON escalation bundles for terminal failures | Shipped |
+| Bounded total-attempt ceiling (`EA_MAX_TOTAL_ATTEMPTS`) | Shipped |
+| **Policy** | |
+| YAML-driven CVSS / tag / license rules (`config/policy.yaml`) | Shipped |
+| Approval-required tags + complex-refactor approval gate | Shipped |
+| Draft-PR policy enforcement | Shipped |
+| **Observability** | |
+| Per-run audit JSONL (`.local/logs/audit-{thread_id}.jsonl`) | Shipped |
+| Per-run metrics CSV (`.local/data/metrics.csv`) | Shipped |
+| Operator CLI: `--status`, `--abort`, `--probe-llm` | Shipped |
+| **Tests** | |
+| 312 unit tests (`EA_MODE=fixture`) | Shipped |
+| 8 integration tests (real OSV / `mvn` / `git`, gated on `EA_INTEGRATION=1`) | Shipped |
+| `ruff check src tests` clean | Shipped |
+| `mypy --strict src` clean across 63 source files | Shipped |
+| GitHub Actions on every push/PR + nightly integration job | Shipped |
+
+## Next milestones
+
+- Compose the existing nodes into LangGraph subgraphs (`subgraphs/`) for isolation testing and clearer architecture diagrams.
+- Wire the staged `RepairProposal`s into the classified-retry matrix (graph composition lands with the subgraph refactor).
+- Phase the post-push rollback primitives onto the failure path (also lands with subgraph composition).
+- Three-target validation suite for the tough-path ladder: `commons-lang 2.x → 3.x` (exit gate), `joda-time → java.time` (stretch), `junit 4 → 5` (stretch).
