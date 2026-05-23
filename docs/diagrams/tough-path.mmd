@@ -1,0 +1,24 @@
+flowchart TD
+  classDef start fill:#d1f0d1,stroke:#2d6a4f,stroke-width:2px
+  classDef shipped fill:#d4edda,stroke:#155724
+  classDef gate fill:#fff3cd,stroke:#856404
+
+  Start([Route: COMPLEX_REFACTOR]):::start --> S1[1. recipe_matcher<br/>OpenRewrite registry]:::shipped
+
+  S1 -- recipe matched + compile green --> Validate[validation<br/>mvn verify + OSV rescan]
+  S1 -- no recipe / partial --> S2[2. JavaParser edits<br/>deterministic renames]:::shipped
+
+  S2 -- compile green --> Validate
+  S2 -- partial --> S3a[3a. decompiler<br/>jar download<br/>CFR + sha256 cache]:::shipped
+
+  S3a --> S3b[3b. api_diff<br/>removed / added / changed]:::shipped
+  S3b --> S3c[3c. symbol_mapper<br/>Jaccard + signature<br/>+ package proximity]:::shipped
+  S3c --> Conf{confidence<br/>gate &gt;= 0.7}:::gate
+
+  Conf -- below threshold --> Esc([escalate for human approval])
+  Conf -- above threshold --> S4[4. patch_generator<br/>JavaParser preferred<br/>LLM fallback]:::shipped
+
+  S4 -- compile gate green --> Validate
+  S4 -- exhausted retries --> Esc
+
+  Validate --> Done([deliver: branch + PR + Jira])

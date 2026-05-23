@@ -1,0 +1,44 @@
+flowchart TD
+  classDef start fill:#d1f0d1,stroke:#2d6a4f,stroke-width:2px
+  classDef stop fill:#d1f0d1,stroke:#2d6a4f,stroke-width:2px
+  classDef error fill:#f8d7da,stroke:#842029
+  classDef gate fill:#fff3cd,stroke:#856404
+
+  Start([CLI<br/>--bootstrap-ticket SEC-XYZ]):::start --> Probe[probe_credentials<br/>Jira + GitHub<br/>read &amp; write scopes]
+  Probe --> Intake[ingest_jira<br/>Jira REST v3<br/>customfields + regex]
+  Intake --> Clone[load_repository_context<br/>YAML inventory<br/>git clone via bastion]
+  Clone --> Idem{idempotency_check<br/>open + closed PRs<br/>≤ 30 days}
+  Idem -- duplicate --> Done[complete_jira<br/>idempotent_hit]
+  Idem -- new --> Profile[detect_maven_profile<br/>JDK + reactor<br/>parent + BOM]
+  Profile --> Adv[verify_advisory<br/>OSV.dev<br/>+ 24h cache]
+  Adv --> Maven[verify_maven_target<br/>Maven Central<br/>+ dependency:tree]
+  Maven --> Route{select_route}
+
+  Route --> Policy[apply_policy<br/>CVSS + tags<br/>license + size limits]
+  Policy -- approve needed --> Gate1{review_remediation_approval<br/>interrupt_before}:::gate
+  Policy -- allow --> Lanes
+  Gate1 -- approved --> Lanes
+  Gate1 -- rejected --> Escalate
+
+  Lanes{simple<br/>transitive<br/>complex}
+  Lanes --> Pre[preflight_validate<br/>mvn dependency:resolve]
+  Pre --> Validate[validate_remediation<br/>mvn verify + Surefire<br/>OSV rescan + license diff]
+
+  Validate -- success --> Gate2{review_delivery_approval<br/>optional}:::gate
+  Validate -- failure --> Classify{classify_failure}
+
+  Classify -- network_transient<br/>or test_failure --> Lanes
+  Classify -- compile_error<br/>or test_failure --> Repair[repair nodes<br/>LLM unified diff<br/>compile gate]
+  Classify -- recipe_noop --> Lanes
+  Classify -- policy_block<br/>or budget exceeded --> Escalate
+
+  Repair --> Validate
+
+  Gate2 -- approved --> Deliver
+  Gate2 -- rejected --> Escalate
+  Deliver[publish_remediation<br/>git push + GitHub PR<br/>Jira comment + transition] --> Next{select_next_target}
+  Next -- more pending --> Profile
+  Next -- all done --> Done
+
+  Done --> End([End]):::stop
+  Escalate[escalate<br/>JSON bundle<br/>+ Jira comment]:::error --> End
