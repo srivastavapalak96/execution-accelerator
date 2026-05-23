@@ -21,17 +21,17 @@ The lifecycle is one Pydantic-typed `RemediationState` flowing through a LangGra
 
 ## The tough path: EOL & backward-incompatible JARs
 
-When a simple version bump cannot work — major-version migrations, removed APIs, replaced constructors — the workflow runs a four-step ladder. Each step has a compile gate; deterministic options are tried before any LLM call.
+When a simple version bump cannot work -- major-version migrations, removed APIs, replaced constructors -- the workflow runs a four-step ladder. Each step has a compile gate; deterministic options are tried before any LLM call.
 
 ![Tough path](docs/diagrams/tough-path.png)
 
 | Step | Module | What it does |
 |---|---|---|
 | 1 | `tough_path/recipe_matcher.py` | Look up a community OpenRewrite recipe (JUnit 4→5, commons-lang 2→3, javax→jakarta, JodaTime→java.time) for the version jump. |
-| 2 | `nodes/remediation.py` | Deterministic Java rewrites — method calls, constructors, static imports, references, helper-shim generation. |
+| 2 | `nodes/remediation.py` | Deterministic Java rewrites -- method calls, constructors, static imports, references, helper-shim generation. |
 | 3a | `tough_path/decompiler.py` | Download old + new JARs from Maven Central, sha256-keyed cache, decompile via CFR. |
 | 3b | `tough_path/api_diff.py` | Walk decompiled sources, extract every public class/method/field, classify removed/added/changed. |
-| 3c | `tough_path/symbol_mapper.py` | Score replacement candidates (token Jaccard + signature + package proximity). LLM enrichment is bounded by `final = min(deterministic, llm)` — the LLM cannot inflate trust beyond the similarity score. |
+| 3c | `tough_path/symbol_mapper.py` | Score replacement candidates (token Jaccard + signature + package proximity). LLM enrichment is bounded by `final = min(deterministic, llm)` -- the LLM cannot inflate trust beyond the similarity score. |
 | 4 | `nodes/repair.py` + LLM | Last-resort patch generation, capped at 10 files / 500 lines per attempt, every patch `mvn compile`-gated before it lands. |
 
 ---
@@ -89,9 +89,9 @@ src/execution_accelerator/
 `EA_MODE=live` swaps every fixture for a real-system call. Configure once:
 
 ```bash
-# config/repositories.yaml — repo inventory (clone URL, manifest, bastion, settings.xml)
-# config/jira.yaml         — customfield IDs + transition map
-# config/policy.yaml       — CVSS gates, tag rules, license allow/deny lists, size limits
+# config/repositories.yaml -- repo inventory (clone URL, manifest, bastion, settings.xml)
+# config/jira.yaml         -- customfield IDs + transition map
+# config/policy.yaml       -- CVSS gates, tag rules, license allow/deny lists, size limits
 ```
 
 Then export credentials:
@@ -167,8 +167,8 @@ The integration suite hits real OSV.dev, real `mvn` (via Maven Central), and rea
 | `EA_MAX_LLM_CALLS_PER_TICKET`  | `20`                                 | Per-ticket LLM call budget |
 | `EA_MAX_LLM_TOKENS_PER_TICKET` | `100000`                             | Per-ticket LLM token budget |
 | `EA_GITHUB_API_BASE`           | `https://api.github.com`             | Override for GitHub Enterprise |
-| `EA_MAVEN_SETTINGS`            | —                                    | Path to settings.xml (per-repo overridable) |
-| `EA_GPG_SIGNING_KEY`           | —                                    | Optional commit-signing key id |
+| `EA_MAVEN_SETTINGS`            | --                                    | Path to settings.xml (per-repo overridable) |
+| `EA_GPG_SIGNING_KEY`           | --                                    | Optional commit-signing key id |
 | `EA_DRY_RUN`                   | `0`                                  | Skip push / PR / Jira write |
 | `EA_INTEGRATION`               | `0`                                  | Run real-systems test suite |
 
@@ -178,7 +178,7 @@ Credentials live in `EA_JIRA_*`, `GITHUB_TOKEN`, and `EA_GIT_USER_*`. They are *
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT -- see [`LICENSE`](LICENSE).
 
 ---
 
